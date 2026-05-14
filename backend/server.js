@@ -5,6 +5,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import rateLimit from 'express-rate-limit';
+import authRoutes from './routes/authRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -42,6 +43,9 @@ app.use('/api', apiLimiter);
 app.get('/', (req, res) => {
   res.send('ResQAI API is running...');
 });
+
+// Mount Routes
+app.use('/api/auth', authRoutes);
 
 // Socket.io Connection Event
 io.on('connection', (socket) => {
