@@ -6,6 +6,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/authRoutes.js';
+import incidentRoutes from './routes/incidentRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -46,6 +47,7 @@ app.get('/', (req, res) => {
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/incidents', incidentRoutes);
 
 // Socket.io Connection Event
 io.on('connection', (socket) => {
