@@ -1,4 +1,46 @@
 import Incident from '../models/Incident.js';
+import { analyzeIncident } from '../utils/aiTriage.js';
+
+// Create a new incident and run AI triage
+export const createIncident = async (req, res) => {
+  try {
+    const { title, description, type, location, affectedCount, tags } = req.body;
+
+    // Run AI triage asynchronously based on title and description
+    const triageData = await analyzeIncident(title, description);
+
+    // Create incident using user input and AI output
+    const newIncident = new Incident({
+      title,
+      description,
+      type,
+      location,
+      severity: triageData.urgency || 'medium', // Map AI urgency to severity
+      reportedBy: req.user._id, // Assuming auth middleware sets req.user
+      affectedCount: affectedCount || triageData.estimatedAffected,
+      aiTriage: {
+        summary: triageData.summary,
+        recommendedActions: triageData.recommendedActions,
+        estimatedAffected: triageData.estimatedAffected,
+        riskScore: triageData.riskScore,
+        processedAt: new Date(),
+        modelUsed: 'gemini-1.5-flash',
+      },
+      tags: tags || [],
+    });
+
+    const savedIncident = await newIncident.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Incident reported successfully',
+      incident: savedIncident,
+    });
+  } catch (error) {
+    console.error('Error creating incident:', error);
+    res.status(500).json({ success: false, message: 'Server error while creating incident' });
+  }
+};
 
 // Controller to handle media upload for an existing incident
 export const uploadIncidentMedia = async (req, res) => {
