@@ -1,5 +1,6 @@
 import Incident from '../models/Incident.js';
 import { analyzeIncident } from '../utils/aiTriage.js';
+import { io } from '../server.js';
 
 // Create a new incident and run AI triage (Handles both JSON and multipart/form-data)
 export const createIncident = async (req, res) => {
@@ -59,6 +60,9 @@ export const createIncident = async (req, res) => {
     });
 
     const savedIncident = await newIncident.save();
+
+    // Emit real-time event to all connected clients
+    io.emit('newIncident', savedIncident);
 
     res.status(201).json({
       success: true,
