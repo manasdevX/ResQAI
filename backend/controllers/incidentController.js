@@ -75,6 +75,26 @@ export const createIncident = async (req, res) => {
   }
 };
 
+// Fetch all incidents (optionally filter by status/type)
+export const getAllIncidents = async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.status) filter.status = req.query.status;
+    
+    // We want to fetch mostly active ones or all, sorting by newest
+    const incidents = await Incident.find(filter).sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      count: incidents.length,
+      incidents,
+    });
+  } catch (error) {
+    console.error('Error fetching incidents:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching incidents' });
+  }
+};
+
 // Controller to handle media upload for an existing incident
 export const uploadIncidentMedia = async (req, res) => {
   try {
