@@ -265,3 +265,48 @@ export const getNearbyIncidents = async (req, res) => {
   }
 };
 
+// Volunteer accepts an incident task
+export const acceptIncidentTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const incident = await Incident.findById(id);
+    if (!incident) {
+      return res.status(404).json({ success: false, message: 'Incident not found' });
+    }
+
+    // Check if user is already assigned
+    if (incident.assignedResponders.includes(userId)) {
+      return res.status(400).json({ success: false, message: 'You have already accepted this task' });
+    }
+
+    // Assign volunteer
+    incident.assignedResponders.push(userId);
+
+    // Update status to responding if it was just reported/acknowledged
+    if (['reported', 'acknowledged'].includes(incident.status)) {
+      incident.status = 'responding';
+      incident._updatedBy = userId; // Triggers statusHistory pre-save hook
+    }
+
+    const updatedIncident = await incident.save();
+
+    // Broadcast update so map/dashboard reflect the change
+    io.emit('incidentUpdated', { 
+      incidentId: id, 
+      status: incident.status, 
+      assignedResponders: updatedIncident.assignedResponders 
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Task accepted successfully',
+      incident: updatedIncident
+    });
+  } catch (error) {
+    console.error('Error accepting task:', error);
+    res.status(500).json({ success: false, message: 'Server error while accepting task' });
+  }
+};
+

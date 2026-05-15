@@ -115,7 +115,6 @@ const UserSchema = new Schema(
 // ─── Indexes ──────────────────────────────────────────────────────────────────
 
 UserSchema.index({ location: '2dsphere' }); // Geospatial queries
-UserSchema.index({ email: 1 });
 UserSchema.index({ role: 1 });
 
 // ─── Pre-save Hook: Hash password ─────────────────────────────────────────────

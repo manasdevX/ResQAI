@@ -9,8 +9,8 @@ import authRoutes from './routes/authRoutes.js';
 import incidentRoutes from './routes/incidentRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables (suppress console tips)
+dotenv.config({ quiet: true });
 
 // Initialize Express App
 const app = express();

@@ -7,6 +7,7 @@ import {
   updateIncidentSeverity,
   broadcastAlert,
   getNearbyIncidents,
+  acceptIncidentTask,
 } from '../controllers/incidentController.js';
 import upload from '../middleware/upload.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -27,6 +28,9 @@ router.patch('/:id/status', protect, updateIncidentStatus);
 
 // Update severity (priority) of a specific incident
 router.patch('/:id/severity', protect, updateIncidentSeverity);
+
+// Volunteer accepts an incident
+router.post('/:id/accept', protect, acceptIncidentTask);
 
 // Broadcast emergency alert (tied to an incident or standalone)
 router.post('/broadcast-alert', protect, broadcastAlert);
