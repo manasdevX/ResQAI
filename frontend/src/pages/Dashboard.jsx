@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import LiveMap from '../components/LiveMap';
+import IncidentToast from '../components/IncidentToast';
 import axios from 'axios';
 
 const SEVERITY_COLORS = {
@@ -28,11 +29,18 @@ const TYPE_ICONS = {
 const Dashboard = () => {
   const socket = useSocket();
   const { token, user, logout } = useAuth();
-  const [incidents, setIncidents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedPanel, setSelectedPanel] = useState(null);
 
-  // Fetch existing incidents on mount
+  const [incidents, setIncidents]           = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [selectedPanel, setSelectedPanel]   = useState(null);
+  const [latestIncidentId, setLatestIncidentId] = useState(null);
+  const [toasts, setToasts]                 = useState([]);      // [{id, incident}]
+  const [newIds, setNewIds]                 = useState(new Set()); // track "NEW" badge IDs
+
+  const sidebarRef    = useRef(null);
+  const incidentRefs  = useRef({});
+
+  // ── Fetch existing incidents on mount ──────────────────────────────────────
   useEffect(() => {
     const fetchIncidents = async () => {
       try {
@@ -46,16 +54,45 @@ const Dashboard = () => {
         setLoading(false);
       }
     };
-
     fetchIncidents();
   }, [token]);
 
-  // Listen for real-time new incidents
+  // ── Dismiss a toast by its temp id ────────────────────────────────────────
+  const dismissToast = useCallback((toastId) => {
+    setToasts(prev => prev.filter(t => t.id !== toastId));
+  }, []);
+
+  // ── Real-time: listen for new incidents ───────────────────────────────────
   useEffect(() => {
     if (!socket) return;
 
     const handleNewIncident = (incident) => {
-      setIncidents((prev) => [incident, ...prev]);
+      // 1. Prepend to incident list
+      setIncidents(prev => [incident, ...prev]);
+
+      // 2. Tell the map which incident is new (triggers auto-pan + pulse)
+      setLatestIncidentId(incident._id);
+
+      // 3. Show toast notification
+      const toastId = `toast-${Date.now()}`;
+      setToasts(prev => [...prev, { id: toastId, incident }]);
+
+      // 4. Mark as NEW for 10 seconds for the sidebar badge
+      setNewIds(prev => new Set([...prev, incident._id]));
+      setTimeout(() => {
+        setNewIds(prev => {
+          const next = new Set(prev);
+          next.delete(incident._id);
+          return next;
+        });
+      }, 10000);
+
+      // 5. Auto-scroll sidebar to top (new items are prepended)
+      setTimeout(() => {
+        if (sidebarRef.current) {
+          sidebarRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 100);
     };
 
     socket.on('newIncident', handleNewIncident);
@@ -68,9 +105,21 @@ const Dashboard = () => {
 
   return (
     <div className="flex flex-col h-screen bg-zinc-950 text-zinc-100 overflow-hidden">
-      
-      {/* ── Top Nav ── */}
-      <header className="flex items-center justify-between px-6 py-3 bg-zinc-900 border-b border-zinc-800 shrink-0">
+
+      {/* ── Toast tray (top-right) ─────────────────────────────────────────── */}
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-3 pointer-events-none">
+        {toasts.map(({ id, incident }) => (
+          <div key={id} className="pointer-events-auto">
+            <IncidentToast
+              incident={incident}
+              onDismiss={() => dismissToast(id)}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* ── Top Nav ────────────────────────────────────────────────────────── */}
+      <header className="flex items-center justify-between px-6 py-3 bg-zinc-900 border-b border-zinc-800 shrink-0 z-10">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center text-sm font-bold">R</div>
           <div>
@@ -95,9 +144,7 @@ const Dashboard = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-sm text-zinc-400 hidden md:block">
-            {user?.name || 'Admin'}
-          </span>
+          <span className="text-sm text-zinc-400 hidden md:block">{user?.name || 'Admin'}</span>
           <button
             onClick={logout}
             className="text-xs px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 transition"
@@ -107,10 +154,10 @@ const Dashboard = () => {
         </div>
       </header>
 
-      {/* ── Body: Map + Sidebar ── */}
+      {/* ── Body: Map + Sidebar ────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* Map (full height) */}
+        {/* Map */}
         <div className="flex-1 relative">
           {loading ? (
             <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-400">
@@ -120,17 +167,17 @@ const Dashboard = () => {
               </div>
             </div>
           ) : (
-            <LiveMap incidents={incidents} />
+            <LiveMap incidents={incidents} latestIncidentId={latestIncidentId} />
           )}
 
           {/* Live badge */}
-          <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-zinc-900/90 backdrop-blur-sm rounded-full border border-zinc-700 text-xs font-medium">
+          <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-zinc-900/90 backdrop-blur-sm rounded-full border border-zinc-700 text-xs font-medium z-10">
             <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
             LIVE — {incidents.length} incident{incidents.length !== 1 ? 's' : ''}
           </div>
 
           {/* Legend */}
-          <div className="absolute bottom-6 left-4 bg-zinc-900/90 backdrop-blur-sm border border-zinc-700 rounded-xl p-3 text-xs space-y-1.5">
+          <div className="absolute bottom-6 left-4 bg-zinc-900/90 backdrop-blur-sm border border-zinc-700 rounded-xl p-3 text-xs space-y-1.5 z-10">
             <p className="text-zinc-400 font-semibold uppercase tracking-wider text-[10px] mb-2">Severity</p>
             {[
               { label: 'Critical', color: 'bg-red-500' },
@@ -148,69 +195,87 @@ const Dashboard = () => {
 
         {/* Sidebar */}
         <aside className="w-80 xl:w-96 bg-zinc-900 border-l border-zinc-800 flex flex-col overflow-hidden shrink-0">
-          <div className="px-4 py-3 border-b border-zinc-800">
+          <div className="px-4 py-3 border-b border-zinc-800 shrink-0">
             <h2 className="text-sm font-semibold text-zinc-200">Incident Feed</h2>
             <p className="text-xs text-zinc-500 mt-0.5">Updates in real-time via Socket.IO</p>
           </div>
 
-          <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/60">
+          <div ref={sidebarRef} className="flex-1 overflow-y-auto divide-y divide-zinc-800/60">
             {incidents.length === 0 ? (
               <div className="p-6 text-center text-zinc-500 text-sm">
                 <p className="text-2xl mb-2">🛡️</p>
                 <p>No incidents reported yet.</p>
               </div>
             ) : (
-              incidents.map((inc) => (
-                <button
-                  key={inc._id}
-                  onClick={() => setSelectedPanel(selectedPanel?._id === inc._id ? null : inc)}
-                  className="w-full text-left px-4 py-3 hover:bg-zinc-800/60 transition group"
-                >
-                  <div className="flex items-start gap-2">
-                    <span className="text-lg shrink-0">{TYPE_ICONS[inc.type] || '📍'}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium text-zinc-100 truncate group-hover:text-white">
-                          {inc.title}
-                        </p>
-                        <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded border ${SEVERITY_COLORS[inc.severity]}`}>
-                          {inc.severity?.toUpperCase()}
-                        </span>
-                      </div>
-                      <p className="text-xs text-zinc-500 truncate mt-0.5">{inc.description}</p>
-                      <p className="text-[10px] text-zinc-600 mt-1">
-                        {inc.location?.address || `${inc.location?.coordinates?.[1]?.toFixed(4)}, ${inc.location?.coordinates?.[0]?.toFixed(4)}`}
-                      </p>
-                    </div>
-                  </div>
+              incidents.map((inc) => {
+                const isNew = newIds.has(inc._id);
+                return (
+                  <button
+                    key={inc._id}
+                    ref={el => incidentRefs.current[inc._id] = el}
+                    onClick={() => setSelectedPanel(selectedPanel?._id === inc._id ? null : inc)}
+                    className={`w-full text-left px-4 py-3 hover:bg-zinc-800/60 transition group relative ${
+                      isNew ? 'bg-zinc-800/40' : ''
+                    }`}
+                  >
+                    {/* NEW badge */}
+                    {isNew && (
+                      <span className="absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 bg-red-600 text-white rounded-full animate-pulse">
+                        NEW
+                      </span>
+                    )}
 
-                  {/* Expanded AI Triage panel */}
-                  {selectedPanel?._id === inc._id && inc.aiTriage && (
-                    <div className="mt-3 p-3 bg-blue-950/30 border border-blue-900/40 rounded-lg text-left">
-                      <p className="text-[11px] font-semibold text-blue-400 mb-1">🤖 AI Triage</p>
-                      <p className="text-xs text-blue-200 leading-relaxed">{inc.aiTriage.summary}</p>
-                      <div className="flex gap-3 mt-2 text-[10px] text-blue-300">
-                        <span>Risk: <strong>{inc.aiTriage.riskScore}/100</strong></span>
-                        <span>Affected: <strong>~{inc.aiTriage.estimatedAffected}</strong></span>
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg shrink-0">{TYPE_ICONS[inc.type] || '📍'}</span>
+                      <div className="flex-1 min-w-0 pr-6">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-zinc-100 truncate group-hover:text-white">
+                            {inc.title}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded border ${SEVERITY_COLORS[inc.severity]}`}>
+                            {inc.severity?.toUpperCase()}
+                          </span>
+                          <p className="text-xs text-zinc-500 truncate">{inc.description}</p>
+                        </div>
+                        <p className="text-[10px] text-zinc-600 mt-1 truncate">
+                          {inc.location?.address ||
+                            (inc.location?.coordinates
+                              ? `${inc.location.coordinates[1]?.toFixed(4)}, ${inc.location.coordinates[0]?.toFixed(4)}`
+                              : 'Unknown location')}
+                        </p>
                       </div>
-                      {inc.aiTriage.recommendedActions?.length > 0 && (
-                        <ul className="mt-2 space-y-1">
-                          {inc.aiTriage.recommendedActions.map((action, i) => (
-                            <li key={i} className="text-[11px] text-blue-200 flex gap-1.5">
-                              <span className="text-blue-500 shrink-0">→</span>
-                              {action}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
                     </div>
-                  )}
-                </button>
-              ))
+
+                    {/* Expanded AI Triage panel */}
+                    {selectedPanel?._id === inc._id && inc.aiTriage && (
+                      <div className="mt-3 p-3 bg-blue-950/30 border border-blue-900/40 rounded-lg text-left">
+                        <p className="text-[11px] font-semibold text-blue-400 mb-1">🤖 AI Triage</p>
+                        <p className="text-xs text-blue-200 leading-relaxed">{inc.aiTriage.summary}</p>
+                        <div className="flex gap-3 mt-2 text-[10px] text-blue-300">
+                          <span>Risk: <strong>{inc.aiTriage.riskScore}/100</strong></span>
+                          <span>Affected: <strong>~{inc.aiTriage.estimatedAffected}</strong></span>
+                        </div>
+                        {inc.aiTriage.recommendedActions?.length > 0 && (
+                          <ul className="mt-2 space-y-1">
+                            {inc.aiTriage.recommendedActions.map((action, i) => (
+                              <li key={i} className="text-[11px] text-blue-200 flex gap-1.5">
+                                <span className="text-blue-500 shrink-0">→</span>
+                                {action}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                );
+              })
             )}
           </div>
 
-          {/* Footer quick link */}
+          {/* Footer CTA */}
           <div className="px-4 py-3 border-t border-zinc-800 shrink-0">
             <a
               href="/report"

@@ -1,19 +1,14 @@
-import { useState, useCallback } from 'react';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle } from '@react-google-maps/api';
 
-const containerStyle = {
-  width: '100%',
-  height: '100%',
-};
+const containerStyle = { width: '100%', height: '100%' };
+const defaultCenter = { lat: 20.5937, lng: 78.9629 };
 
-const defaultCenter = { lat: 20.5937, lng: 78.9629 }; // India
-
-// Severity to marker color mapping
 const SEVERITY_COLORS = {
-  critical: '#ef4444', // red
-  high:     '#f97316', // orange
-  medium:   '#eab308', // yellow
-  low:      '#22c55e', // green
+  critical: '#ef4444',
+  high:     '#f97316',
+  medium:   '#eab308',
+  low:      '#22c55e',
 };
 
 const TYPE_ICONS = {
@@ -30,15 +25,59 @@ const TYPE_ICONS = {
   other:              '📍',
 };
 
-const LiveMap = ({ incidents = [] }) => {
+// Pulsing ring animation radii
+const PULSE_RADII = [3000, 6000, 9000];
+
+const LiveMap = ({ incidents = [], latestIncidentId = null }) => {
   const [selectedIncident, setSelectedIncident] = useState(null);
+  const [pulsingId, setPulsingId] = useState(null);
+  const [pulseOpacity, setPulseOpacity] = useState(0.6);
+  const mapRef = useRef(null);
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
   });
 
-  const onMapLoad = useCallback(() => {}, []);
+  const onMapLoad = useCallback((map) => {
+    mapRef.current = map;
+  }, []);
+
+  // When a new incident arrives: pan map + trigger pulse ring + auto-open InfoWindow
+  useEffect(() => {
+    if (!latestIncidentId || !mapRef.current) return;
+
+    const incident = incidents.find(i => i._id === latestIncidentId);
+    if (!incident?.location?.coordinates) return;
+
+    const [lng, lat] = incident.location.coordinates;
+    if (!lat || !lng) return;
+
+    // Pan & zoom to new incident
+    mapRef.current.panTo({ lat, lng });
+    mapRef.current.setZoom(10);
+
+    // Start pulse animation
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPulsingId(latestIncidentId);
+    setPulseOpacity(0.6);
+
+    // Fade out pulse rings after 4 seconds
+    const fadeTimer = setTimeout(() => {
+      setPulseOpacity(0);
+    }, 3000);
+    const clearTimer = setTimeout(() => {
+      setPulsingId(null);
+    }, 4500);
+
+    // Auto-open InfoWindow for the new incident
+    setSelectedIncident(incident);
+
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(clearTimer);
+    };
+  }, [latestIncidentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isLoaded) {
     return (
@@ -70,21 +109,46 @@ const LiveMap = ({ incidents = [] }) => {
         const [lng, lat] = incident.location?.coordinates || [0, 0];
         if (!lat || !lng) return null;
 
+        const isNew = incident._id === pulsingId;
+        const color = SEVERITY_COLORS[incident.severity] || '#94a3b8';
+
         return (
-          <Marker
-            key={incident._id}
-            position={{ lat, lng }}
-            title={incident.title}
-            onClick={() => setSelectedIncident(incident)}
-            icon={{
-              path: window.google.maps.SymbolPath.CIRCLE,
-              scale: incident.severity === 'critical' ? 14 : incident.severity === 'high' ? 11 : 9,
-              fillColor: SEVERITY_COLORS[incident.severity] || '#94a3b8',
-              fillOpacity: 0.9,
-              strokeWeight: 2,
-              strokeColor: '#ffffff',
-            }}
-          />
+          <div key={incident._id}>
+            {/* Pulsing ripple rings for the latest incident */}
+            {isNew && PULSE_RADII.map((radius, i) => (
+              <Circle
+                key={`pulse-${radius}`}
+                center={{ lat, lng }}
+                radius={radius * (i + 1)}
+                options={{
+                  strokeColor: color,
+                  strokeOpacity: pulseOpacity * (1 - i * 0.25),
+                  strokeWeight: 2,
+                  fillColor: color,
+                  fillOpacity: pulseOpacity * 0.06 * (1 - i * 0.3),
+                  zIndex: 0,
+                }}
+              />
+            ))}
+
+            {/* Main marker */}
+            <Marker
+              position={{ lat, lng }}
+              title={incident.title}
+              onClick={() => setSelectedIncident(incident)}
+              zIndex={isNew ? 999 : 1}
+              icon={{
+                path: window.google.maps.SymbolPath.CIRCLE,
+                scale: isNew
+                  ? (incident.severity === 'critical' ? 18 : 14)
+                  : (incident.severity === 'critical' ? 14 : incident.severity === 'high' ? 11 : 9),
+                fillColor: color,
+                fillOpacity: 0.95,
+                strokeWeight: isNew ? 3 : 2,
+                strokeColor: isNew ? '#ffffff' : '#ffffff',
+              }}
+            />
+          </div>
         );
       })}
 
@@ -119,10 +183,10 @@ const LiveMap = ({ incidents = [] }) => {
             <p className="text-xs text-gray-600 mb-2 line-clamp-3">{selectedIncident.description}</p>
             {selectedIncident.aiTriage && (
               <div className="bg-blue-50 border border-blue-200 rounded p-2">
-                <p className="text-xs font-semibold text-blue-700 mb-0.5">AI Summary</p>
+                <p className="text-xs font-semibold text-blue-700 mb-0.5">🤖 AI Summary</p>
                 <p className="text-xs text-blue-600">{selectedIncident.aiTriage.summary}</p>
                 <p className="text-xs text-blue-500 mt-1">
-                  Risk: {selectedIncident.aiTriage.riskScore}/100
+                  Risk: <strong>{selectedIncident.aiTriage.riskScore}/100</strong>
                 </p>
               </div>
             )}
@@ -141,81 +205,21 @@ const darkMapStyles = [
   { elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
   { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a2e' }] },
   { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
-  {
-    featureType: 'administrative.locality',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#d59563' }],
-  },
-  {
-    featureType: 'poi',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#d59563' }],
-  },
-  {
-    featureType: 'poi.park',
-    elementType: 'geometry',
-    stylers: [{ color: '#263c3f' }],
-  },
-  {
-    featureType: 'poi.park',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#6b9a76' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'geometry',
-    stylers: [{ color: '#16213e' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'geometry.stroke',
-    stylers: [{ color: '#0f3460' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#9ca5b3' }],
-  },
-  {
-    featureType: 'road.highway',
-    elementType: 'geometry',
-    stylers: [{ color: '#0f3460' }],
-  },
-  {
-    featureType: 'road.highway',
-    elementType: 'geometry.stroke',
-    stylers: [{ color: '#1a1a2e' }],
-  },
-  {
-    featureType: 'road.highway',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#f3d19c' }],
-  },
-  {
-    featureType: 'transit',
-    elementType: 'geometry',
-    stylers: [{ color: '#16213e' }],
-  },
-  {
-    featureType: 'transit.station',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#d59563' }],
-  },
-  {
-    featureType: 'water',
-    elementType: 'geometry',
-    stylers: [{ color: '#0e2954' }],
-  },
-  {
-    featureType: 'water',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#515c6d' }],
-  },
-  {
-    featureType: 'water',
-    elementType: 'labels.text.stroke',
-    stylers: [{ color: '#17263c' }],
-  },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#263c3f' }] },
+  { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#6b9a76' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#16213e' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#0f3460' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9ca5b3' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#0f3460' }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#1a1a2e' }] },
+  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#f3d19c' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#16213e' }] },
+  { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e2954' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#515c6d' }] },
+  { featureType: 'water', elementType: 'labels.text.stroke', stylers: [{ color: '#17263c' }] },
 ];
 
 export default LiveMap;
