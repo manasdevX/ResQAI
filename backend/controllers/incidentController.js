@@ -1,15 +1,43 @@
 import Incident from '../models/Incident.js';
 import { analyzeIncident } from '../utils/aiTriage.js';
 
-// Create a new incident and run AI triage
+// Create a new incident and run AI triage (Handles both JSON and multipart/form-data)
 export const createIncident = async (req, res) => {
   try {
-    const { title, description, type, location, affectedCount, tags } = req.body;
+    let { title, description, type, location, affectedCount, tags } = req.body;
+
+    // If location is sent as a string (multipart/form-data), parse it
+    if (typeof location === 'string') {
+      try { location = JSON.parse(location); } catch (e) { /* ignore */ }
+    }
+    
+    // If tags is sent as a string (multipart/form-data), parse it
+    if (typeof tags === 'string') {
+      try { tags = JSON.parse(tags); } catch (e) { /* ignore */ }
+    }
+
+    // Process uploaded files if any
+    let media = [];
+    if (req.files && req.files.length > 0) {
+      media = req.files.map(file => {
+        let type = 'image';
+        if (file.mimetype.startsWith('video/')) type = 'video';
+        else if (file.mimetype.startsWith('audio/')) type = 'audio';
+        else if (file.mimetype.includes('pdf')) type = 'document';
+
+        return {
+          url: file.path,
+          publicId: file.filename,
+          type: type,
+          caption: ''
+        };
+      });
+    }
 
     // Run AI triage asynchronously based on title and description
     const triageData = await analyzeIncident(title, description);
 
-    // Create incident using user input and AI output
+    // Create incident using user input, media, and AI output
     const newIncident = new Incident({
       title,
       description,
@@ -17,6 +45,7 @@ export const createIncident = async (req, res) => {
       location,
       severity: triageData.urgency || 'medium', // Map AI urgency to severity
       reportedBy: req.user._id, // Assuming auth middleware sets req.user
+      media,
       affectedCount: affectedCount || triageData.estimatedAffected,
       aiTriage: {
         summary: triageData.summary,
