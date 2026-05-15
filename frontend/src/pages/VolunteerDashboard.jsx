@@ -86,8 +86,22 @@ const VolunteerDashboard = () => {
     );
   };
 
+  const handleAcceptTask = async (incidentId) => {
+    try {
+      const { data } = await axios.post(`http://localhost:5000/api/incidents/${incidentId}/accept`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // Update local state
+      setIncidents(prev => prev.map(inc => inc._id === incidentId ? data.incident : inc));
+    } catch (err) {
+      console.error('Failed to accept task:', err);
+      setError(err.response?.data?.message || 'Failed to accept task.');
+    }
+  };
+
   // Initial load
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     locateAndFetch(radius);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -225,12 +239,22 @@ const VolunteerDashboard = () => {
                   </div>
                   
                   <div className="px-5 py-3 bg-zinc-800/30 border-t border-zinc-800 mt-auto flex items-center justify-between">
-                    <span className="text-xs font-medium px-2 py-1 bg-zinc-800 rounded text-zinc-300 uppercase">
+                    <span className="text-[10px] font-bold px-2 py-1 bg-zinc-800 rounded text-zinc-400 uppercase tracking-wider">
                       {inc.status}
                     </span>
-                    <button className="text-sm font-semibold text-blue-500 hover:text-blue-400 transition">
-                      View Details →
-                    </button>
+                    
+                    {inc.assignedResponders?.includes(user?._id) ? (
+                      <span className="text-sm font-semibold text-green-500 flex items-center gap-1.5">
+                        <span>✓</span> Assigned to You
+                      </span>
+                    ) : (
+                      <button 
+                        onClick={() => handleAcceptTask(inc._id)}
+                        className="text-xs font-semibold px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded transition"
+                      >
+                        Accept Task
+                      </button>
+                    )}
                   </div>
                 </div>
               );
