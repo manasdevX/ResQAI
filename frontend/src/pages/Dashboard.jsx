@@ -100,11 +100,11 @@ const Dashboard = () => {
     socket.on('newIncident', handleNewIncident);
 
     // Handle status/severity updates from other admin sessions
-    const handleIncidentUpdated = ({ incidentId, status, severity }) => {
+    const handleIncidentUpdated = ({ incidentId, status, severity, assignedResponders }) => {
       setIncidents(prev =>
         prev.map(inc =>
           inc._id === incidentId
-            ? { ...inc, ...(status && { status }), ...(severity && { severity }) }
+            ? { ...inc, ...(status && { status }), ...(severity && { severity }), ...(assignedResponders && { assignedResponders }) }
             : inc
         )
       );

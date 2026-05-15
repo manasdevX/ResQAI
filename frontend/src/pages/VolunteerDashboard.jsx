@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 
 const SEVERITY_COLORS = {
   critical: 'bg-red-500/20 text-red-400 border-red-500/30',
@@ -39,6 +40,7 @@ const getDistance = (lat1, lon1, lat2, lon2) => {
 
 const VolunteerDashboard = () => {
   const { token, user, logout } = useAuth();
+  const socket = useSocket();
   
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -114,6 +116,42 @@ const VolunteerDashboard = () => {
       fetchNearby(location.lat, location.lng, newRadius);
     }
   };
+
+  // Socket.io Real-time Status Sync
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleIncidentUpdated = ({ incidentId, status, severity, assignedResponders }) => {
+      setIncidents(prev =>
+        prev.map(inc =>
+          inc._id === incidentId
+            ? { 
+                ...inc, 
+                ...(status && { status }), 
+                ...(severity && { severity }),
+                ...(assignedResponders && { assignedResponders })
+              }
+            : inc
+        )
+      );
+    };
+
+    const handleNewIncident = () => {
+      // Add new incident if it falls within the radius
+      // For simplicity, we fetch nearby again to maintain proper sorting/distance calc
+      if (location) {
+        fetchNearby(location.lat, location.lng, radius);
+      }
+    };
+
+    socket.on('incidentUpdated', handleIncidentUpdated);
+    socket.on('newIncident', handleNewIncident);
+
+    return () => {
+      socket.off('incidentUpdated', handleIncidentUpdated);
+      socket.off('newIncident', handleNewIncident);
+    };
+  }, [socket, location, radius]);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
