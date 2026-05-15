@@ -1,18 +1,34 @@
 import express from 'express';
-import { createIncident, uploadIncidentMedia, getAllIncidents } from '../controllers/incidentController.js';
+import {
+  createIncident,
+  uploadIncidentMedia,
+  getAllIncidents,
+  updateIncidentStatus,
+  updateIncidentSeverity,
+  broadcastAlert,
+} from '../controllers/incidentController.js';
 import upload from '../middleware/upload.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Route to create a new incident (triggers AI triage)
+// Create a new incident (triggers AI triage)
 router.post('/', protect, createIncident);
 
-// Route to get all incidents
+// Get all incidents
 router.get('/', protect, getAllIncidents);
 
-// Route to upload media to a specific incident
-// Supports up to 5 files at a time
+// Update status of a specific incident
+router.patch('/:id/status', protect, updateIncidentStatus);
+
+// Update severity (priority) of a specific incident
+router.patch('/:id/severity', protect, updateIncidentSeverity);
+
+// Broadcast emergency alert (tied to an incident or standalone)
+router.post('/broadcast-alert', protect, broadcastAlert);
+
+// Upload media to a specific incident
 router.post('/:id/media', protect, upload.array('media', 5), uploadIncidentMedia);
 
 export default router;
+

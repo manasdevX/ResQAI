@@ -3,6 +3,7 @@ import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import LiveMap from '../components/LiveMap';
 import IncidentToast from '../components/IncidentToast';
+import IncidentManagementPanel from '../components/IncidentManagementPanel';
 import axios from 'axios';
 
 const SEVERITY_COLORS = {
@@ -30,12 +31,13 @@ const Dashboard = () => {
   const socket = useSocket();
   const { token, user, logout } = useAuth();
 
-  const [incidents, setIncidents]           = useState([]);
-  const [loading, setLoading]               = useState(true);
-  const [selectedPanel, setSelectedPanel]   = useState(null);
+  const [incidents, setIncidents]               = useState([]);
+  const [loading, setLoading]                   = useState(true);
+  const [selectedPanel, setSelectedPanel]       = useState(null);
   const [latestIncidentId, setLatestIncidentId] = useState(null);
-  const [toasts, setToasts]                 = useState([]);      // [{id, incident}]
-  const [newIds, setNewIds]                 = useState(new Set()); // track "NEW" badge IDs
+  const [toasts, setToasts]                     = useState([]);
+  const [newIds, setNewIds]                     = useState(new Set());
+  const [globalAlert, setGlobalAlert]           = useState(null); // alertBroadcast payload
 
   const sidebarRef    = useRef(null);
   const incidentRefs  = useRef({});
@@ -96,8 +98,42 @@ const Dashboard = () => {
     };
 
     socket.on('newIncident', handleNewIncident);
-    return () => socket.off('newIncident', handleNewIncident);
+
+    // Handle status/severity updates from other admin sessions
+    const handleIncidentUpdated = ({ incidentId, status, severity }) => {
+      setIncidents(prev =>
+        prev.map(inc =>
+          inc._id === incidentId
+            ? { ...inc, ...(status && { status }), ...(severity && { severity }) }
+            : inc
+        )
+      );
+    };
+    socket.on('incidentUpdated', handleIncidentUpdated);
+
+    // Handle emergency broadcast alerts
+    const handleAlertBroadcast = (alert) => {
+      setGlobalAlert(alert);
+      // Auto-dismiss after 12 seconds
+      setTimeout(() => setGlobalAlert(null), 12000);
+    };
+    socket.on('alertBroadcast', handleAlertBroadcast);
+
+    return () => {
+      socket.off('newIncident', handleNewIncident);
+      socket.off('incidentUpdated', handleIncidentUpdated);
+      socket.off('alertBroadcast', handleAlertBroadcast);
+    };
   }, [socket]);
+
+  // Called by IncidentManagementPanel after a successful PATCH
+  const handleIncidentUpdated = useCallback((updatedIncident) => {
+    setIncidents(prev =>
+      prev.map(inc => inc._id === updatedIncident._id ? updatedIncident : inc)
+    );
+    // Keep panel open with updated data
+    setSelectedPanel(updatedIncident);
+  }, []);
 
   const activeCount   = incidents.filter(i => !['resolved', 'closed'].includes(i.status)).length;
   const criticalCount = incidents.filter(i => i.severity === 'critical').length;
@@ -153,6 +189,35 @@ const Dashboard = () => {
           </button>
         </div>
       </header>
+
+      {/* ── Global Alert Banner ───────────────────────────────────────────── */}
+      {globalAlert && (
+        <div className={`relative flex items-start gap-3 px-6 py-3 text-sm font-medium border-b animate-pulse shrink-0 ${
+          globalAlert.alertType === 'evacuation' ? 'bg-red-950/80 border-red-800 text-red-200' :
+          globalAlert.alertType === 'medical'    ? 'bg-orange-950/80 border-orange-800 text-orange-200' :
+          globalAlert.alertType === 'shelter'    ? 'bg-blue-950/80 border-blue-800 text-blue-200' :
+          'bg-zinc-800/80 border-zinc-700 text-zinc-200'
+        }`}>
+          <span className="text-xl shrink-0">
+            {globalAlert.alertType === 'evacuation' ? '🚨' :
+             globalAlert.alertType === 'medical'    ? '🚑' :
+             globalAlert.alertType === 'shelter'    ? '🏠' : '📢'}
+          </span>
+          <div className="flex-1">
+            <span className="font-bold uppercase tracking-wide text-xs opacity-70 mr-2">
+              {globalAlert.alertType} ALERT
+            </span>
+            {globalAlert.message}
+            <span className="text-xs opacity-50 ml-2">— {globalAlert.broadcastBy}</span>
+          </div>
+          <button
+            onClick={() => setGlobalAlert(null)}
+            className="text-lg opacity-50 hover:opacity-100 transition shrink-0"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* ── Body: Map + Sidebar ────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
@@ -248,25 +313,36 @@ const Dashboard = () => {
                       </div>
                     </div>
 
-                    {/* Expanded AI Triage panel */}
-                    {selectedPanel?._id === inc._id && inc.aiTriage && (
-                      <div className="mt-3 p-3 bg-blue-950/30 border border-blue-900/40 rounded-lg text-left">
-                        <p className="text-[11px] font-semibold text-blue-400 mb-1">🤖 AI Triage</p>
-                        <p className="text-xs text-blue-200 leading-relaxed">{inc.aiTriage.summary}</p>
-                        <div className="flex gap-3 mt-2 text-[10px] text-blue-300">
-                          <span>Risk: <strong>{inc.aiTriage.riskScore}/100</strong></span>
-                          <span>Affected: <strong>~{inc.aiTriage.estimatedAffected}</strong></span>
-                        </div>
-                        {inc.aiTriage.recommendedActions?.length > 0 && (
-                          <ul className="mt-2 space-y-1">
-                            {inc.aiTriage.recommendedActions.map((action, i) => (
-                              <li key={i} className="text-[11px] text-blue-200 flex gap-1.5">
-                                <span className="text-blue-500 shrink-0">→</span>
-                                {action}
-                              </li>
-                            ))}
-                          </ul>
+                    {/* Expanded AI Triage + Management panel */}
+                    {selectedPanel?._id === inc._id && (
+                      <div className="mt-3 space-y-2">
+                        {inc.aiTriage && (
+                          <div className="p-3 bg-blue-950/30 border border-blue-900/40 rounded-lg text-left">
+                            <p className="text-[11px] font-semibold text-blue-400 mb-1">🤖 AI Triage</p>
+                            <p className="text-xs text-blue-200 leading-relaxed">{inc.aiTriage.summary}</p>
+                            <div className="flex gap-3 mt-2 text-[10px] text-blue-300">
+                              <span>Risk: <strong>{inc.aiTriage.riskScore}/100</strong></span>
+                              <span>Affected: <strong>~{inc.aiTriage.estimatedAffected}</strong></span>
+                            </div>
+                            {inc.aiTriage.recommendedActions?.length > 0 && (
+                              <ul className="mt-2 space-y-1">
+                                {inc.aiTriage.recommendedActions.map((action, i) => (
+                                  <li key={i} className="text-[11px] text-blue-200 flex gap-1.5">
+                                    <span className="text-blue-500 shrink-0">→</span>
+                                    {action}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
                         )}
+
+                        {/* Admin management panel */}
+                        <IncidentManagementPanel
+                          incident={inc}
+                          token={token}
+                          onIncidentUpdated={handleIncidentUpdated}
+                        />
                       </div>
                     )}
                   </button>

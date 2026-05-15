@@ -141,3 +141,92 @@ export const uploadIncidentMedia = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error while uploading media' });
   }
 };
+
+// Update incident status (acknowledged → responding → resolved → closed)
+export const updateIncidentStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, note } = req.body;
+
+    const allowed = ['reported', 'acknowledged', 'responding', 'resolved', 'closed'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status value' });
+    }
+
+    const incident = await Incident.findById(id);
+    if (!incident) return res.status(404).json({ success: false, message: 'Incident not found' });
+
+    // Store updatedBy for the pre-save hook
+    incident._updatedBy = req.user._id;
+    incident.status = status;
+    if (note) {
+      incident.statusHistory.push({ status, note, updatedBy: req.user._id, updatedAt: new Date() });
+    }
+
+    const updated = await incident.save();
+
+    // Broadcast status change to all connected clients
+    io.emit('incidentUpdated', { incidentId: id, status, note, updatedBy: req.user.name });
+
+    res.status(200).json({ success: true, message: 'Status updated', incident: updated });
+  } catch (error) {
+    console.error('Error updating status:', error);
+    res.status(500).json({ success: false, message: 'Server error while updating status' });
+  }
+};
+
+// Update incident severity / priority
+export const updateIncidentSeverity = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { severity } = req.body;
+
+    const allowed = ['low', 'medium', 'high', 'critical'];
+    if (!allowed.includes(severity)) {
+      return res.status(400).json({ success: false, message: 'Invalid severity value' });
+    }
+
+    const incident = await Incident.findByIdAndUpdate(
+      id,
+      { severity },
+      { new: true, runValidators: true }
+    );
+    if (!incident) return res.status(404).json({ success: false, message: 'Incident not found' });
+
+    // Broadcast severity change
+    io.emit('incidentUpdated', { incidentId: id, severity, updatedBy: req.user.name });
+
+    res.status(200).json({ success: true, message: 'Severity updated', incident });
+  } catch (error) {
+    console.error('Error updating severity:', error);
+    res.status(500).json({ success: false, message: 'Server error while updating severity' });
+  }
+};
+
+// Broadcast an emergency alert to all connected clients
+export const broadcastAlert = async (req, res) => {
+  try {
+    const { incidentId, message, alertType } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ success: false, message: 'Alert message is required' });
+    }
+
+    const alertPayload = {
+      incidentId,
+      message,
+      alertType: alertType || 'general',   // general | evacuation | shelter | medical
+      broadcastBy: req.user.name,
+      broadcastAt: new Date(),
+    };
+
+    // Emit to all connected clients (civilians + responders)
+    io.emit('alertBroadcast', alertPayload);
+
+    res.status(200).json({ success: true, message: 'Alert broadcast sent', alert: alertPayload });
+  } catch (error) {
+    console.error('Error broadcasting alert:', error);
+    res.status(500).json({ success: false, message: 'Server error while broadcasting alert' });
+  }
+};
+
