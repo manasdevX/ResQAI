@@ -57,6 +57,13 @@ export const AuthProvider = ({ children }) => {
     setUser(data);
   };
 
+  const googleLogin = async (googleToken) => {
+    const { data } = await api.post('/auth/google', { token: googleToken });
+    localStorage.setItem('token', data.token);
+    setToken(data.token);
+    setUser(data);
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     setToken(null);
@@ -69,6 +76,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     signup,
+    googleLogin,
     logout,
   };
 
