@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
+import VolunteerDashboard from './pages/VolunteerDashboard';
 import Report from './pages/Report';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
@@ -20,6 +21,7 @@ function App() {
             {/* Protected Routes for all authenticated users */}
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/volunteer-dashboard" element={<VolunteerDashboard />} />
               <Route path="/report" element={<Report />} />
             </Route>
             

@@ -6,6 +6,7 @@ import {
   updateIncidentStatus,
   updateIncidentSeverity,
   broadcastAlert,
+  getNearbyIncidents,
 } from '../controllers/incidentController.js';
 import upload from '../middleware/upload.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -17,6 +18,9 @@ router.post('/', protect, createIncident);
 
 // Get all incidents
 router.get('/', protect, getAllIncidents);
+
+// Get nearby active incidents
+router.get('/nearby', protect, getNearbyIncidents);
 
 // Update status of a specific incident
 router.patch('/:id/status', protect, updateIncidentStatus);

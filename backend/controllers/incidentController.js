@@ -230,3 +230,38 @@ export const broadcastAlert = async (req, res) => {
   }
 };
 
+// Fetch nearby incidents using MongoDB geospatial queries
+export const getNearbyIncidents = async (req, res) => {
+  try {
+    const { lng, lat, maxDistance = 10000 } = req.query; // maxDistance default 10km (10000 meters)
+
+    if (!lng || !lat) {
+      return res.status(400).json({ success: false, message: 'Longitude and latitude are required' });
+    }
+
+    // Must ensure Incident schema has a 2dsphere index on location
+    // Wait, the schema should have `location: { type: 'Point', coordinates: [lng, lat] }` and an index.
+    const incidents = await Incident.find({
+      location: {
+        $near: {
+          $geometry: {
+            type: 'Point',
+            coordinates: [parseFloat(lng), parseFloat(lat)],
+          },
+          $maxDistance: parseInt(maxDistance),
+        },
+      },
+      status: { $nin: ['resolved', 'closed'] }, // Optionally only show active ones to volunteers
+    });
+
+    res.status(200).json({
+      success: true,
+      count: incidents.length,
+      incidents,
+    });
+  } catch (error) {
+    console.error('Error fetching nearby incidents:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching nearby incidents' });
+  }
+};
+
