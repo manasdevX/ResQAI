@@ -25,7 +25,11 @@ export const io = new Server(httpServer, {
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -64,6 +68,18 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
 
+// Handle port already in use gracefully
+httpServer.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n❌ Port ${PORT} is already in use.`);
+    console.error(`   Run this to free it: npx kill-port ${PORT}`);
+    console.error('   Then restart the server.\n');
+    process.exit(1);
+  } else {
+    throw err;
+  }
+});
+
 mongoose.connect(MONGO_URI)
   .then(() => {
     console.log('Connected to MongoDB');
@@ -73,4 +89,5 @@ mongoose.connect(MONGO_URI)
   })
   .catch((err) => {
     console.error('Failed to connect to MongoDB:', err.message);
+    process.exit(1);
   });
