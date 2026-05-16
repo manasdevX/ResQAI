@@ -1,75 +1,71 @@
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });
 
-// Initialize the Gemini AI client
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'placeholder_key');
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-// Using gemini-1.5-flash as it is fast and efficient for standard text and JSON tasks
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+// gemini-2.0-flash — confirmed working with this API key
+const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 /**
- * Analyzes an incident description and returns structured JSON output.
- * @param {string} description - The civilian's report description.
- * @param {string} title - The title of the incident.
- * @returns {Promise<Object>} - The structured AI triage data.
+ * Analyzes an incident and returns structured triage data.
+ * @param {string} title
+ * @param {string} description
+ * @returns {Promise<{summary, urgency, recommendedActions, estimatedAffected, riskScore}>}
  */
 export const analyzeIncident = async (title, description) => {
   try {
-    const prompt = `
-      You are an emergency response AI triage assistant. 
-      Analyze the following incident report and provide a structured assessment.
+    const prompt = `You are an emergency response AI triage assistant.
+Analyze the following incident report and respond with ONLY valid JSON — no markdown, no code fences.
 
-      Incident Title: ${title}
-      Incident Description: ${description}
-      
-      Respond with ONLY valid JSON matching this structure:
-      {
-        "summary": "A concise 1-2 sentence summary of the incident",
-        "urgency": "low | medium | high | critical",
-        "recommendedActions": ["action 1", "action 2"],
-        "estimatedAffected": <number, estimate based on description, 0 if unknown>,
-        "riskScore": <number 0-100>
-      }
-    `;
+Incident Title: ${title}
+Incident Description: ${description}
 
-    // Using JSON mode
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: SchemaType.OBJECT,
-          properties: {
-            summary: { type: SchemaType.STRING },
-            urgency: { 
-              type: SchemaType.STRING, 
-              enum: ['low', 'medium', 'high', 'critical'] 
-            },
-            recommendedActions: { 
-              type: SchemaType.ARRAY, 
-              items: { type: SchemaType.STRING } 
-            },
-            estimatedAffected: { type: SchemaType.INTEGER },
-            riskScore: { type: SchemaType.INTEGER }
-          },
-          required: ["summary", "urgency", "recommendedActions", "estimatedAffected", "riskScore"]
-        }
-      }
-    });
+JSON format (respond with this exact structure):
+{
+  "summary": "A concise 1-2 sentence summary of the incident",
+  "urgency": "low | medium | high | critical",
+  "recommendedActions": ["action 1", "action 2", "action 3"],
+  "estimatedAffected": <number, estimate based on description, 0 if unknown>,
+  "riskScore": <integer 0-100>
+}`;
 
-    const responseText = result.response.text();
-    return JSON.parse(responseText);
-  } catch (error) {
-    console.error('Error during AI triage:', error);
-    // Fallback if AI fails
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text().trim();
+
+    // Strip markdown code fences if model wraps response
+    const cleaned = responseText
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+
+    const parsed = JSON.parse(cleaned);
+
+    // Validate required fields
+    const urgencyValues = ['low', 'medium', 'high', 'critical'];
     return {
-      summary: 'AI analysis failed. Please review manually.',
-      urgency: 'high', // default safe fallback
+      summary:            parsed.summary            || 'No summary provided',
+      urgency:            urgencyValues.includes(parsed.urgency) ? parsed.urgency : 'medium',
+      recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : [],
+      estimatedAffected:  Number.isFinite(parsed.estimatedAffected) ? parsed.estimatedAffected : 0,
+      riskScore:          Number.isFinite(parsed.riskScore) ? Math.min(100, Math.max(0, parsed.riskScore)) : 50,
+    };
+  } catch (error) {
+    const msg = error.message || String(error);
+    if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.includes('Too Many Requests')) {
+      console.warn('[aiTriage] Rate limited by Gemini API — using fallback triage');
+    } else {
+      console.error('[aiTriage] AI triage error:', msg);
+    }
+    // Safe fallback — incident is always saved regardless of AI status
+    return {
+      summary:            'AI analysis unavailable. Please review manually.',
+      urgency:            'high',
       recommendedActions: ['Review incident details manually', 'Dispatch scout team'],
-      estimatedAffected: 0,
-      riskScore: 50
+      estimatedAffected:  0,
+      riskScore:          50,
     };
   }
 };

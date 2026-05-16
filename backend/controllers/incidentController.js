@@ -2,270 +2,302 @@ import Incident from '../models/Incident.js';
 import { analyzeIncident } from '../utils/aiTriage.js';
 import { io } from '../server.js';
 
-// Create a new incident and run AI triage (Handles both JSON and multipart/form-data)
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+/** Normalise uploaded Cloudinary files → media array for the schema */
+const buildMediaArray = (files = []) =>
+  files.map((file) => {
+    let type = 'image';
+    if (file.mimetype?.startsWith('video/'))             type = 'video';
+    else if (file.mimetype?.startsWith('audio/'))        type = 'audio';
+    else if (file.mimetype?.includes('pdf'))             type = 'document';
+
+    return {
+      url:      file.path,       // Cloudinary secure URL
+      publicId: file.filename,   // Cloudinary public_id
+      type,
+      caption:  '',
+    };
+  });
+
+/** Safe JSON parse — returns fallback on failure */
+const safeParse = (value, fallback) => {
+  if (typeof value !== 'string') return value ?? fallback;
+  try { return JSON.parse(value); } catch { return fallback; }
+};
+
+// ── Controllers ────────────────────────────────────────────────────────────────
+
+/**
+ * @desc  Create a new incident with optional media & AI triage
+ * @route POST /api/report        (multipart, with upload middleware)
+ * @route POST /api/incidents     (JSON only)
+ * @access Private
+ */
 export const createIncident = async (req, res) => {
   try {
     let { title, description, type, location, affectedCount, tags } = req.body;
 
-    // If location is sent as a string (multipart/form-data), parse it
-    if (typeof location === 'string') {
-      try { location = JSON.parse(location); } catch (e) { /* ignore */ }
-    }
-    
-    // If tags is sent as a string (multipart/form-data), parse it
-    if (typeof tags === 'string') {
-      try { tags = JSON.parse(tags); } catch (e) { /* ignore */ }
-    }
+    // ── Validate required fields ───────────────────────────────────────────────
+    if (!title?.trim())       return res.status(400).json({ success: false, message: 'Incident title is required' });
+    if (!description?.trim()) return res.status(400).json({ success: false, message: 'Description is required' });
+    if (!type?.trim())        return res.status(400).json({ success: false, message: 'Incident type is required' });
+    if (!location)            return res.status(400).json({ success: false, message: 'Location is required' });
 
-    // Process uploaded files if any
-    let media = [];
-    if (req.files && req.files.length > 0) {
-      media = req.files.map(file => {
-        let type = 'image';
-        if (file.mimetype.startsWith('video/')) type = 'video';
-        else if (file.mimetype.startsWith('audio/')) type = 'audio';
-        else if (file.mimetype.includes('pdf')) type = 'document';
+    // Normalise multipart string fields
+    location = safeParse(location, null);
+    tags     = safeParse(tags, []);
 
-        return {
-          url: file.path,
-          publicId: file.filename,
-          type: type,
-          caption: ''
-        };
-      });
+    if (!location?.coordinates || !Array.isArray(location.coordinates) || location.coordinates.length < 2) {
+      return res.status(400).json({ success: false, message: 'Invalid location: coordinates [lng, lat] are required' });
     }
 
-    // Run AI triage asynchronously based on title and description
+    // ── Media ──────────────────────────────────────────────────────────────────
+    const media = buildMediaArray(req.files);
+
+    // ── AI Triage ─────────────────────────────────────────────────────────────
     const triageData = await analyzeIncident(title, description);
 
-    // Create incident using user input, media, and AI output
+    // ── Save Incident ─────────────────────────────────────────────────────────
     const newIncident = new Incident({
-      title,
-      description,
+      title:        title.trim(),
+      description:  description.trim(),
       type,
       location,
-      severity: triageData.urgency || 'medium', // Map AI urgency to severity
-      reportedBy: req.user._id, // Assuming auth middleware sets req.user
+      severity:     triageData.urgency || 'medium',
+      reportedBy:   req.user._id,
       media,
-      affectedCount: affectedCount || triageData.estimatedAffected,
+      affectedCount: affectedCount ? Number(affectedCount) : (triageData.estimatedAffected || 0),
       aiTriage: {
-        summary: triageData.summary,
-        recommendedActions: triageData.recommendedActions,
-        estimatedAffected: triageData.estimatedAffected,
-        riskScore: triageData.riskScore,
-        processedAt: new Date(),
-        modelUsed: 'gemini-1.5-flash',
+        summary:              triageData.summary,
+        recommendedActions:   triageData.recommendedActions,
+        estimatedAffected:    triageData.estimatedAffected,
+        riskScore:            triageData.riskScore,
+        processedAt:          new Date(),
+        modelUsed:            'gemini-2.0-flash',
       },
-      tags: tags || [],
+      tags: Array.isArray(tags) ? tags : [],
     });
 
     const savedIncident = await newIncident.save();
 
-    // Emit real-time event to all connected clients
+    // Broadcast to all dashboard clients
     io.emit('newIncident', savedIncident);
 
-    res.status(201).json({
-      success: true,
-      message: 'Incident reported successfully',
+    return res.status(201).json({
+      success:  true,
+      message:  'Incident reported successfully',
       incident: savedIncident,
     });
   } catch (error) {
-    console.error('Error creating incident:', error);
-    res.status(500).json({ success: false, message: 'Server error while creating incident' });
+    console.error('[createIncident] Error:', error);
+
+    // Multer / upload errors bubble up here
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ success: false, message: 'File too large. Maximum 10 MB per file.' });
+    }
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({ success: false, message: 'Too many files. Maximum 5 files allowed.' });
+    }
+    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({ success: false, message: 'Unexpected file field. Use "media" as the field name.' });
+    }
+
+    return res.status(500).json({ success: false, message: error.message || 'Server error while creating incident' });
   }
 };
 
-// Fetch all incidents (optionally filter by status/type)
+/**
+ * @desc  Get all incidents (optionally filter by status / type)
+ * @route GET /api/incidents
+ * @access Private
+ */
 export const getAllIncidents = async (req, res) => {
   try {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
-    
-    // We want to fetch mostly active ones or all, sorting by newest
-    const incidents = await Incident.find(filter).sort({ createdAt: -1 });
-    
-    res.status(200).json({
-      success: true,
-      count: incidents.length,
+    if (req.query.type)   filter.type   = req.query.type;
+
+    const incidents = await Incident.find(filter)
+      .sort({ createdAt: -1 })
+      .populate('reportedBy', 'name email avatar role');
+
+    return res.status(200).json({
+      success:   true,
+      count:     incidents.length,
       incidents,
     });
   } catch (error) {
-    console.error('Error fetching incidents:', error);
-    res.status(500).json({ success: false, message: 'Server error while fetching incidents' });
+    console.error('[getAllIncidents] Error:', error);
+    return res.status(500).json({ success: false, message: 'Server error while fetching incidents' });
   }
 };
 
-// Controller to handle media upload for an existing incident
+/**
+ * @desc  Upload additional media to an existing incident
+ * @route POST /api/incidents/:id/media
+ * @access Private
+ */
 export const uploadIncidentMedia = async (req, res) => {
   try {
-    const { id } = req.params;
-    
-    // Find incident
-    const incident = await Incident.findById(id);
-
+    const incident = await Incident.findById(req.params.id);
     if (!incident) {
       return res.status(404).json({ success: false, message: 'Incident not found' });
     }
-
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ success: false, message: 'No media files uploaded' });
     }
 
-    // Process uploaded files
-    const newMedia = req.files.map(file => {
-      // Determine type based on mimetype
-      let type = 'image';
-      if (file.mimetype.startsWith('video/')) type = 'video';
-      else if (file.mimetype.startsWith('audio/')) type = 'audio';
-      else if (file.mimetype.includes('pdf')) type = 'document';
-
-      return {
-        url: file.path,
-        publicId: file.filename,
-        type: type,
-        caption: req.body.caption || ''
-      };
-    });
-
-    // Add media to incident
+    const newMedia = buildMediaArray(req.files);
     incident.media.push(...newMedia);
     await incident.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'Media uploaded successfully',
-      media: incident.media
+      media:   incident.media,
     });
   } catch (error) {
-    console.error('Error uploading media:', error);
-    res.status(500).json({ success: false, message: 'Server error while uploading media' });
+    console.error('[uploadIncidentMedia] Error:', error);
+    return res.status(500).json({ success: false, message: 'Server error while uploading media' });
   }
 };
 
-// Update incident status (acknowledged → responding → resolved → closed)
+/**
+ * @desc  Update incident status
+ * @route PATCH /api/incidents/:id/status
+ * @access Private
+ */
 export const updateIncidentStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, note } = req.body;
 
-    const allowed = ['reported', 'acknowledged', 'responding', 'resolved', 'closed'];
-    if (!allowed.includes(status)) {
-      return res.status(400).json({ success: false, message: 'Invalid status value' });
+    const VALID_STATUSES = ['reported', 'acknowledged', 'responding', 'resolved', 'closed'];
+    if (!VALID_STATUSES.includes(status)) {
+      return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` });
     }
 
     const incident = await Incident.findById(id);
     if (!incident) return res.status(404).json({ success: false, message: 'Incident not found' });
 
-    // Store updatedBy for the pre-save hook
     incident._updatedBy = req.user._id;
-    incident.status = status;
-    if (note) {
-      incident.statusHistory.push({ status, note, updatedBy: req.user._id, updatedAt: new Date() });
-    }
+    incident.status     = status;
+
+    // Always push to statusHistory when status changes
+    incident.statusHistory.push({
+      status,
+      note:      note?.trim() || '',
+      updatedBy: req.user._id,
+      updatedAt: new Date(),
+    });
 
     const updated = await incident.save();
 
-    // Broadcast status change to all connected clients
     io.emit('incidentUpdated', { incidentId: id, status, note, updatedBy: req.user.name });
 
-    res.status(200).json({ success: true, message: 'Status updated', incident: updated });
+    return res.status(200).json({ success: true, message: 'Status updated', incident: updated });
   } catch (error) {
-    console.error('Error updating status:', error);
-    res.status(500).json({ success: false, message: 'Server error while updating status' });
+    console.error('[updateIncidentStatus] Error:', error);
+    return res.status(500).json({ success: false, message: 'Server error while updating status' });
   }
 };
 
-// Update incident severity / priority
+/**
+ * @desc  Update incident severity
+ * @route PATCH /api/incidents/:id/severity
+ * @access Private
+ */
 export const updateIncidentSeverity = async (req, res) => {
   try {
     const { id } = req.params;
     const { severity } = req.body;
 
-    const allowed = ['low', 'medium', 'high', 'critical'];
-    if (!allowed.includes(severity)) {
-      return res.status(400).json({ success: false, message: 'Invalid severity value' });
+    const VALID_SEVERITIES = ['low', 'medium', 'high', 'critical'];
+    if (!VALID_SEVERITIES.includes(severity)) {
+      return res.status(400).json({ success: false, message: `Invalid severity. Must be one of: ${VALID_SEVERITIES.join(', ')}` });
     }
 
-    const incident = await Incident.findByIdAndUpdate(
-      id,
-      { severity },
-      { new: true, runValidators: true }
-    );
+    const incident = await Incident.findByIdAndUpdate(id, { severity }, { new: true, runValidators: true });
     if (!incident) return res.status(404).json({ success: false, message: 'Incident not found' });
 
-    // Broadcast severity change
     io.emit('incidentUpdated', { incidentId: id, severity, updatedBy: req.user.name });
 
-    res.status(200).json({ success: true, message: 'Severity updated', incident });
+    return res.status(200).json({ success: true, message: 'Severity updated', incident });
   } catch (error) {
-    console.error('Error updating severity:', error);
-    res.status(500).json({ success: false, message: 'Server error while updating severity' });
+    console.error('[updateIncidentSeverity] Error:', error);
+    return res.status(500).json({ success: false, message: 'Server error while updating severity' });
   }
 };
 
-// Broadcast an emergency alert to all connected clients
+/**
+ * @desc  Broadcast an emergency alert
+ * @route POST /api/incidents/broadcast-alert
+ * @access Private
+ */
 export const broadcastAlert = async (req, res) => {
   try {
     const { incidentId, message, alertType } = req.body;
 
-    if (!message) {
+    if (!message?.trim()) {
       return res.status(400).json({ success: false, message: 'Alert message is required' });
     }
 
     const alertPayload = {
       incidentId,
-      message,
-      alertType: alertType || 'general',   // general | evacuation | shelter | medical
+      message:     message.trim(),
+      alertType:   alertType || 'general',
       broadcastBy: req.user.name,
       broadcastAt: new Date(),
     };
 
-    // Emit to all connected clients (civilians + responders)
     io.emit('alertBroadcast', alertPayload);
 
-    res.status(200).json({ success: true, message: 'Alert broadcast sent', alert: alertPayload });
+    return res.status(200).json({ success: true, message: 'Alert broadcast sent', alert: alertPayload });
   } catch (error) {
-    console.error('Error broadcasting alert:', error);
-    res.status(500).json({ success: false, message: 'Server error while broadcasting alert' });
+    console.error('[broadcastAlert] Error:', error);
+    return res.status(500).json({ success: false, message: 'Server error while broadcasting alert' });
   }
 };
 
-// Fetch nearby incidents using MongoDB geospatial queries
+/**
+ * @desc  Get nearby active incidents (geospatial)
+ * @route GET /api/incidents/nearby?lng=&lat=&maxDistance=
+ * @access Private
+ */
 export const getNearbyIncidents = async (req, res) => {
   try {
-    const { lng, lat, maxDistance = 10000 } = req.query; // maxDistance default 10km (10000 meters)
+    const { lng, lat, maxDistance = 10000 } = req.query;
 
     if (!lng || !lat) {
-      return res.status(400).json({ success: false, message: 'Longitude and latitude are required' });
+      return res.status(400).json({ success: false, message: 'Longitude and latitude query params are required' });
     }
 
-    // Must ensure Incident schema has a 2dsphere index on location
-    // Wait, the schema should have `location: { type: 'Point', coordinates: [lng, lat] }` and an index.
     const incidents = await Incident.find({
       location: {
         $near: {
           $geometry: {
-            type: 'Point',
+            type:        'Point',
             coordinates: [parseFloat(lng), parseFloat(lat)],
           },
           $maxDistance: parseInt(maxDistance),
         },
       },
-      status: { $nin: ['resolved', 'closed'] }, // Optionally only show active ones to volunteers
-    });
+      status: { $nin: ['resolved', 'closed'] },
+    }).populate('reportedBy', 'name avatar');
 
-    res.status(200).json({
-      success: true,
-      count: incidents.length,
-      incidents,
-    });
+    return res.status(200).json({ success: true, count: incidents.length, incidents });
   } catch (error) {
-    console.error('Error fetching nearby incidents:', error);
-    res.status(500).json({ success: false, message: 'Server error while fetching nearby incidents' });
+    console.error('[getNearbyIncidents] Error:', error);
+    return res.status(500).json({ success: false, message: 'Server error while fetching nearby incidents' });
   }
 };
 
-// Volunteer accepts an incident task
+/**
+ * @desc  Volunteer accepts an incident task
+ * @route POST /api/incidents/:id/accept
+ * @access Private
+ */
 export const acceptIncidentTask = async (req, res) => {
   try {
     const { id } = req.params;
@@ -276,37 +308,28 @@ export const acceptIncidentTask = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Incident not found' });
     }
 
-    // Check if user is already assigned
-    if (incident.assignedResponders.includes(userId)) {
+    if (incident.assignedResponders.some(r => r.toString() === userId.toString())) {
       return res.status(400).json({ success: false, message: 'You have already accepted this task' });
     }
 
-    // Assign volunteer
     incident.assignedResponders.push(userId);
 
-    // Update status to responding if it was just reported/acknowledged
     if (['reported', 'acknowledged'].includes(incident.status)) {
-      incident.status = 'responding';
-      incident._updatedBy = userId; // Triggers statusHistory pre-save hook
+      incident.status     = 'responding';
+      incident._updatedBy = userId;
     }
 
     const updatedIncident = await incident.save();
 
-    // Broadcast update so map/dashboard reflect the change
-    io.emit('incidentUpdated', { 
-      incidentId: id, 
-      status: incident.status, 
-      assignedResponders: updatedIncident.assignedResponders 
+    io.emit('incidentUpdated', {
+      incidentId:         id,
+      status:             incident.status,
+      assignedResponders: updatedIncident.assignedResponders,
     });
 
-    res.status(200).json({
-      success: true,
-      message: 'Task accepted successfully',
-      incident: updatedIncident
-    });
+    return res.status(200).json({ success: true, message: 'Task accepted successfully', incident: updatedIncident });
   } catch (error) {
-    console.error('Error accepting task:', error);
-    res.status(500).json({ success: false, message: 'Server error while accepting task' });
+    console.error('[acceptIncidentTask] Error:', error);
+    return res.status(500).json({ success: false, message: 'Server error while accepting task' });
   }
 };
-

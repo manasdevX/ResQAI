@@ -195,10 +195,10 @@ IncidentSchema.index({ createdAt: -1 });
 
 // ─── Pre-save: Push to statusHistory on status change ─────────────────────────
 
-IncidentSchema.pre('save', function (next) {
+IncidentSchema.pre('save', function () {
   if (this.isModified('status') && !this.isNew) {
     this.statusHistory.push({
-      status: this.status,
+      status:    this.status,
       updatedBy: this._updatedBy || this.reportedBy,
       updatedAt: new Date(),
     });
@@ -208,8 +208,6 @@ IncidentSchema.pre('save', function (next) {
   if (this.status === 'resolved' && !this.resolvedAt) {
     this.resolvedAt = new Date();
   }
-
-  next();
 });
 
 // ─── Virtual: Response time in minutes ────────────────────────────────────────

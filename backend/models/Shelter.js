@@ -178,7 +178,7 @@ ShelterSchema.index({ managedBy: 1 });
 
 // ─── Pre-save: Auto-update status based on occupancy ─────────────────────────
 
-ShelterSchema.pre('save', function (next) {
+ShelterSchema.pre('save', function () {
   if (this.autoCloseWhenFull) {
     if (this.currentOccupancy >= this.totalCapacity && this.status === 'active') {
       this.status = 'full';
@@ -186,7 +186,6 @@ ShelterSchema.pre('save', function (next) {
       this.status = 'active';
     }
   }
-  next();
 });
 
 // ─── Virtual: Available spots ─────────────────────────────────────────────────
