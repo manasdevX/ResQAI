@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import VolunteerDashboard from './pages/VolunteerDashboard';
 import Report from './pages/Report';
 import Shelters from './pages/Shelters';
+import Chat from './pages/Chat';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -25,6 +26,7 @@ function App() {
               <Route path="/volunteer-dashboard" element={<VolunteerDashboard />} />
               <Route path="/report" element={<Report />} />
               <Route path="/shelters" element={<Shelters />} />
+              <Route path="/chat" element={<Chat />} />
             </Route>
             
             {/* Example of Role-based protection:

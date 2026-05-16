@@ -9,6 +9,8 @@ import authRoutes from './routes/authRoutes.js';
 import incidentRoutes from './routes/incidentRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import shelterRoutes from './routes/shelterRoutes.js';
+import chatRoutes from './routes/chatRoutes.js';
+import { setupChatSocket } from './controllers/chatController.js';
 
 // Load environment variables (suppress console tips)
 dotenv.config({ quiet: true });
@@ -56,15 +58,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/report', reportRoutes);
 app.use('/api/shelters', shelterRoutes);
+app.use('/api/chat', chatRoutes);
 
-// Socket.io Connection Event
-io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
-
-  socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
-  });
-});
+// Socket.IO — chat handler (handles all chat:* events + online users)
+setupChatSocket(io);
 
 // Database Connection & Server Start
 const PORT = process.env.PORT || 5000;

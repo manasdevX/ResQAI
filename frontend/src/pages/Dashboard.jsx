@@ -365,6 +365,12 @@ const Dashboard = () => {
             >
               <span>🏥</span> Find Shelters & Hospitals
             </a>
+            <a
+              href="/chat"
+              className="flex items-center justify-center gap-2 w-full py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-semibold transition border border-zinc-700"
+            >
+              <span>💬</span> Open Chat
+            </a>
           </div>
         </aside>
       </div>
