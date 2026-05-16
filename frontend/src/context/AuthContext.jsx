@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 
 const AuthContext = createContext();
@@ -11,43 +11,35 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken]   = useState(() => localStorage.getItem('token') || null);
   const [loading, setLoading] = useState(true);
 
-  // Keep a mutable ref so interceptors always read the freshest token
-  // without needing to be recreated on every token change.
-  const tokenRef = useRef(token);
-
-  // Sync ref whenever token state changes
-  useEffect(() => {
-    tokenRef.current = token;
-  }, [token]);
-
-  // Stable axios instance — created once for the lifetime of the provider
+  // Stable axios instance — recreated only when token changes
   const api = useMemo(() => {
-    const instance = axios.create({ baseURL: 'http://localhost:5000/api' });
-
-    instance.interceptors.request.use((config) => {
-      const t = tokenRef.current;
-      if (t) {
-        config.headers.Authorization = `Bearer ${t}`;
-      }
-      return config;
+    const instance = axios.create({ 
+      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api' 
     });
 
+    if (token) {
+      instance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    }
+
     return instance;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally empty — instance must not be recreated
+  }, [token]);
 
   // On mount: if a token exists in storage, validate it and hydrate user state
   useEffect(() => {
     const fetchUser = async () => {
-      const storedToken = tokenRef.current;
+      // If we already have a user in state (e.g. from login), don't re-validate
+      if (user) {
+        setLoading(false);
+        return;
+      }
+
+      const storedToken = localStorage.getItem('token');
       if (storedToken) {
         try {
           const { data } = await api.get('/auth/me');
           setUser(data);
         } catch (error) {
-          // Token is invalid or expired — clear everything
           console.error('Session validation failed:', error);
-          tokenRef.current = null;
           localStorage.removeItem('token');
           setToken(null);
           setUser(null);
@@ -57,15 +49,13 @@ export const AuthProvider = ({ children }) => {
     };
 
     fetchUser();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // run once on mount only
+  }, [api, user]); // validate session when api instance is ready or user state is empty
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   /** Save token + user after a successful auth API response */
   const persistAuth = (data) => {
     const { token: newToken, ...userData } = data;
-    tokenRef.current = newToken;           // update ref immediately (before state flush)
     localStorage.setItem('token', newToken);
     setToken(newToken);
     setUser(userData);
@@ -89,7 +79,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    tokenRef.current = null; // clear immediately so in-flight requests drop the header
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);

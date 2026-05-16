@@ -5,6 +5,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 import authRoutes from './routes/authRoutes.js';
 import incidentRoutes from './routes/incidentRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
@@ -28,6 +29,7 @@ export const io = new Server(httpServer, {
 });
 
 // Middleware
+app.use(helmet({ crossOriginResourcePolicy: false })); // Allow cross-origin images/resources if needed
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
@@ -81,12 +83,17 @@ httpServer.on('error', (err) => {
 
 mongoose.connect(MONGO_URI)
   .then(() => {
-    console.log('Connected to MongoDB');
+    console.log('\n🚀 [ResQAI Server] System Initialized');
+    console.log('─────────────────────────────────────────');
+    console.log(`✅ MongoDB:    Connected successfully`);
     httpServer.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      console.log(`📡 Network:    Listening on port ${PORT}`);
+      console.log(`🔗 API Base:   http://localhost:${PORT}/api`);
+      console.log('─────────────────────────────────────────\n');
     });
   })
   .catch((err) => {
-    console.error('Failed to connect to MongoDB:', err.message);
+    console.error('\n❌ [ResQAI Server] Bootstrapping Failed');
+    console.error(`💥 Reason: ${err.message}\n`);
     process.exit(1);
   });

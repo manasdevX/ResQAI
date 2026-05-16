@@ -8,7 +8,7 @@ import {
   updateShelterStatus,
   deleteShelter,
 } from '../controllers/shelterController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -25,16 +25,16 @@ router.get('/:id', protect, getShelterById);
 
 // ── Write routes ──────────────────────────────────────────────────────────────
 
-// POST create a new shelter
-router.post('/', protect, createShelter);
+// POST create a new shelter (Admin/Shelter Manager)
+router.post('/', protect, authorize('admin', 'shelter_manager'), createShelter);
 
-// PATCH update occupancy (+/- delta)
-router.patch('/:id/occupancy', protect, updateOccupancy);
+// PATCH update occupancy (Admin/Shelter Manager)
+router.patch('/:id/occupancy', protect, authorize('admin', 'shelter_manager'), updateOccupancy);
 
-// PATCH update shelter status
-router.patch('/:id/status', protect, updateShelterStatus);
+// PATCH update shelter status (Admin/Shelter Manager)
+router.patch('/:id/status', protect, authorize('admin', 'shelter_manager'), updateShelterStatus);
 
-// DELETE remove a shelter (admin)
-router.delete('/:id', protect, deleteShelter);
+// DELETE remove a shelter (Admin only)
+router.delete('/:id', protect, authorize('admin'), deleteShelter);
 
 export default router;

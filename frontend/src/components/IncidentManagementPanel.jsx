@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 const STATUS_OPTIONS = [
   { value: 'reported',     label: 'Reported',     color: 'text-zinc-400' },
@@ -23,7 +23,8 @@ const ALERT_TYPES = [
   { value: 'medical',    label: '🚑 Medical',     desc: 'Medical emergency response' },
 ];
 
-const IncidentManagementPanel = ({ incident, token, onIncidentUpdated }) => {
+const IncidentManagementPanel = ({ incident, onIncidentUpdated }) => {
+  const { api } = useAuth();
   const [activeTab, setActiveTab]     = useState('status'); // 'status' | 'priority' | 'alert'
   const [selectedStatus, setSelectedStatus]   = useState(incident.status);
   const [statusNote, setStatusNote]           = useState('');
@@ -32,9 +33,6 @@ const IncidentManagementPanel = ({ incident, token, onIncidentUpdated }) => {
   const [alertType, setAlertType]             = useState('general');
   const [loading, setLoading]                 = useState(false);
   const [feedback, setFeedback]               = useState(null); // { type: 'success'|'error', text }
-
-  const headers = { Authorization: `Bearer ${token}` };
-  const BASE = 'http://localhost:5000/api/incidents';
 
   const showFeedback = (type, text) => {
     setFeedback({ type, text });
@@ -45,10 +43,9 @@ const IncidentManagementPanel = ({ incident, token, onIncidentUpdated }) => {
     if (selectedStatus === incident.status && !statusNote) return;
     setLoading(true);
     try {
-      const { data } = await axios.patch(
-        `${BASE}/${incident._id}/status`,
-        { status: selectedStatus, note: statusNote },
-        { headers }
+      const { data } = await api.patch(
+        `/incidents/${incident._id}/status`,
+        { status: selectedStatus, note: statusNote }
       );
       onIncidentUpdated(data.incident);
       showFeedback('success', `Status updated to "${selectedStatus}"`);
@@ -64,10 +61,9 @@ const IncidentManagementPanel = ({ incident, token, onIncidentUpdated }) => {
     if (selectedSeverity === incident.severity) return;
     setLoading(true);
     try {
-      const { data } = await axios.patch(
-        `${BASE}/${incident._id}/severity`,
-        { severity: selectedSeverity },
-        { headers }
+      const { data } = await api.patch(
+        `/incidents/${incident._id}/severity`,
+        { severity: selectedSeverity }
       );
       onIncidentUpdated(data.incident);
       showFeedback('success', `Priority set to "${selectedSeverity}"`);
@@ -82,10 +78,9 @@ const IncidentManagementPanel = ({ incident, token, onIncidentUpdated }) => {
     if (!alertMessage.trim()) return;
     setLoading(true);
     try {
-      await axios.post(
-        `${BASE}/broadcast-alert`,
-        { incidentId: incident._id, message: alertMessage, alertType },
-        { headers }
+      await api.post(
+        '/incidents/broadcast-alert',
+        { incidentId: incident._id, message: alertMessage, alertType }
       );
       showFeedback('success', 'Alert broadcast sent to all users!');
       setAlertMessage('');

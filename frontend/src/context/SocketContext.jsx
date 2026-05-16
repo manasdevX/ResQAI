@@ -24,7 +24,8 @@ export const SocketProvider = ({ children }) => {
       return;
     }
 
-    const s = io('http://localhost:5000', {
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+    const s = io(socketUrl, {
       auth:        { token },           // send JWT so server can validate if needed
       reconnection: true,
       reconnectionAttempts: 10,

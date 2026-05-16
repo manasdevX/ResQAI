@@ -11,7 +11,7 @@ import {
   acceptIncidentTask,
 } from '../controllers/incidentController.js';
 import upload from '../middleware/upload.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -41,17 +41,17 @@ router.get('/', protect, getAllIncidents);
 // Get nearby active incidents
 router.get('/nearby', protect, getNearbyIncidents);
 
-// Broadcast emergency alert (must be BEFORE /:id routes to avoid param collision)
-router.post('/broadcast-alert', protect, broadcastAlert);
+// Broadcast emergency alert (Admin/Responder only)
+router.post('/broadcast-alert', protect, authorize('admin', 'responder'), broadcastAlert);
 
 // Update status of a specific incident
 router.patch('/:id/status', protect, updateIncidentStatus);
 
-// Update severity (priority) of a specific incident
-router.patch('/:id/severity', protect, updateIncidentSeverity);
+// Update severity (priority) of a specific incident (Admin/Responder only)
+router.patch('/:id/severity', protect, authorize('admin', 'responder'), updateIncidentSeverity);
 
-// Volunteer accepts an incident
-router.post('/:id/accept', protect, acceptIncidentTask);
+// Volunteer accepts an incident (Responder only)
+router.post('/:id/accept', protect, authorize('responder', 'admin'), acceptIncidentTask);
 
 // Upload media to a specific incident
 router.post('/:id/media', protect, withUpload('media', 5), uploadIncidentMedia);

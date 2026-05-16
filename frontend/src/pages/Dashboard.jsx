@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import LiveMap from '../components/LiveMap';
 import IncidentToast from '../components/IncidentToast';
 import IncidentManagementPanel from '../components/IncidentManagementPanel';
-import axios from 'axios';
 
 const SEVERITY_COLORS = {
   critical: 'bg-red-500/20 text-red-400 border-red-500/30',
@@ -29,7 +28,7 @@ const TYPE_ICONS = {
 
 const Dashboard = () => {
   const socket = useSocket();
-  const { token, user, logout } = useAuth();
+  const { token, user, logout, api } = useAuth();
 
   const [incidents, setIncidents]               = useState([]);
   const [loading, setLoading]                   = useState(true);
@@ -46,9 +45,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchIncidents = async () => {
       try {
-        const { data } = await axios.get('http://localhost:5000/api/incidents', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const { data } = await api.get('/incidents');
         if (data.success) setIncidents(data.incidents);
       } catch (err) {
         console.error('Failed to fetch incidents:', err);
