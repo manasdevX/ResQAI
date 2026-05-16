@@ -1,0 +1,229 @@
+import Shelter from '../models/Shelter.js';
+import { io } from '../server.js';
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+const safeParse = (value, fallback) => {
+  if (typeof value !== 'string') return value ?? fallback;
+  try { return JSON.parse(value); } catch { return fallback; }
+};
+
+// ── Controllers ────────────────────────────────────────────────────────────────
+
+/**
+ * @desc  Get all shelters (with optional status / type filters)
+ * @route GET /api/shelters
+ * @access Private
+ */
+export const getAllShelters = async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.type)   filter.type   = req.query.type;
+
+    const shelters = await Shelter.find(filter)
+      .populate('managedBy', 'name email phone')
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({ success: true, count: shelters.length, shelters });
+  } catch (error) {
+    console.error('[getAllShelters]', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch shelters' });
+  }
+};
+
+/**
+ * @desc  Get a single shelter by ID
+ * @route GET /api/shelters/:id
+ * @access Private
+ */
+export const getShelterById = async (req, res) => {
+  try {
+    const shelter = await Shelter.findById(req.params.id)
+      .populate('managedBy', 'name email phone')
+      .populate('registeredOccupants', 'name email');
+
+    if (!shelter) return res.status(404).json({ success: false, message: 'Shelter not found' });
+    return res.status(200).json({ success: true, shelter });
+  } catch (error) {
+    console.error('[getShelterById]', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch shelter' });
+  }
+};
+
+/**
+ * @desc  Get nearby active shelters within a radius
+ * @route GET /api/shelters/nearby?lng=&lat=&maxDistance=&type=
+ * @access Private
+ */
+export const getNearbyShelters = async (req, res) => {
+  try {
+    const { lng, lat, maxDistance = 50000, type } = req.query; // default 50 km
+
+    if (!lng || !lat) {
+      return res.status(400).json({ success: false, message: 'lng and lat query params are required' });
+    }
+
+    const geoQuery = {
+      location: {
+        $near: {
+          $geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
+          $maxDistance: parseInt(maxDistance),
+        },
+      },
+      status: { $in: ['active', 'preparing'] },
+    };
+
+    if (type) geoQuery.type = type;
+
+    const shelters = await Shelter.find(geoQuery)
+      .select('-registeredOccupants -linkedIncidents')
+      .populate('managedBy', 'name phone');
+
+    // Append distance (straight-line km) to each shelter for the UI
+    const userLat = parseFloat(lat);
+    const userLng = parseFloat(lng);
+    const withDist = shelters.map((s) => {
+      const [sLng, sLat] = s.location.coordinates;
+      const R = 6371;
+      const dLat = ((sLat - userLat) * Math.PI) / 180;
+      const dLon = ((sLng - userLng) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((userLat * Math.PI) / 180) *
+          Math.cos((sLat * Math.PI) / 180) *
+          Math.sin(dLon / 2) ** 2;
+      const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return { ...s.toJSON(), distanceKm: Math.round(distKm * 10) / 10 };
+    });
+
+    return res.status(200).json({ success: true, count: withDist.length, shelters: withDist });
+  } catch (error) {
+    console.error('[getNearbyShelters]', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch nearby shelters' });
+  }
+};
+
+/**
+ * @desc  Create a new shelter
+ * @route POST /api/shelters
+ * @access Private (admin / shelter_manager)
+ */
+export const createShelter = async (req, res) => {
+  try {
+    let { name, type, location, totalCapacity, description, amenities, contacts } = req.body;
+
+    if (!name?.trim())    return res.status(400).json({ success: false, message: 'Shelter name is required' });
+    if (!location)        return res.status(400).json({ success: false, message: 'Location is required' });
+    if (!totalCapacity)   return res.status(400).json({ success: false, message: 'Total capacity is required' });
+
+    location  = safeParse(location,  null);
+    amenities = safeParse(amenities, {});
+    contacts  = safeParse(contacts,  []);
+
+    if (!location?.coordinates?.length) {
+      return res.status(400).json({ success: false, message: 'Invalid location coordinates' });
+    }
+
+    const shelter = await Shelter.create({
+      name:          name.trim(),
+      type:          type || 'relief_camp',
+      location,
+      totalCapacity: Number(totalCapacity),
+      description:   description?.trim(),
+      amenities,
+      contacts,
+      managedBy:     req.user._id,
+    });
+
+    io.emit('shelterCreated', shelter);
+
+    return res.status(201).json({ success: true, message: 'Shelter created', shelter });
+  } catch (error) {
+    console.error('[createShelter]', error);
+    return res.status(500).json({ success: false, message: error.message || 'Failed to create shelter' });
+  }
+};
+
+/**
+ * @desc  Update shelter occupancy (check-in / check-out)
+ * @route PATCH /api/shelters/:id/occupancy
+ * @access Private
+ */
+export const updateOccupancy = async (req, res) => {
+  try {
+    const { delta } = req.body; // +1 check-in, -1 check-out, any integer
+    if (typeof delta !== 'number') {
+      return res.status(400).json({ success: false, message: '"delta" must be a number (e.g. 1 or -1)' });
+    }
+
+    const shelter = await Shelter.findById(req.params.id);
+    if (!shelter) return res.status(404).json({ success: false, message: 'Shelter not found' });
+
+    const newOccupancy = shelter.currentOccupancy + delta;
+    if (newOccupancy < 0) {
+      return res.status(400).json({ success: false, message: 'Occupancy cannot go below 0' });
+    }
+    if (newOccupancy > shelter.totalCapacity) {
+      return res.status(400).json({ success: false, message: 'Exceeds total capacity' });
+    }
+
+    shelter.currentOccupancy = newOccupancy;
+    const updated = await shelter.save();
+
+    io.emit('shelterUpdated', { shelterId: updated._id, currentOccupancy: updated.currentOccupancy, status: updated.status });
+
+    return res.status(200).json({ success: true, shelter: updated });
+  } catch (error) {
+    console.error('[updateOccupancy]', error);
+    return res.status(500).json({ success: false, message: 'Failed to update occupancy' });
+  }
+};
+
+/**
+ * @desc  Update shelter status
+ * @route PATCH /api/shelters/:id/status
+ * @access Private
+ */
+export const updateShelterStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const VALID = ['active', 'full', 'closed', 'preparing'];
+    if (!VALID.includes(status)) {
+      return res.status(400).json({ success: false, message: `Status must be one of: ${VALID.join(', ')}` });
+    }
+
+    const shelter = await Shelter.findByIdAndUpdate(
+      req.params.id,
+      { status, ...(status === 'closed' ? { closedAt: new Date() } : {}) },
+      { new: true, runValidators: true }
+    );
+    if (!shelter) return res.status(404).json({ success: false, message: 'Shelter not found' });
+
+    io.emit('shelterUpdated', { shelterId: shelter._id, status });
+
+    return res.status(200).json({ success: true, shelter });
+  } catch (error) {
+    console.error('[updateShelterStatus]', error);
+    return res.status(500).json({ success: false, message: 'Failed to update status' });
+  }
+};
+
+/**
+ * @desc  Delete a shelter
+ * @route DELETE /api/shelters/:id
+ * @access Private (admin only)
+ */
+export const deleteShelter = async (req, res) => {
+  try {
+    const shelter = await Shelter.findByIdAndDelete(req.params.id);
+    if (!shelter) return res.status(404).json({ success: false, message: 'Shelter not found' });
+
+    io.emit('shelterDeleted', { shelterId: req.params.id });
+
+    return res.status(200).json({ success: true, message: 'Shelter deleted' });
+  } catch (error) {
+    console.error('[deleteShelter]', error);
+    return res.status(500).json({ success: false, message: 'Failed to delete shelter' });
+  }
+};

@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/authRoutes.js';
 import incidentRoutes from './routes/incidentRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
+import shelterRoutes from './routes/shelterRoutes.js';
 
 // Load environment variables (suppress console tips)
 dotenv.config({ quiet: true });
@@ -54,6 +55,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/report', reportRoutes);
+app.use('/api/shelters', shelterRoutes);
 
 // Socket.io Connection Event
 io.on('connection', (socket) => {

@@ -351,13 +351,19 @@ const Dashboard = () => {
             )}
           </div>
 
-          {/* Footer CTA */}
-          <div className="px-4 py-3 border-t border-zinc-800 shrink-0">
+          {/* Footer CTAs */}
+          <div className="px-4 py-3 border-t border-zinc-800 shrink-0 space-y-2">
             <a
               href="/report"
               className="flex items-center justify-center gap-2 w-full py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-semibold transition"
             >
               <span>🚨</span> Report New Incident
+            </a>
+            <a
+              href="/shelters"
+              className="flex items-center justify-center gap-2 w-full py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-semibold transition border border-zinc-700"
+            >
+              <span>🏥</span> Find Shelters & Hospitals
             </a>
           </div>
         </aside>
