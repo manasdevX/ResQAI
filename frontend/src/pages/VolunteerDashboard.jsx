@@ -4,33 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { MapPin, RefreshCw, LogOut, Zap, CheckCircle, AlertTriangle, MessageCircle, Home } from 'lucide-react';
 
-const SEVERITY_COLORS = {
-  critical: 'bg-red-500/20 text-red-400 border-red-500/30',
-  high:     'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  medium:   'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  low:      'bg-green-500/20 text-green-400 border-green-500/30',
-};
-
-const SEVERITY_BAR = {
-  critical: 'bg-red-500',
-  high:     'bg-orange-500',
-  medium:   'bg-yellow-500',
-  low:      'bg-green-500',
-};
-
-const TYPE_ICONS = {
-  fire: '🔥', flood: '🌊', earthquake: '🌍', cyclone: '🌀',
-  landslide: '🏔️', accident: '🚗', medical_emergency: '🚑',
-  building_collapse: '🏚️', chemical_spill: '☣️', riot: '⚠️', other: '📍',
-};
-
-const STATUS_LABELS = {
-  reported:     { label: 'Reported',     color: 'bg-zinc-700 text-zinc-300' },
-  acknowledged: { label: 'Acknowledged', color: 'bg-blue-500/20 text-blue-400' },
-  responding:   { label: 'Responding',   color: 'bg-yellow-500/20 text-yellow-400' },
-  resolved:     { label: 'Resolved',     color: 'bg-green-500/20 text-green-400' },
-  closed:       { label: 'Closed',       color: 'bg-zinc-600/40 text-zinc-500' },
-};
+import { SEVERITY_BADGE, SEVERITY_DOT, TYPE_ICONS, INCIDENT_STATUS } from '../constants/incident';
 
 const haversine = (lat1, lon1, lat2, lon2) => {
   const R = 6371;
@@ -62,18 +36,18 @@ const IncidentCard = ({ inc, user, location, onAccept, accepting }) => {
     : null;
 
   const isAssigned = inc.assignedResponders?.includes(user?._id);
-  const statusStyle = STATUS_LABELS[inc.status] || STATUS_LABELS.reported;
+  const statusStyle = INCIDENT_STATUS[inc.status] || INCIDENT_STATUS.reported;
 
   return (
     <div className="flex flex-col bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-700 transition-all duration-200 animate-fade-up">
       {/* Severity bar */}
-      <div className={`h-0.5 w-full ${SEVERITY_BAR[inc.severity] || 'bg-zinc-600'}`} />
+      <div className={`h-0.5 w-full ${SEVERITY_DOT[inc.severity] || 'bg-zinc-600'}`} />
 
       <div className="p-5 flex-1 space-y-3">
         <div className="flex justify-between items-start">
           <span className="text-3xl">{TYPE_ICONS[inc.type] || '📍'}</span>
           <div className="flex flex-col items-end gap-1">
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${SEVERITY_COLORS[inc.severity]}`}>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${SEVERITY_BADGE[inc.severity]}`}>
               {inc.severity?.toUpperCase()}
             </span>
             {distStr && (

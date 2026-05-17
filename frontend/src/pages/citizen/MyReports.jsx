@@ -2,26 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { RefreshCw, MapPin, Clock, AlertTriangle, FileText } from 'lucide-react';
 
-const SEVERITY_COLORS = {
-  critical: 'bg-red-500/20 text-red-400 border-red-500/30',
-  high:     'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  medium:   'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  low:      'bg-green-500/20 text-green-400 border-green-500/30',
-};
-
-const STATUS_STYLES = {
-  reported:     { label: 'Reported',     color: 'bg-zinc-700/60 text-zinc-300' },
-  acknowledged: { label: 'Acknowledged', color: 'bg-blue-500/20 text-blue-400' },
-  responding:   { label: 'Responding',   color: 'bg-yellow-500/20 text-yellow-400' },
-  resolved:     { label: 'Resolved',     color: 'bg-green-500/20 text-green-400' },
-  closed:       { label: 'Closed',       color: 'bg-zinc-600/30 text-zinc-500' },
-};
-
-const TYPE_ICONS = {
-  fire: '🔥', flood: '🌊', earthquake: '🌍', cyclone: '🌀',
-  landslide: '🏔️', accident: '🚗', medical_emergency: '🚑',
-  building_collapse: '🏚️', chemical_spill: '☣️', riot: '⚠️', other: '📍',
-};
+import { SEVERITY_BADGE, TYPE_ICONS, INCIDENT_STATUS } from '../../constants/incident';
 
 const STATUS_STEPS = ['reported', 'acknowledged', 'responding', 'resolved'];
 
@@ -90,7 +71,7 @@ const MyReports = () => {
       ) : (
         <div className="space-y-3">
           {incidents.map(inc => {
-            const statusStyle = STATUS_STYLES[inc.status] || STATUS_STYLES.reported;
+            const statusStyle = INCIDENT_STATUS[inc.status] || INCIDENT_STATUS.reported;
             const currentStep = stepIndex(inc.status);
             const isResolved  = inc.status === 'resolved' || inc.status === 'closed';
             const isExpanded  = expanded === inc._id;
@@ -137,7 +118,7 @@ const MyReports = () => {
                       )}
                     </div>
 
-                    <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border ${SEVERITY_COLORS[inc.severity]}`}>
+                    <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border ${SEVERITY_BADGE[inc.severity]}`}>
                       {inc.severity?.toUpperCase()}
                     </span>
                   </div>

@@ -4,40 +4,10 @@ import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle } from '@react-go
 const containerStyle = { width: '100%', height: '100%' };
 const defaultCenter  = { lat: 20.5937, lng: 78.9629 };
 
-// ── Incident helpers ───────────────────────────────────────────────────────────
-const SEVERITY_COLORS = {
-  critical: '#ef4444',
-  high:     '#f97316',
-  medium:   '#eab308',
-  low:      '#22c55e',
-};
-
-const TYPE_ICONS = {
-  fire:               '🔥',  flood:             '🌊',  earthquake:        '🌍',
-  cyclone:            '🌀',  landslide:         '🏔️',  accident:          '🚗',
-  medical_emergency:  '🚑',  building_collapse: '🏚️',  chemical_spill:    '☣️',
-  riot:               '⚠️',  other:             '📍',
-};
+import { TYPE_ICONS, SEVERITY_HEX } from '../constants/incident';
+import { SHELTER_TYPE_META, SHELTER_STATUS_HEX } from '../constants/shelter';
 
 const PULSE_RADII = [3000, 6000, 9000];
-
-// ── Shelter helpers ────────────────────────────────────────────────────────────
-const SHELTER_TYPE_ICONS = {
-  hospital:            '🏥',
-  relief_camp:         '⛺',
-  school:              '🏫',
-  community_hall:      '🏛️',
-  government_building: '🏢',
-  warehouse:           '🏭',
-  other:               '📍',
-};
-
-const SHELTER_STATUS_COLORS = {
-  active:    { fill: '#22c55e', stroke: '#16a34a' },
-  full:      { fill: '#f97316', stroke: '#ea580c' },
-  preparing: { fill: '#3b82f6', stroke: '#2563eb' },
-  closed:    { fill: '#6b7280', stroke: '#4b5563' },
-};
 
 // ── Map dark style ─────────────────────────────────────────────────────────────
 const darkMapStyles = [
@@ -143,7 +113,7 @@ const LiveMap = ({
         const [lng, lat] = incident.location?.coordinates || [0, 0];
         if (!lat || !lng) return null;
         const isNew   = incident._id === pulsingId;
-        const color   = SEVERITY_COLORS[incident.severity] || '#94a3b8';
+        const color   = SEVERITY_HEX[incident.severity] || '#94a3b8';
         const isSel   = selectedIncident?._id === incident._id;
 
         return (
@@ -198,7 +168,7 @@ const LiveMap = ({
             </div>
             <div className="flex gap-2 mb-2">
               <span className="text-xs font-semibold px-2 py-0.5 rounded"
-                style={{ backgroundColor: SEVERITY_COLORS[selectedIncident.severity] + '22', color: SEVERITY_COLORS[selectedIncident.severity], border: `1px solid ${SEVERITY_COLORS[selectedIncident.severity]}44` }}>
+                style={{ backgroundColor: SEVERITY_HEX[selectedIncident.severity] + '22', color: SEVERITY_HEX[selectedIncident.severity], border: `1px solid ${SEVERITY_HEX[selectedIncident.severity]}44` }}>
                 {selectedIncident.severity?.toUpperCase()}
               </span>
               <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded border border-gray-200">
@@ -224,7 +194,7 @@ const LiveMap = ({
       {showShelters && shelters.map((shelter) => {
         const [lng, lat] = shelter.location?.coordinates || [0, 0];
         if (!lat || !lng) return null;
-        const colors    = SHELTER_STATUS_COLORS[shelter.status] || SHELTER_STATUS_COLORS.active;
+        const colors    = SHELTER_STATUS_HEX[shelter.status] || SHELTER_STATUS_HEX.active;
         const isHighlit = shelter._id === highlightShelterId;
         const isSel     = selectedShelter?._id === shelter._id;
         const pct       = shelter.occupancyPercent ?? Math.round(((shelter.currentOccupancy || 0) / (shelter.totalCapacity || 1)) * 100);
@@ -260,7 +230,7 @@ const LiveMap = ({
         >
           <div className="max-w-sm p-2 font-sans">
             <div className="flex items-start gap-2 mb-2">
-              <span className="text-2xl">{SHELTER_TYPE_ICONS[selectedShelter.type] || '📍'}</span>
+              <span className="text-2xl">{SHELTER_TYPE_META[selectedShelter.type]?.icon || '📍'}</span>
               <div>
                 <h3 className="font-bold text-gray-900 text-sm leading-tight">{selectedShelter.name}</h3>
                 <p className="text-xs text-gray-500 mt-0.5">{selectedShelter.location?.address}</p>

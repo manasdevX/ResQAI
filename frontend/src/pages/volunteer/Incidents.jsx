@@ -3,30 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import { MapPin, RefreshCw, AlertTriangle, CheckCircle, Zap } from 'lucide-react';
 
-const SEVERITY_COLORS = {
-  critical: 'bg-red-500/20 text-red-400 border-red-500/30',
-  high:     'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  medium:   'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  low:      'bg-green-500/20 text-green-400 border-green-500/30',
-};
-
-const SEVERITY_BAR = {
-  critical: 'bg-red-500', high: 'bg-orange-500', medium: 'bg-yellow-500', low: 'bg-green-500',
-};
-
-const STATUS_LABELS = {
-  reported:     { label: 'Reported',     color: 'bg-zinc-700 text-zinc-300' },
-  acknowledged: { label: 'Acknowledged', color: 'bg-blue-500/20 text-blue-400' },
-  responding:   { label: 'Responding',   color: 'bg-yellow-500/20 text-yellow-400' },
-  resolved:     { label: 'Resolved',     color: 'bg-green-500/20 text-green-400' },
-  closed:       { label: 'Closed',       color: 'bg-zinc-600/30 text-zinc-500' },
-};
-
-const TYPE_ICONS = {
-  fire: '🔥', flood: '🌊', earthquake: '🌍', cyclone: '🌀',
-  landslide: '🏔️', accident: '🚗', medical_emergency: '🚑',
-  building_collapse: '🏚️', chemical_spill: '☣️', riot: '⚠️', other: '📍',
-};
+import { SEVERITY_BADGE, SEVERITY_DOT, TYPE_ICONS, INCIDENT_STATUS } from '../../constants/incident';
 
 const haversine = (lat1, lon1, lat2, lon2) => {
   const R = 6371;
@@ -185,11 +162,11 @@ const VolunteerIncidents = () => {
             const distStr = location && inc.location?.coordinates
               ? `${haversine(location.lat, location.lng, inc.location.coordinates[1], inc.location.coordinates[0])} km`
               : null;
-            const statusStyle = STATUS_LABELS[inc.status] || STATUS_LABELS.reported;
+            const statusStyle = INCIDENT_STATUS[inc.status] || INCIDENT_STATUS.reported;
 
             return (
               <div key={inc._id} className={`bg-zinc-900 border rounded-2xl overflow-hidden transition-all ${inc.isSOS ? 'border-red-600/60 shadow-lg shadow-red-600/10' : 'border-zinc-800 hover:border-zinc-700'}`}>
-                <div className={`h-0.5 w-full ${SEVERITY_BAR[inc.severity] || 'bg-zinc-700'}`} />
+                <div className={`h-0.5 w-full ${SEVERITY_DOT[inc.severity] || 'bg-zinc-700'}`} />
 
                 <div className="p-4 space-y-3">
                   {inc.isSOS && (
@@ -210,7 +187,7 @@ const VolunteerIncidents = () => {
                         </p>
                       </div>
                     </div>
-                    <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border ${SEVERITY_COLORS[inc.severity]}`}>
+                    <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border ${SEVERITY_BADGE[inc.severity]}`}>
                       {inc.severity?.toUpperCase()}
                     </span>
                   </div>

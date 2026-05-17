@@ -2,26 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { RefreshCw, AlertTriangle, TrendingUp, Activity, Clock, Users } from 'lucide-react';
 
-const TYPE_ICONS = {
-  fire: '🔥', flood: '🌊', earthquake: '🌍', cyclone: '🌀',
-  landslide: '🏔️', accident: '🚗', medical_emergency: '🚑',
-  building_collapse: '🏚️', chemical_spill: '☣️', riot: '⚠️', other: '📍',
-};
-
-const SEVERITY_COLORS = {
-  critical: { bar: 'bg-red-500',    text: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/30' },
-  high:     { bar: 'bg-orange-500', text: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/30' },
-  medium:   { bar: 'bg-yellow-500', text: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/30' },
-  low:      { bar: 'bg-green-500',  text: 'text-green-400',  bg: 'bg-green-500/10 border-green-500/30' },
-};
-
-const STATUS_COLORS = {
-  reported:     { bar: 'bg-zinc-500',   text: 'text-zinc-400' },
-  acknowledged: { bar: 'bg-blue-500',   text: 'text-blue-400' },
-  responding:   { bar: 'bg-yellow-500', text: 'text-yellow-400' },
-  resolved:     { bar: 'bg-green-500',  text: 'text-green-400' },
-  closed:       { bar: 'bg-zinc-600',   text: 'text-zinc-500' },
-};
+import { TYPE_ICONS, SEVERITY_BAR, INCIDENT_STATUS_BAR } from '../../constants/incident';
 
 const HBar = ({ label, value, max, colorClass, icon }) => {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
@@ -217,14 +198,14 @@ const AdminAnalytics = () => {
           <h3 className="text-sm font-bold text-zinc-200 mb-4">Incidents by Severity</h3>
           <div className="space-y-3">
             {bySeverity.map(({ label, value }) => (
-              <HBar key={label} label={label} value={value} max={maxSev} colorClass={SEVERITY_COLORS[label]?.bar || 'bg-zinc-500'} />
+              <HBar key={label} label={label} value={value} max={maxSev} colorClass={SEVERITY_BAR[label]?.bar || 'bg-zinc-500'} />
             ))}
           </div>
           {/* Donut-style summary */}
           <div className="flex gap-2 mt-5 flex-wrap">
             {bySeverity.map(({ label, value }) => (
-              <div key={label} className={`flex-1 min-w-[80px] p-2.5 rounded-xl border text-center ${SEVERITY_COLORS[label]?.bg}`}>
-                <p className={`text-lg font-black ${SEVERITY_COLORS[label]?.text}`}>{value}</p>
+              <div key={label} className={`flex-1 min-w-[80px] p-2.5 rounded-xl border text-center ${SEVERITY_BAR[label]?.bg}`}>
+                <p className={`text-lg font-black ${SEVERITY_BAR[label]?.text}`}>{value}</p>
                 <p className="text-[10px] text-zinc-500 capitalize">{label}</p>
               </div>
             ))}
@@ -251,7 +232,7 @@ const AdminAnalytics = () => {
             {byStatus.length === 0
               ? <p className="text-sm text-zinc-500 text-center py-6">No data yet</p>
               : byStatus.map(([status, value]) => (
-                  <HBar key={status} label={status} value={value} max={maxStatus} colorClass={STATUS_COLORS[status]?.bar || 'bg-zinc-500'} />
+                  <HBar key={status} label={status} value={value} max={maxStatus} colorClass={INCIDENT_STATUS_BAR[status]?.bar || 'bg-zinc-500'} />
                 ))
             }
           </div>

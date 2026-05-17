@@ -2,40 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import LiveMap from '../components/LiveMap';
 import {
-  MapPin, Search, Filter, RefreshCw, Phone, Users, Wifi,
-  Zap, Heart, Baby, Accessibility, BedDouble, Droplets,
-  UtensilsCrossed, X, AlertTriangle, ChevronRight, Building2,
+  MapPin, Search, Filter, RefreshCw, Phone, Users,
+  X, AlertTriangle, ChevronRight, Building2,
 } from 'lucide-react';
-
-// ── Constants ──────────────────────────────────────────────────────────────────
-
-const TYPE_LABELS = {
-  hospital:            { label: 'Hospital',       icon: '🏥', color: 'text-red-400 bg-red-500/10 border-red-500/30' },
-  relief_camp:         { label: 'Relief Camp',    icon: '⛺', color: 'text-orange-400 bg-orange-500/10 border-orange-500/30' },
-  school:              { label: 'School',         icon: '🏫', color: 'text-blue-400 bg-blue-500/10 border-blue-500/30' },
-  community_hall:      { label: 'Comm. Hall',     icon: '🏛️', color: 'text-purple-400 bg-purple-500/10 border-purple-500/30' },
-  government_building: { label: 'Govt Building',  icon: '🏢', color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30' },
-  warehouse:           { label: 'Warehouse',      icon: '🏭', color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' },
-  other:               { label: 'Other',          icon: '📍', color: 'text-zinc-400 bg-zinc-500/10 border-zinc-500/30' },
-};
-
-const STATUS_STYLES = {
-  active:    'bg-green-500/15 text-green-400 border-green-500/30',
-  full:      'bg-red-500/15 text-red-400 border-red-500/30',
-  preparing: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  closed:    'bg-zinc-500/15 text-zinc-400 border-zinc-500/30',
-};
-
-const AMENITY_ICONS = [
-  { key: 'food',                icon: UtensilsCrossed, label: 'Food' },
-  { key: 'water',               icon: Droplets,        label: 'Water' },
-  { key: 'medical',             icon: Heart,           label: 'Medical' },
-  { key: 'electricity',         icon: Zap,             label: 'Power' },
-  { key: 'wifi',                icon: Wifi,            label: 'WiFi' },
-  { key: 'bedding',             icon: BedDouble,       label: 'Beds' },
-  { key: 'childCare',           icon: Baby,            label: 'Child Care' },
-  { key: 'wheelchairAccessible',icon: Accessibility,   label: 'Accessible' },
-];
+import { SHELTER_TYPE_META, SHELTER_STATUS_BADGE, AMENITIES } from '../constants/shelter';
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
@@ -59,7 +29,7 @@ const OccupancyBar = ({ current, total, status }) => {
 };
 
 const ShelterCard = ({ shelter, isHighlit, onClick }) => {
-  const typeInfo = TYPE_LABELS[shelter.type] || TYPE_LABELS.other;
+  const typeInfo = SHELTER_TYPE_META[shelter.type] || SHELTER_TYPE_META.other;
   return (
     <button
       onClick={onClick}
@@ -81,7 +51,7 @@ const ShelterCard = ({ shelter, isHighlit, onClick }) => {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1.5 shrink-0">
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase ${STATUS_STYLES[shelter.status]}`}>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase ${SHELTER_STATUS_BADGE[shelter.status]}`}>
             {shelter.status}
           </span>
           <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${typeInfo.color}`}>
@@ -93,7 +63,7 @@ const ShelterCard = ({ shelter, isHighlit, onClick }) => {
       <OccupancyBar current={shelter.currentOccupancy} total={shelter.totalCapacity} status={shelter.status} />
 
       <div className="flex flex-wrap gap-1 mt-3">
-        {AMENITY_ICONS.filter(a => shelter.amenities?.[a.key]).slice(0, 5).map(({ key, icon: Icon, label }) => (
+        {AMENITIES.filter(a => shelter.amenities?.[a.key]).slice(0, 5).map(({ key, icon: Icon, label }) => (
           <span key={key} className="flex items-center gap-1 text-[10px] text-zinc-400 bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded-md">
             <Icon className="w-2.5 h-2.5" /> {label}
           </span>

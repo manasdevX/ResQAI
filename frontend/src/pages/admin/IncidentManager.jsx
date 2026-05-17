@@ -4,32 +4,9 @@ import { useSocket } from '../../context/SocketContext';
 import { RefreshCw, AlertTriangle, Search, Filter, X, ChevronDown, MapPin, Clock, Users } from 'lucide-react';
 import IncidentManagementPanel from '../../components/IncidentManagementPanel';
 
-const SEVERITY_COLORS = {
-  critical: 'text-red-400 bg-red-500/10 border-red-500/30',
-  high:     'text-orange-400 bg-orange-500/10 border-orange-500/30',
-  medium:   'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
-  low:      'text-green-400 bg-green-500/10 border-green-500/30',
-};
+import { INCIDENT_TYPES, TYPE_ICONS, SEVERITY_BADGE, SEVERITY_DOT, INCIDENT_STATUS } from '../../constants/incident';
 
-const SEVERITY_DOT = {
-  critical: 'bg-red-500', high: 'bg-orange-500', medium: 'bg-yellow-500', low: 'bg-green-500',
-};
-
-const STATUS_STYLES = {
-  reported:     'bg-zinc-700/60 text-zinc-300',
-  acknowledged: 'bg-blue-500/20 text-blue-400',
-  responding:   'bg-yellow-500/20 text-yellow-400',
-  resolved:     'bg-green-500/20 text-green-400',
-  closed:       'bg-zinc-600/30 text-zinc-500',
-};
-
-const TYPE_ICONS = {
-  fire: '🔥', flood: '🌊', earthquake: '🌍', cyclone: '🌀',
-  landslide: '🏔️', accident: '🚗', medical_emergency: '🚑',
-  building_collapse: '🏚️', chemical_spill: '☣️', riot: '⚠️', other: '📍',
-};
-
-const TYPES = ['fire','flood','earthquake','cyclone','landslide','accident','medical_emergency','building_collapse','chemical_spill','riot','other'];
+const TYPES = INCIDENT_TYPES.map(t => t.value);
 
 const AdminIncidentManager = () => {
   const { token, api } = useAuth();
@@ -259,13 +236,13 @@ const AdminIncidentManager = () => {
                         <p className="text-sm font-semibold text-zinc-100 leading-tight truncate">
                           {inc.isSOS && '🚨 '}{TYPE_ICONS[inc.type] || '📍'} {inc.title}
                         </p>
-                        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border ${SEVERITY_COLORS[inc.severity]}`}>
+                        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border ${SEVERITY_BADGE[inc.severity]}`}>
                           {inc.severity?.toUpperCase()}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_STYLES[inc.status]}`}>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${INCIDENT_STATUS[inc.status]?.color}`}>
                           {inc.status}
                         </span>
                         {inc.location?.address && (

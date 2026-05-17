@@ -6,18 +6,7 @@ import IncidentToast from '../../components/IncidentToast';
 import IncidentManagementPanel from '../../components/IncidentManagementPanel';
 import WeatherWidget from '../../components/WeatherWidget';
 
-const SEVERITY_COLORS = {
-  critical: 'bg-red-500/20 text-red-400 border-red-500/30',
-  high:     'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  medium:   'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  low:      'bg-green-500/20 text-green-400 border-green-500/30',
-};
-
-const TYPE_ICONS = {
-  fire: '🔥', flood: '🌊', earthquake: '🌍', cyclone: '🌀',
-  landslide: '🏔️', accident: '🚗', medical_emergency: '🚑',
-  building_collapse: '🏚️', chemical_spill: '☣️', riot: '⚠️', other: '📍',
-};
+import { SEVERITY_BADGE, TYPE_ICONS } from '../../constants/incident';
 
 const AdminDashboard = () => {
   const socket = useSocket();
@@ -229,7 +218,7 @@ const AdminDashboard = () => {
                           {inc.isSOS && '🚨 '}{inc.title}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${SEVERITY_COLORS[inc.severity]}`}>
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${SEVERITY_BADGE[inc.severity]}`}>
                             {inc.severity?.toUpperCase()}
                           </span>
                           <p className="text-xs text-zinc-500 truncate">{inc.description}</p>

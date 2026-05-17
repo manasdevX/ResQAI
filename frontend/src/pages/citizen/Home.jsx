@@ -7,18 +7,7 @@ import WeatherWidget from '../../components/WeatherWidget';
 import ResourceRequestModal from '../../components/ResourceRequestModal';
 import { AlertOctagon, Building2, Package, MessageCircle, FileText, CheckCircle, MapPin, Clock, Zap } from 'lucide-react';
 
-const SEVERITY_COLORS = {
-  critical: 'text-red-400 bg-red-500/10 border-red-500/30',
-  high:     'text-orange-400 bg-orange-500/10 border-orange-500/30',
-  medium:   'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
-  low:      'text-green-400 bg-green-500/10 border-green-500/30',
-};
-
-const TYPE_ICONS = {
-  fire: '🔥', flood: '🌊', earthquake: '🌍', cyclone: '🌀',
-  landslide: '🏔️', accident: '🚗', medical_emergency: '🚑',
-  building_collapse: '🏚️', chemical_spill: '☣️', riot: '⚠️', other: '📍',
-};
+import { SEVERITY_BADGE, TYPE_ICONS } from '../../constants/incident';
 
 const QUICK_ACTIONS = [
   { to: '/report',     icon: AlertOctagon,  label: 'Report Emergency', desc: 'Submit an incident with photos', color: 'border-red-600/30 hover:border-red-500/50 hover:bg-red-950/20' },
@@ -176,7 +165,7 @@ const CitizenHome = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-zinc-200 truncate">{inc.title}</p>
-                    <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${SEVERITY_COLORS[inc.severity]}`}>
+                    <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${SEVERITY_BADGE[inc.severity]}`}>
                       {inc.severity?.toUpperCase()}
                     </span>
                   </div>

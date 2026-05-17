@@ -3,43 +3,8 @@ import { useAuth } from '../../context/AuthContext';
 import {
   RefreshCw, Plus, AlertTriangle, Building2, MapPin, Phone,
   Users, Edit2, Trash2, X, CheckCircle, Save,
-  Zap, Wifi, Heart, Baby, Accessibility, BedDouble, Droplets, UtensilsCrossed,
 } from 'lucide-react';
-
-const TYPE_OPTIONS = [
-  { value: 'hospital',            label: 'Hospital' },
-  { value: 'relief_camp',         label: 'Relief Camp' },
-  { value: 'school',              label: 'School' },
-  { value: 'community_hall',      label: 'Community Hall' },
-  { value: 'government_building', label: 'Govt Building' },
-  { value: 'warehouse',           label: 'Warehouse' },
-  { value: 'other',               label: 'Other' },
-];
-
-const STATUS_OPTIONS = ['active', 'preparing', 'full', 'closed'];
-
-const TYPE_ICONS = {
-  hospital:'🏥', relief_camp:'⛺', school:'🏫',
-  community_hall:'🏛️', government_building:'🏢', warehouse:'🏭', other:'📍',
-};
-
-const STATUS_COLORS = {
-  active:    'bg-green-500/10 text-green-400 border-green-500/30',
-  full:      'bg-red-500/10 text-red-400 border-red-500/30',
-  preparing: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-  closed:    'bg-zinc-500/10 text-zinc-400 border-zinc-500/30',
-};
-
-const AMENITIES = [
-  { key: 'food',                icon: UtensilsCrossed, label: 'Food' },
-  { key: 'water',               icon: Droplets,        label: 'Water' },
-  { key: 'medical',             icon: Heart,           label: 'Medical' },
-  { key: 'electricity',         icon: Zap,             label: 'Power' },
-  { key: 'wifi',                icon: Wifi,            label: 'WiFi' },
-  { key: 'bedding',             icon: BedDouble,       label: 'Beds' },
-  { key: 'childCare',           icon: Baby,            label: 'Child Care' },
-  { key: 'wheelchairAccessible',icon: Accessibility,   label: 'Accessible' },
-];
+import { SHELTER_SHELTER_TYPE_OPTIONS, SHELTER_SHELTER_STATUS_OPTIONS, SHELTER_TYPE_META, SHELTER_STATUS_BADGE, AMENITIES } from '../../constants/shelter';
 
 const OccupancyBar = ({ current, total, status }) => {
   const pct = total ? Math.min(100, Math.round((current / total) * 100)) : 0;
@@ -109,7 +74,7 @@ const ShelterForm = ({ initial, onSave, onCancel, saving }) => {
           <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5 block">Type</label>
           <select value={form.type} onChange={e => set(['type'], e.target.value)}
             className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 focus:outline-none focus:border-blue-500 transition">
-            {TYPE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            {SHELTER_TYPE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
 
@@ -117,7 +82,7 @@ const ShelterForm = ({ initial, onSave, onCancel, saving }) => {
           <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5 block">Status</label>
           <select value={form.status} onChange={e => set(['status'], e.target.value)}
             className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 focus:outline-none focus:border-blue-500 transition">
-            {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+            {SHELTER_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
           </select>
         </div>
 
@@ -347,7 +312,7 @@ const AdminShelterManager = () => {
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {/* Status filter */}
           <div className="flex gap-1.5">
-            {['all', ...STATUS_OPTIONS].map(s => (
+            {['all', ...SHELTER_STATUS_OPTIONS].map(s => (
               <button key={s} onClick={() => setFilterStatus(s)}
                 className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition capitalize ${filterStatus === s ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600'}`}>
                 {s === 'all' ? `All (${shelters.length})` : `${s} (${shelters.filter(x => x.status === s).length})`}
@@ -379,7 +344,7 @@ const AdminShelterManager = () => {
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="flex items-start gap-2.5 min-w-0">
-                        <span className="text-xl shrink-0">{TYPE_ICONS[s.type] || '📍'}</span>
+                        <span className="text-xl shrink-0">{SHELTER_TYPE_META[s.type]?.icon || '📍'}</span>
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-zinc-100 leading-tight truncate">{s.name}</p>
                           <p className="text-xs text-zinc-500 mt-0.5 flex items-center gap-1">
@@ -387,7 +352,7 @@ const AdminShelterManager = () => {
                           </p>
                         </div>
                       </div>
-                      <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase ${STATUS_COLORS[s.status]}`}>{s.status}</span>
+                      <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase ${SHELTER_STATUS_BADGE[s.status]}`}>{s.status}</span>
                     </div>
 
                     <OccupancyBar current={s.currentOccupancy || 0} total={s.totalCapacity || 0} status={s.status} />

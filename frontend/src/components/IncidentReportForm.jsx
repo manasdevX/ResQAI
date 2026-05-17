@@ -15,19 +15,7 @@ const MAX_FILES           = 5;
 const MAX_FILE_MB         = 10;
 const ALLOWED_TYPES       = ['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/quicktime','video/webm','application/pdf'];
 
-const INCIDENT_TYPES = [
-  { value: 'fire',               label: '🔥 Fire' },
-  { value: 'flood',              label: '🌊 Flood' },
-  { value: 'earthquake',         label: '🌍 Earthquake' },
-  { value: 'cyclone',            label: '🌀 Cyclone' },
-  { value: 'landslide',          label: '⛰️ Landslide' },
-  { value: 'accident',           label: '🚗 Accident' },
-  { value: 'medical_emergency',  label: '🚑 Medical Emergency' },
-  { value: 'building_collapse',  label: '🏚️ Building Collapse' },
-  { value: 'chemical_spill',     label: '☣️ Chemical Spill' },
-  { value: 'riot',               label: '🚨 Riot' },
-  { value: 'other',              label: '📌 Other' },
-];
+import { INCIDENT_TYPES } from '../constants/incident';
 
 // ── Validation schema ──────────────────────────────────────────────────────────
 
