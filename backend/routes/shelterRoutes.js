@@ -3,7 +3,9 @@ import {
   getAllShelters,
   getShelterById,
   getNearbyShelters,
+  getNearbyPlaces,
   createShelter,
+  updateShelter,
   updateOccupancy,
   updateShelterStatus,
   deleteShelter,
@@ -20,6 +22,9 @@ router.get('/', protect, getAllShelters);
 // GET nearby shelters — must be BEFORE /:id to avoid param collision
 router.get('/nearby', protect, getNearbyShelters);
 
+// GET real places from Google Places API
+router.get('/places', protect, getNearbyPlaces);
+
 // GET a single shelter
 router.get('/:id', protect, getShelterById);
 
@@ -27,6 +32,9 @@ router.get('/:id', protect, getShelterById);
 
 // POST create a new shelter (Admin/Shelter Manager)
 router.post('/', protect, authorize('admin', 'shelter_manager'), createShelter);
+
+// PUT update shelter details (Admin/Shelter Manager)
+router.put('/:id', protect, authorize('admin', 'shelter_manager'), updateShelter);
 
 // PATCH update occupancy (Admin/Shelter Manager)
 router.patch('/:id/occupancy', protect, authorize('admin', 'shelter_manager'), updateOccupancy);

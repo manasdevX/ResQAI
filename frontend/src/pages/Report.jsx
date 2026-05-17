@@ -1,4 +1,5 @@
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import IncidentReportForm from '../components/IncidentReportForm';
 
 const Report = () => (
@@ -8,12 +9,12 @@ const Report = () => (
 
     {/* Header */}
     <header className="sticky top-0 z-10 flex items-center gap-3 px-4 sm:px-6 py-3 bg-zinc-900/90 backdrop-blur-sm border-b border-zinc-800">
-      <a
-        href="/dashboard"
+      <Link
+        to="/home"
         className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition px-2 py-1.5 rounded-lg hover:bg-zinc-800"
       >
-        <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
-      </a>
+        <ArrowLeft className="w-3.5 h-3.5" /> Home
+      </Link>
       <div className="h-4 w-px bg-zinc-700" />
       <div className="flex items-center gap-2">
         <div className="w-5 h-5 rounded-full bg-red-600 flex items-center justify-center">

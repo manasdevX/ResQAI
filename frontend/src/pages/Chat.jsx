@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, roleHome } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { Link } from 'react-router-dom';
 import { Send, Search, MessageCircle, Users, Circle, ArrowLeft, Trash2, Reply, X, Hash } from 'lucide-react';
@@ -164,9 +164,8 @@ const Chat = () => {
   useEffect(() => {
     if (!socket || !user) return;
 
-    // Register presence
+    // Register presence — userId is derived server-side from the JWT
     socket.emit('chat:join', {
-      userId: user._id,
       name:   user.name,
       role:   user.role,
       avatar: user.avatar,
@@ -330,7 +329,7 @@ const Chat = () => {
               <h1 className="text-sm font-bold leading-none">ResQAI Chat</h1>
               <p className="text-[10px] text-zinc-500 mt-0.5">Real-time coordination</p>
             </div>
-            <Link to="/dashboard" className="ml-auto text-zinc-500 hover:text-zinc-300 transition">
+            <Link to={roleHome(user?.role)} className="ml-auto text-zinc-500 hover:text-zinc-300 transition">
               <ArrowLeft className="w-4 h-4" />
             </Link>
           </div>

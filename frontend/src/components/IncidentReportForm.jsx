@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
 import * as z from 'zod';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, roleHome } from '../context/AuthContext';
 import { AlertTriangle, Upload, X, MapPin, CheckCircle2, Loader2, ImageIcon } from 'lucide-react';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -205,8 +205,7 @@ const IncidentReportForm = () => {
         setMediaFiles([]);
         setMarkerPosition(null);
         setMapCenter(DEFAULT_CENTER);
-        // Redirect to dashboard after 2 seconds
-        setTimeout(() => navigate('/dashboard'), 2000);
+        setTimeout(() => navigate(roleHome(user?.role)), 2000);
       }
     } catch (error) {
       console.error('[IncidentReportForm] submit error:', error);
@@ -325,22 +324,60 @@ const IncidentReportForm = () => {
           <p className="text-xs text-zinc-500">Or click on the map to set the exact location:</p>
 
           <div className="rounded-lg overflow-hidden border border-zinc-700">
-            {isLoaded ? (
-              <GoogleMap
-                mapContainerStyle={MAP_CONTAINER_STYLE}
-                center={mapCenter}
-                zoom={5}
-                onClick={handleMapClick}
-                options={{
-                  styles: [{ elementType: 'geometry', stylers: [{ color: '#1d2127' }] }, { elementType: 'labels.text.fill', stylers: [{ color: '#8a9099' }] }],
-                  mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
-                }}
-              >
-                {markerPosition && <Marker position={markerPosition} />}
-              </GoogleMap>
+            {import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? (
+              isLoaded ? (
+                <GoogleMap
+                  mapContainerStyle={MAP_CONTAINER_STYLE}
+                  center={mapCenter}
+                  zoom={5}
+                  onClick={handleMapClick}
+                  options={{
+                    styles: [{ elementType: 'geometry', stylers: [{ color: '#1d2127' }] }, { elementType: 'labels.text.fill', stylers: [{ color: '#8a9099' }] }],
+                    mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
+                  }}
+                >
+                  {markerPosition && <Marker position={markerPosition} />}
+                </GoogleMap>
+              ) : (
+                <div className="w-full h-[280px] flex items-center justify-center bg-zinc-900 text-zinc-500 text-sm">
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading Map…
+                </div>
+              )
             ) : (
-              <div className="w-full h-[280px] flex items-center justify-center bg-zinc-900 text-zinc-500 text-sm">
-                <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading Map…
+              <div className="w-full p-4 bg-zinc-900 space-y-3">
+                <p className="text-xs text-amber-400/80 text-center">Map unavailable — enter coordinates manually.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-zinc-400 mb-1">Latitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="e.g. 28.6139"
+                      {...register('latitude', { valueAsNumber: true })}
+                      onChange={e => {
+                        const lat = parseFloat(e.target.value);
+                        const lng = parseFloat(getValues('longitude'));
+                        if (isFinite(lat) && isFinite(lng)) setMarkerPosition({ lat, lng });
+                      }}
+                      className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-zinc-400 mb-1">Longitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="e.g. 77.2090"
+                      {...register('longitude', { valueAsNumber: true })}
+                      onChange={e => {
+                        const lng = parseFloat(e.target.value);
+                        const lat = parseFloat(getValues('latitude'));
+                        if (isFinite(lat) && isFinite(lng)) setMarkerPosition({ lat, lng });
+                      }}
+                      className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </div>

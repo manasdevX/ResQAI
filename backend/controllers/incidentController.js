@@ -181,8 +181,7 @@ export const updateIncidentStatus = async (req, res) => {
     const incident = await Incident.findById(id);
     if (!incident) return res.status(404).json({ success: false, message: 'Incident not found' });
 
-    incident._updatedBy = req.user._id;
-    incident.status     = status;
+    incident.status = status;
 
     // Always push to statusHistory when status changes
     incident.statusHistory.push({
@@ -273,14 +272,20 @@ export const getNearbyIncidents = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Longitude and latitude query params are required' });
     }
 
+    const parsedLng = parseFloat(lng);
+    const parsedLat = parseFloat(lat);
+    if (parsedLng < -180 || parsedLng > 180 || parsedLat < -90 || parsedLat > 90) {
+      return res.status(400).json({ success: false, message: 'Invalid coordinates' });
+    }
+
     const incidents = await Incident.find({
       location: {
         $near: {
           $geometry: {
             type:        'Point',
-            coordinates: [parseFloat(lng), parseFloat(lat)],
+            coordinates: [parsedLng, parsedLat],
           },
-          $maxDistance: parseInt(maxDistance),
+          $maxDistance: Math.min(parseInt(maxDistance) || 10000, 200000), // cap at 200 km
         },
       },
       status: { $nin: ['resolved', 'closed'] },
@@ -290,6 +295,52 @@ export const getNearbyIncidents = async (req, res) => {
   } catch (error) {
     console.error('[getNearbyIncidents] Error:', error);
     return res.status(500).json({ success: false, message: 'Server error while fetching nearby incidents' });
+  }
+};
+
+/**
+ * @desc  Create an SOS emergency incident
+ * @route POST /api/incidents/sos
+ * @access Private
+ */
+export const createSOSIncident = async (req, res) => {
+  try {
+    const { location, description } = req.body;
+
+    if (!location?.coordinates || location.coordinates.length < 2) {
+      return res.status(400).json({ success: false, message: 'GPS coordinates are required for SOS' });
+    }
+
+    const incident = new Incident({
+      title:       `SOS Emergency — ${req.user.name}`,
+      description: description?.trim() || 'Emergency SOS activated. Immediate assistance required.',
+      type:        'other',
+      severity:    'critical',
+      isSOS:       true,
+      location,
+      reportedBy:  req.user._id,
+      statusHistory: [{
+        status:    'reported',
+        note:      'SOS auto-generated',
+        updatedBy: req.user._id,
+        updatedAt: new Date(),
+      }],
+    });
+
+    const saved = await incident.save();
+
+    io.emit('sosAlert', {
+      incidentId: saved._id,
+      user:       { name: req.user.name, _id: req.user._id, avatar: req.user.avatar },
+      location,
+      createdAt:  saved.createdAt,
+    });
+    io.emit('newIncident', saved);
+
+    return res.status(201).json({ success: true, incident: saved });
+  } catch (error) {
+    console.error('[createSOSIncident] Error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Failed to create SOS incident' });
   }
 };
 

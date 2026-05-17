@@ -176,6 +176,11 @@ const IncidentSchema = new Schema(
       default: null,
     },
 
+    isSOS: {
+      type: Boolean,
+      default: false,
+    },
+
     tags: [{ type: String, trim: true, lowercase: true }],
   },
   {

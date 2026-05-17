@@ -64,11 +64,17 @@ export const getNearbyShelters = async (req, res) => {
       return res.status(400).json({ success: false, message: 'lng and lat query params are required' });
     }
 
+    const parsedLng = parseFloat(lng);
+    const parsedLat = parseFloat(lat);
+    if (parsedLng < -180 || parsedLng > 180 || parsedLat < -90 || parsedLat > 90) {
+      return res.status(400).json({ success: false, message: 'Invalid coordinates' });
+    }
+
     const geoQuery = {
       location: {
         $near: {
-          $geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
-          $maxDistance: parseInt(maxDistance),
+          $geometry: { type: 'Point', coordinates: [parsedLng, parsedLat] },
+          $maxDistance: Math.min(parseInt(maxDistance) || 50000, 500000), // cap at 500 km
         },
       },
       status: { $in: ['active', 'preparing'] },
@@ -81,8 +87,8 @@ export const getNearbyShelters = async (req, res) => {
       .populate('managedBy', 'name phone');
 
     // Append distance (straight-line km) to each shelter for the UI
-    const userLat = parseFloat(lat);
-    const userLng = parseFloat(lng);
+    const userLat = parsedLat;
+    const userLng = parsedLng;
     const withDist = shelters.map((s) => {
       const [sLng, sLat] = s.location.coordinates;
       const R = 6371;
@@ -206,6 +212,105 @@ export const updateShelterStatus = async (req, res) => {
   } catch (error) {
     console.error('[updateShelterStatus]', error);
     return res.status(500).json({ success: false, message: 'Failed to update status' });
+  }
+};
+
+/**
+ * @desc  Get real hospitals/shelters from Google Places API
+ * @route GET /api/shelters/places?lat=&lng=&type=&radius=
+ * @access Private
+ */
+export const getNearbyPlaces = async (req, res) => {
+  try {
+    const { lat, lng, type = 'hospital', radius = 5000 } = req.query;
+    const key = process.env.GOOGLE_MAPS_API_KEY;
+
+    if (!lat || !lng) {
+      return res.status(400).json({ success: false, message: 'lat and lng are required' });
+    }
+    const parsedPlacesLng = parseFloat(lng);
+    const parsedPlacesLat = parseFloat(lat);
+    if (parsedPlacesLng < -180 || parsedPlacesLng > 180 || parsedPlacesLat < -90 || parsedPlacesLat > 90) {
+      return res.status(400).json({ success: false, message: 'Invalid coordinates' });
+    }
+    if (!key) {
+      return res.status(503).json({ success: false, message: 'Nearby places search is not available (Google Maps API key not configured)' });
+    }
+
+    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${Math.min(parseInt(radius), 50000)}&type=${type}&key=${key}`;
+    const response = await fetch(url);
+    const data     = await response.json();
+
+    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+      console.error('[getNearbyPlaces] Google API error:', data.status, data.error_message);
+      return res.json({ success: true, places: [] });
+    }
+
+    const places = (data.results || []).map(p => ({
+      placeId:  p.place_id,
+      name:     p.name,
+      vicinity: p.vicinity,
+      location: {
+        type:        'Point',
+        coordinates: [p.geometry.location.lng, p.geometry.location.lat],
+      },
+      rating:   p.rating || null,
+      isOpen:   p.opening_hours?.open_now ?? null,
+      types:    p.types || [],
+      icon:     p.icon,
+    }));
+
+    return res.json({ success: true, count: places.length, places });
+  } catch (error) {
+    console.error('[getNearbyPlaces]', error);
+    return res.json({ success: true, places: [] });
+  }
+};
+
+/**
+ * @desc  Update shelter details
+ * @route PUT /api/shelters/:id
+ * @access Private (admin / shelter_manager)
+ */
+export const updateShelter = async (req, res) => {
+  try {
+    let { name, type, location, totalCapacity, description, amenities, contacts } = req.body;
+
+    if (name !== undefined && !name?.trim()) {
+      return res.status(400).json({ success: false, message: 'Shelter name cannot be empty' });
+    }
+
+    location  = location  ? safeParse(location,  null) : undefined;
+    amenities = amenities ? safeParse(amenities, {})   : undefined;
+    contacts  = contacts  ? safeParse(contacts,  [])   : undefined;
+
+    if (location !== undefined && !location?.coordinates?.length) {
+      return res.status(400).json({ success: false, message: 'Invalid location coordinates' });
+    }
+
+    const updates = {};
+    if (name          !== undefined) updates.name          = name.trim();
+    if (type          !== undefined) updates.type          = type;
+    if (location      !== undefined) updates.location      = location;
+    if (totalCapacity !== undefined) updates.totalCapacity = Number(totalCapacity);
+    if (description   !== undefined) updates.description   = description?.trim();
+    if (amenities     !== undefined) updates.amenities     = amenities;
+    if (contacts      !== undefined) updates.contacts      = contacts;
+
+    const shelter = await Shelter.findByIdAndUpdate(
+      req.params.id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).populate('managedBy', 'name email phone');
+
+    if (!shelter) return res.status(404).json({ success: false, message: 'Shelter not found' });
+
+    io.emit('shelterUpdated', shelter);
+
+    return res.status(200).json({ success: true, message: 'Shelter updated', shelter });
+  } catch (error) {
+    console.error('[updateShelter]', error);
+    return res.status(500).json({ success: false, message: error.message || 'Failed to update shelter' });
   }
 };
 

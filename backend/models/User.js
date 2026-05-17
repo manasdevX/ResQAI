@@ -85,6 +85,18 @@ const UserSchema = new Schema(
       default: null,
     },
 
+    skills: [{ type: String, trim: true, lowercase: true }],
+
+    isAvailable: {
+      type: Boolean,
+      default: false,
+    },
+
+    isSafe: {
+      type: Boolean,
+      default: true,
+    },
+
     isActive: {
       type: Boolean,
       default: true,

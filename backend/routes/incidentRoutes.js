@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import {
   createIncident,
+  createSOSIncident,
   uploadIncidentMedia,
   getAllIncidents,
   updateIncidentStatus,
@@ -34,6 +35,9 @@ const withUpload = (fieldName, maxCount) => (req, res, next) => {
 
 // Create a new incident (JSON only — no file upload here)
 router.post('/', protect, createIncident);
+
+// SOS emergency — must be before /:id routes
+router.post('/sos', protect, createSOSIncident);
 
 // Get all incidents
 router.get('/', protect, getAllIncidents);

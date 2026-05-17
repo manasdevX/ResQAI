@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { Home, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { useAuth, roleHome } from '../context/AuthContext';
 
 const NotFound = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-zinc-100 page-enter">
       {/* Glow blob */}
@@ -28,7 +30,7 @@ const NotFound = () => {
             <ArrowLeft className="w-4 h-4" /> Go back
           </button>
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(user ? roleHome(user.role) : '/login')}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg shadow-red-600/20"
           >
             <Home className="w-4 h-4" /> Dashboard

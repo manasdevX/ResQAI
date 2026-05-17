@@ -72,6 +72,9 @@ export const sendDM = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Message content is required' });
     }
 
+    if (userId === req.user._id.toString()) {
+      return res.status(400).json({ success: false, message: 'Cannot send a message to yourself' });
+    }
     const recipient = await User.findById(userId).select('_id name');
     if (!recipient) {
       return res.status(404).json({ success: false, message: 'Recipient not found' });
@@ -234,6 +237,7 @@ export const deleteMessage = async (req, res) => {
   try {
     const message = await Message.findById(req.params.messageId);
     if (!message) return res.status(404).json({ success: false, message: 'Message not found' });
+    if (message.isDeleted) return res.status(400).json({ success: false, message: 'Message already deleted' });
 
     const isOwner = message.sender?.toString() === req.user._id.toString();
     const isAdmin = req.user.role === 'admin';
@@ -263,11 +267,12 @@ export const setupChatSocket = (io) => {
 
   io.on('connection', (socket) => {
 
-    // ── Join: user authenticates their socket ────────────────────────────────
-    socket.on('chat:join', async ({ userId, name, role, avatar }) => {
+    // ── Join: register name/role/avatar for this verified socket ────────────
+    // socket.userId is already set and verified by server.js JWT middleware
+    socket.on('chat:join', ({ name, role, avatar }) => {
+      const userId = socket.userId;
       if (!userId) return;
 
-      socket.userId = userId;
       onlineUsers.set(socket.id, { userId, name, role, avatar, socketId: socket.id });
 
       // Broadcast updated online users list
@@ -280,6 +285,7 @@ export const setupChatSocket = (io) => {
     // ── Send DM ───────────────────────────────────────────────────────────────
     socket.on('chat:sendDM', async ({ recipientId, content, replyTo, tempId }) => {
       if (!socket.userId || !content?.trim() || !recipientId) return;
+      if (recipientId === socket.userId) return; // prevent self-DM
 
       try {
         const message = await Message.create({

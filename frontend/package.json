@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npx kill-port 5173 && vite",
+    "dev": "npx kill-port 5173 > nul 2>&1 && vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

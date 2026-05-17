@@ -14,6 +14,14 @@ const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
  * @param {string} description
  * @returns {Promise<{summary, urgency, recommendedActions, estimatedAffected, riskScore}>}
  */
+const withTimeout = (promise, ms) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('AI triage timed out')), ms)
+    ),
+  ]);
+
 export const analyzeIncident = async (title, description) => {
   try {
     const prompt = `You are an emergency response AI triage assistant.
@@ -31,7 +39,7 @@ JSON format (respond with this exact structure):
   "riskScore": <integer 0-100>
 }`;
 
-    const result = await model.generateContent(prompt);
+    const result = await withTimeout(model.generateContent(prompt), 15000);
     const responseText = result.response.text().trim();
 
     // Strip markdown code fences if model wraps response

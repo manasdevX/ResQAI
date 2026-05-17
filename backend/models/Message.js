@@ -135,12 +135,10 @@ const MessageSchema = new Schema(
     isDeleted: {
       type: Boolean,
       default: false,
-      select: false,
     },
     deletedAt: {
       type: Date,
       default: null,
-      select: false,
     },
 
     // Edited flag

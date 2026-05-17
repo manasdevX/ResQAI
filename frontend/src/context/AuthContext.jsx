@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import axios from 'axios';
 
 const AuthContext = createContext();
@@ -6,98 +6,135 @@ const AuthContext = createContext();
 // eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser]     = useState(null);
-  const [token, setToken]   = useState(() => localStorage.getItem('token') || null);
-  const [loading, setLoading] = useState(true);
+export const roleHome = (role) => {
+  switch (role) {
+    case 'admin':           return '/admin';
+    case 'responder':       return '/volunteer';
+    case 'shelter_manager': return '/volunteer';
+    default:                return '/home';
+  }
+};
 
-  // Stable axios instance — recreated only when token changes
+export const AuthProvider = ({ children }) => {
+  const [user,    setUser]    = useState(null);
+  const [token,   setToken]   = useState(() => localStorage.getItem('token') || null);
+  const [loading, setLoading] = useState(true);
+  const fetchedRef = useRef(false); // prevent duplicate fetches
+
   const api = useMemo(() => {
-    const instance = axios.create({ 
-      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api' 
+    const instance = axios.create({
+      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
 
-    if (token) {
-      instance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    }
+    // Globally handle 401 — expired / invalid token → force re-login
+    instance.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          localStorage.removeItem('token');
+          // Only redirect if not already on login/signup page
+          if (!window.location.pathname.startsWith('/login') &&
+              !window.location.pathname.startsWith('/signup')) {
+            window.location.href = '/login';
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
 
     return instance;
   }, [token]);
 
-  // On mount: if a token exists in storage, validate it and hydrate user state
+  // Fetch user from token on mount / token change — only when no user in memory
   useEffect(() => {
+    let cancelled = false;
+
     const fetchUser = async () => {
-      // If we already have a user in state (e.g. from login), don't re-validate
-      if (user) {
+      const storedToken = localStorage.getItem('token');
+      if (!storedToken) {
         setLoading(false);
         return;
       }
-
-      const storedToken = localStorage.getItem('token');
-      if (storedToken) {
-        try {
-          const { data } = await api.get('/auth/me');
-          setUser(data);
-        } catch (error) {
-          console.error('Session validation failed:', error);
+      try {
+        const { data } = await api.get('/auth/me');
+        if (!cancelled) setUser(data);
+      } catch {
+        if (!cancelled) {
           localStorage.removeItem('token');
           setToken(null);
           setUser(null);
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     };
 
+    // Skip if we've already got a user in state (e.g. after login)
+    if (user) {
+      setLoading(false);
+      return;
+    }
+
+    // Only run once per token value (guard against React StrictMode double-invoke)
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+
     fetchUser();
-  }, [api, user]); // validate session when api instance is ready or user state is empty
+    return () => { cancelled = true; };
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
-
-  /** Save token + user after a successful auth API response */
   const persistAuth = (data) => {
     const { token: newToken, ...userData } = data;
     localStorage.setItem('token', newToken);
+    fetchedRef.current = true; // mark fetched so useEffect doesn't re-run /auth/me
     setToken(newToken);
     setUser(userData);
   };
 
-  // ── Auth actions ──────────────────────────────────────────────────────────────
+  const updateUser = useCallback((patch) => {
+    setUser(prev => prev ? { ...prev, ...patch } : prev);
+  }, []);
 
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
     persistAuth(data);
+    return data;
   };
 
-  const signup = async (name, email, password, role) => {
-    const { data } = await api.post('/auth/signup', { name, email, password, role });
+  const signup = async (name, email, password, role, inviteToken) => {
+    const { data } = await api.post('/auth/signup', { name, email, password, role, inviteToken });
     persistAuth(data);
+    return data;
   };
 
-  const googleLogin = async (googleToken) => {
-    const { data } = await api.post('/auth/google', { token: googleToken });
+  const googleLogin = async (googleToken, role) => {
+    const { data } = await api.post('/auth/google', { token: googleToken, role });
     persistAuth(data);
+    return data;
   };
 
   const logout = () => {
     localStorage.removeItem('token');
+    fetchedRef.current = false;
     setToken(null);
     setUser(null);
+    setLoading(false);
   };
-
-  // ── Context value ─────────────────────────────────────────────────────────────
 
   const value = {
     user,
     token,
     loading,
-    api,           // expose stable api instance for use in other hooks/components
+    api,
     login,
     signup,
     googleLogin,
     logout,
+    updateUser,
+    roleHome,
   };
 
-  // Render children only after the initial session check completes
   return (
     <AuthContext.Provider value={value}>
       {!loading && children}
