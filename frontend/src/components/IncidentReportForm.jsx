@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
@@ -44,8 +44,10 @@ const schema = z.object({
 
 const MediaPreview = ({ file, onRemove }) => {
   const isImage = file.type.startsWith('image/');
-  const url     = URL.createObjectURL(file);
   const sizeMB  = (file.size / (1024 * 1024)).toFixed(1);
+
+  const url = useMemo(() => URL.createObjectURL(file), [file]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
 
   return (
     <div className="relative group rounded-lg overflow-hidden border border-zinc-700 bg-zinc-800">
@@ -54,7 +56,6 @@ const MediaPreview = ({ file, onRemove }) => {
           src={url}
           alt={file.name}
           className="w-full h-24 object-cover"
-          onLoad={() => URL.revokeObjectURL(url)}
         />
       ) : (
         <div className="w-full h-24 flex flex-col items-center justify-center gap-1 text-zinc-400">

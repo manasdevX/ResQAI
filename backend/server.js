@@ -16,6 +16,15 @@ import { setupChatSocket } from './controllers/chatController.js';
 // Load environment variables (suppress console tips)
 dotenv.config({ quiet: true });
 
+// Fail fast if critical env vars are missing
+const REQUIRED_ENV = ['MONGO_URI', 'JWT_SECRET'];
+const missing = REQUIRED_ENV.filter(k => !process.env[k]);
+if (missing.length) {
+  console.error(`\n❌ Missing required environment variables: ${missing.join(', ')}`);
+  console.error('   Set them in backend/.env before starting the server.\n');
+  process.exit(1);
+}
+
 // Initialize Express App
 const app = express();
 const httpServer = createServer(app);
@@ -23,8 +32,9 @@ const httpServer = createServer(app);
 // Socket.io setup for real-time communication
 export const io = new Server(httpServer, {
   cors: {
-    origin: '*', // Adjust this to your frontend URL in production
-    methods: ['GET', 'POST']
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    credentials: true,
   }
 });
 

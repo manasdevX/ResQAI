@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { MapPin, RefreshCw, LogOut, Zap, CheckCircle, AlertTriangle, MessageCircle, Home } from 'lucide-react';
@@ -24,10 +25,11 @@ const TYPE_ICONS = {
 };
 
 const STATUS_LABELS = {
-  reported: { label: 'Reported',    color: 'bg-zinc-700 text-zinc-300' },
-  active:   { label: 'Active',      color: 'bg-blue-500/20 text-blue-400' },
-  resolved: { label: 'Resolved',    color: 'bg-green-500/20 text-green-400' },
-  closed:   { label: 'Closed',      color: 'bg-zinc-600/40 text-zinc-500' },
+  reported:     { label: 'Reported',     color: 'bg-zinc-700 text-zinc-300' },
+  acknowledged: { label: 'Acknowledged', color: 'bg-blue-500/20 text-blue-400' },
+  responding:   { label: 'Responding',   color: 'bg-yellow-500/20 text-yellow-400' },
+  resolved:     { label: 'Resolved',     color: 'bg-green-500/20 text-green-400' },
+  closed:       { label: 'Closed',       color: 'bg-zinc-600/40 text-zinc-500' },
 };
 
 const haversine = (lat1, lon1, lat2, lon2) => {
@@ -226,7 +228,7 @@ const VolunteerDashboard = () => {
     }
   }, [api]);
 
-  const activeCount   = incidents.filter(i => i.status === 'active').length;
+  const activeCount   = incidents.filter(i => !['resolved', 'closed'].includes(i.status)).length;
   const criticalCount = incidents.filter(i => i.severity === 'critical').length;
 
   return (
@@ -255,12 +257,12 @@ const VolunteerDashboard = () => {
             </div>
           </div>
 
-          <a href="/chat" className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition" title="Open chat">
+          <Link to="/chat" className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition" title="Open chat">
             <MessageCircle className="w-4 h-4 text-zinc-400" />
-          </a>
-          <a href="/dashboard" className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition" title="Admin dashboard">
+          </Link>
+          <Link to="/dashboard" className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition" title="Admin dashboard">
             <Home className="w-4 h-4 text-zinc-400" />
-          </a>
+          </Link>
           <span className="text-sm text-zinc-500 hidden md:block">Hi, {user?.name?.split(' ')[0]}</span>
           <button onClick={logout}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-zinc-800 hover:bg-red-900/40 hover:text-red-400 hover:border-red-800 rounded-lg border border-zinc-700 transition">

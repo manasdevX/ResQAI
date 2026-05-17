@@ -193,18 +193,9 @@ IncidentSchema.index({ type: 1 });
 IncidentSchema.index({ reportedBy: 1 });
 IncidentSchema.index({ createdAt: -1 });
 
-// ─── Pre-save: Push to statusHistory on status change ─────────────────────────
+// ─── Pre-save: Auto-set resolvedAt when status becomes 'resolved' ─────────────
 
 IncidentSchema.pre('save', function () {
-  if (this.isModified('status') && !this.isNew) {
-    this.statusHistory.push({
-      status:    this.status,
-      updatedBy: this._updatedBy || this.reportedBy,
-      updatedAt: new Date(),
-    });
-  }
-
-  // Auto-set resolvedAt timestamp
   if (this.status === 'resolved' && !this.resolvedAt) {
     this.resolvedAt = new Date();
   }

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import LiveMap from '../components/LiveMap';
@@ -54,7 +55,7 @@ const Dashboard = () => {
       }
     };
     fetchIncidents();
-  }, [token]);
+  }, [api]);
 
   // ── Dismiss a toast by its temp id ────────────────────────────────────────
   const dismissToast = useCallback((toastId) => {
@@ -350,24 +351,24 @@ const Dashboard = () => {
 
           {/* Footer CTAs */}
           <div className="px-4 py-3 border-t border-zinc-800 shrink-0 space-y-2">
-            <a
-              href="/report"
+            <Link
+              to="/report"
               className="flex items-center justify-center gap-2 w-full py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-semibold transition"
             >
               <span>🚨</span> Report New Incident
-            </a>
-            <a
-              href="/shelters"
+            </Link>
+            <Link
+              to="/shelters"
               className="flex items-center justify-center gap-2 w-full py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-semibold transition border border-zinc-700"
             >
               <span>🏥</span> Find Shelters & Hospitals
-            </a>
-            <a
-              href="/chat"
+            </Link>
+            <Link
+              to="/chat"
               className="flex items-center justify-center gap-2 w-full py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-semibold transition border border-zinc-700"
             >
               <span>💬</span> Open Chat
-            </a>
+            </Link>
           </div>
         </aside>
       </div>

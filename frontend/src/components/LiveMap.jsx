@@ -152,7 +152,7 @@ const LiveMap = ({
               <Circle
                 key={`pulse-${radius}`}
                 center={{ lat, lng }}
-                radius={radius * (i + 1)}
+                radius={radius}
                 options={{
                   strokeColor:   color,
                   strokeOpacity: pulseOpacity * (1 - i * 0.25),

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import { Link } from 'react-router-dom';
 import { Send, Search, MessageCircle, Users, Circle, ArrowLeft, Trash2, Reply, X, Hash } from 'lucide-react';
 
 // ── Role badge ─────────────────────────────────────────────────────────────────
@@ -132,7 +133,7 @@ const Chat = () => {
   const [replyTo,      setReplyTo]      = useState(null);
   const [draft,        setDraft]        = useState('');
   const [typingPeers,  setTypingPeers]  = useState({});  // { senderId: name }
-  const [sending,      setSending]      = useState(false);
+  const [sending,      setSending]      = useState(false); // true while awaiting socket echo
 
   const messagesEndRef  = useRef(null);
   const inputRef        = useRef(null);
@@ -269,7 +270,7 @@ const Chat = () => {
     setMessages(prev => [...prev, optimistic]);
     setDraft('');
     setReplyTo(null);
-    setSending(false);
+    setSending(true);
 
     socket?.emit('chat:sendDM', {
       recipientId: activePeer._id,
@@ -278,8 +279,9 @@ const Chat = () => {
       tempId,
     });
 
-    // Clear typing
+    // Clear typing indicator; unlock send after a short guard window
     socket?.emit('chat:typing', { recipientId: activePeer._id, isTyping: false });
+    setTimeout(() => setSending(false), 500);
   }, [draft, activePeer, sending, replyTo, socket, user]);
 
   // ── Typing emission ────────────────────────────────────────────────────────
@@ -328,9 +330,9 @@ const Chat = () => {
               <h1 className="text-sm font-bold leading-none">ResQAI Chat</h1>
               <p className="text-[10px] text-zinc-500 mt-0.5">Real-time coordination</p>
             </div>
-            <a href="/dashboard" className="ml-auto text-zinc-500 hover:text-zinc-300 transition">
+            <Link to="/dashboard" className="ml-auto text-zinc-500 hover:text-zinc-300 transition">
               <ArrowLeft className="w-4 h-4" />
-            </a>
+            </Link>
           </div>
 
           {/* My presence */}

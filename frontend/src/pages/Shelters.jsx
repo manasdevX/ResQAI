@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import LiveMap from '../components/LiveMap';
 import { MapPin, Search, Filter, RefreshCw, Phone, Users, Wifi, Zap, Heart, Baby, Accessibility, BedDouble, Droplets, UtensilsCrossed, X, AlertTriangle, ChevronRight } from 'lucide-react';
@@ -265,7 +266,7 @@ const Shelters = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <a href="/dashboard" className="text-xs px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 transition">← Dashboard</a>
+          <Link to="/dashboard" className="text-xs px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 transition">← Dashboard</Link>
         </div>
       </header>
 

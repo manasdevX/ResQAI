@@ -28,7 +28,7 @@ const IncidentToast = ({ incident, onDismiss }) => {
 
   return (
     <div
-      className={`relative overflow-hidden w-80 rounded-xl border backdrop-blur-sm shadow-2xl transition-all duration-400 ${style.bg} ${
+      className={`relative overflow-hidden w-80 rounded-xl border backdrop-blur-sm shadow-2xl transition-[opacity,transform] duration-300 ${style.bg} ${
         visible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
       }`}
     >

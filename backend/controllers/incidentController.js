@@ -315,8 +315,13 @@ export const acceptIncidentTask = async (req, res) => {
     incident.assignedResponders.push(userId);
 
     if (['reported', 'acknowledged'].includes(incident.status)) {
-      incident.status     = 'responding';
-      incident._updatedBy = userId;
+      incident.status = 'responding';
+      incident.statusHistory.push({
+        status:    'responding',
+        note:      'Task accepted by responder',
+        updatedBy: userId,
+        updatedAt: new Date(),
+      });
     }
 
     const updatedIncident = await incident.save();
