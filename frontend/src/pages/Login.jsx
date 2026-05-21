@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, Mail, Lock, AlertTriangle, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Mail, Lock, AlertTriangle, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const Login = () => {
   const [email,        setEmail]        = useState('');
@@ -10,6 +12,12 @@ const Login = () => {
   const [showPwd,      setShowPwd]      = useState(false);
   const [error,        setError]        = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Real-time email validation state
+  const [emailTouched, setEmailTouched] = useState(false);
+  const emailValid      = EMAIL_REGEX.test(email.trim());
+  const showEmailError  = emailTouched && email.trim() && !emailValid;
+  const showEmailValid  = emailTouched && emailValid;
 
   const { login, googleLogin, roleHome } = useAuth();
   const navigate = useNavigate();
@@ -36,13 +44,25 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!email.trim() || !password) { setError('Please fill in all fields.'); return; }
+
+    if (!email.trim())  { setError('Email address is required'); setEmailTouched(true); return; }
+    if (!emailValid)    { setError('Please enter a valid email address'); setEmailTouched(true); return; }
+    if (!password)      { setError('Password is required'); return; }
+
     setIsSubmitting(true);
     try {
       const data = await login(email.trim(), password);
       redirect(data.role);
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password');
+      const res = err.response?.data;
+
+      // Account exists but email not yet verified — redirect to signup OTP step
+      if (res?.requiresVerification) {
+        navigate(`/signup?unverified=${encodeURIComponent(res.email || email.trim())}`);
+        return;
+      }
+
+      setError(res?.message || 'Invalid email or password');
       setIsSubmitting(false);
     }
   };
@@ -99,26 +119,48 @@ const Login = () => {
           <p className="text-sm text-zinc-500 mb-8">Sign in to access your dashboard.</p>
 
           {error && (
-            <div className="flex items-center gap-2.5 mb-5 p-3.5 bg-red-950/40 border border-red-900/50 rounded-xl text-sm text-red-400">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
+            <div className="flex items-start gap-2.5 mb-5 p-3.5 bg-red-950/40 border border-red-900/50 rounded-xl text-sm text-red-400">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
-              <input
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="Email address"
-                className="w-full pl-10 pr-4 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-sm placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all"
-              />
+
+            {/* Email */}
+            <div>
+              <div className="relative">
+                <Mail className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none transition-colors
+                  ${showEmailError ? 'text-red-400' : showEmailValid ? 'text-emerald-400' : 'text-zinc-500'}`} />
+                <input
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setEmailTouched(false); }}
+                  onBlur={() => { if (email.trim()) setEmailTouched(true); }}
+                  placeholder="Email address"
+                  className={`w-full pl-10 pr-10 py-3 bg-zinc-900 border rounded-xl text-sm placeholder-zinc-500 focus:outline-none transition-all
+                    ${showEmailError
+                      ? 'border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/30'
+                      : showEmailValid
+                        ? 'border-emerald-600/60 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30'
+                        : 'border-zinc-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30'}`}
+                />
+                {email.trim() && emailTouched && (
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                    {emailValid
+                      ? <CheckCircle className="w-4 h-4 text-emerald-400" />
+                      : <AlertTriangle className="w-4 h-4 text-red-400" />}
+                  </div>
+                )}
+              </div>
+              {showEmailError && (
+                <p className="text-xs text-red-400 mt-1.5 ml-1">Please enter a valid email address</p>
+              )}
             </div>
 
+            {/* Password */}
             <div className="relative">
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
               <input
@@ -126,12 +168,17 @@ const Login = () => {
                 autoComplete="current-password"
                 required
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
                 className="w-full pl-10 pr-10 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-sm placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all"
               />
-              <button type="button" onClick={() => setShowPwd(p => !p)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition">
+              <button
+                type="button"
+                onClick={() => setShowPwd((p) => !p)}
+                tabIndex={-1}
+                aria-label={showPwd ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors p-1"
+              >
                 {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
@@ -139,7 +186,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
             >
               {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Signing in…</> : 'Sign in'}
             </button>
@@ -157,7 +204,7 @@ const Login = () => {
           <button
             onClick={() => loginWithGoogle()}
             disabled={isSubmitting}
-            className="w-full flex items-center justify-center gap-3 py-3 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 border border-zinc-700 rounded-xl text-sm font-semibold transition-all duration-200 hover:border-zinc-600"
+            className="w-full flex items-center justify-center gap-3 py-3 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 border border-zinc-700 hover:border-zinc-600 rounded-xl text-sm font-semibold transition-all duration-200"
           >
             <svg viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />

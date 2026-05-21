@@ -19,7 +19,7 @@ export const AuthProvider = ({ children }) => {
   const [user,    setUser]    = useState(null);
   const [token,   setToken]   = useState(() => localStorage.getItem('token') || null);
   const [loading, setLoading] = useState(true);
-  const fetchedRef = useRef(false); // prevent duplicate fetches
+  const fetchedRef = useRef(false);
 
   const api = useMemo(() => {
     const instance = axios.create({
@@ -27,15 +27,15 @@ export const AuthProvider = ({ children }) => {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
 
-    // Globally handle 401 — expired / invalid token → force re-login
     instance.interceptors.response.use(
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
           localStorage.removeItem('token');
-          // Only redirect if not already on login/signup page
-          if (!window.location.pathname.startsWith('/login') &&
-              !window.location.pathname.startsWith('/signup')) {
+          if (
+            !window.location.pathname.startsWith('/login') &&
+            !window.location.pathname.startsWith('/signup')
+          ) {
             window.location.href = '/login';
           }
         }
@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }) => {
     return instance;
   }, [token]);
 
-  // Fetch user from token on mount / token change — only when no user in memory
+  // Restore session from stored token on mount
   useEffect(() => {
     let cancelled = false;
 
@@ -70,13 +70,7 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    // Skip if we've already got a user in state (e.g. after login)
-    if (user) {
-      setLoading(false);
-      return;
-    }
-
-    // Only run once per token value (guard against React StrictMode double-invoke)
+    if (user) { setLoading(false); return; }
     if (fetchedRef.current) return;
     fetchedRef.current = true;
 
@@ -84,17 +78,19 @@ export const AuthProvider = ({ children }) => {
     return () => { cancelled = true; };
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const persistAuth = (data) => {
+  const persistAuth = useCallback((data) => {
     const { token: newToken, ...userData } = data;
     localStorage.setItem('token', newToken);
-    fetchedRef.current = true; // mark fetched so useEffect doesn't re-run /auth/me
+    fetchedRef.current = true;
     setToken(newToken);
     setUser(userData);
-  };
+  }, []);
 
   const updateUser = useCallback((patch) => {
-    setUser(prev => prev ? { ...prev, ...patch } : prev);
+    setUser((prev) => (prev ? { ...prev, ...patch } : prev));
   }, []);
+
+  // ── Auth actions ────────────────────────────────────────────────────────────
 
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
@@ -102,9 +98,22 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
+  // Step 1: creates account + sends OTP — does NOT return an auth token
   const signup = async (name, email, password, role, inviteToken) => {
     const { data } = await api.post('/auth/signup', { name, email, password, role, inviteToken });
-    persistAuth(data);
+    return data; // { requiresVerification: true, email, message }
+  };
+
+  // Step 2: verifies OTP — returns auth token on success
+  const verifyOTP = async (email, otp) => {
+    const { data } = await api.post('/auth/verify-otp', { email, otp });
+    if (data.token) persistAuth(data);
+    return data;
+  };
+
+  // Resend OTP for an unverified account
+  const resendOTP = async (email) => {
+    const { data } = await api.post('/auth/resend-otp', { email });
     return data;
   };
 
@@ -129,6 +138,8 @@ export const AuthProvider = ({ children }) => {
     api,
     login,
     signup,
+    verifyOTP,
+    resendOTP,
     googleLogin,
     logout,
     updateUser,

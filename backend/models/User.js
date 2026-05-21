@@ -116,6 +116,29 @@ const UserSchema = new Schema(
       type: Date,
       select: false,
     },
+
+    // Email verification via OTP
+    isEmailVerified: {
+      type:    Boolean,
+      default: false,
+    },
+    emailOTP: {
+      type:   String,
+      select: false,
+    },
+    emailOTPExpires: {
+      type:   Date,
+      select: false,
+    },
+    emailOTPAttempts: {
+      type:    Number,
+      default: 0,
+      select:  false,
+    },
+    emailOTPSentAt: {
+      type:   Date,
+      select: false,
+    },
   },
   {
     timestamps: true, // createdAt, updatedAt
