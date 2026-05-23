@@ -48,8 +48,8 @@ router.get('/nearby', protect, getNearbyIncidents);
 // Broadcast emergency alert (Admin/Responder only)
 router.post('/broadcast-alert', protect, authorize('admin', 'responder'), broadcastAlert);
 
-// Update status of a specific incident
-router.patch('/:id/status', protect, updateIncidentStatus);
+// Update status of a specific incident (Admin/Responder only)
+router.patch('/:id/status', protect, authorize('admin', 'responder'), updateIncidentStatus);
 
 // Update severity (priority) of a specific incident (Admin/Responder only)
 router.patch('/:id/severity', protect, authorize('admin', 'responder'), updateIncidentSeverity);

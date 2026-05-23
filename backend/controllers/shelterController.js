@@ -154,7 +154,7 @@ export const createShelter = async (req, res) => {
 /**
  * @desc  Update shelter occupancy (check-in / check-out)
  * @route PATCH /api/shelters/:id/occupancy
- * @access Private
+ * @access Private (admin / shelter_manager — own shelter only)
  */
 export const updateOccupancy = async (req, res) => {
   try {
@@ -165,6 +165,14 @@ export const updateOccupancy = async (req, res) => {
 
     const shelter = await Shelter.findById(req.params.id);
     if (!shelter) return res.status(404).json({ success: false, message: 'Shelter not found' });
+
+    // Shelter managers can only update shelters they manage
+    if (
+      req.user.role === 'shelter_manager' &&
+      shelter.managedBy?.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({ success: false, message: 'You can only manage your own shelter' });
+    }
 
     const newOccupancy = shelter.currentOccupancy + delta;
     if (newOccupancy < 0) {
@@ -189,7 +197,7 @@ export const updateOccupancy = async (req, res) => {
 /**
  * @desc  Update shelter status
  * @route PATCH /api/shelters/:id/status
- * @access Private
+ * @access Private (admin / shelter_manager — own shelter only)
  */
 export const updateShelterStatus = async (req, res) => {
   try {
@@ -197,6 +205,17 @@ export const updateShelterStatus = async (req, res) => {
     const VALID = ['active', 'full', 'closed', 'preparing'];
     if (!VALID.includes(status)) {
       return res.status(400).json({ success: false, message: `Status must be one of: ${VALID.join(', ')}` });
+    }
+
+    // Fetch first so we can apply the ownership check
+    const existing = await Shelter.findById(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, message: 'Shelter not found' });
+
+    if (
+      req.user.role === 'shelter_manager' &&
+      existing.managedBy?.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({ success: false, message: 'You can only manage your own shelter' });
     }
 
     const shelter = await Shelter.findByIdAndUpdate(
@@ -270,7 +289,7 @@ export const getNearbyPlaces = async (req, res) => {
 /**
  * @desc  Update shelter details
  * @route PUT /api/shelters/:id
- * @access Private (admin / shelter_manager)
+ * @access Private (admin / shelter_manager — own shelter only)
  */
 export const updateShelter = async (req, res) => {
   try {
@@ -278,6 +297,17 @@ export const updateShelter = async (req, res) => {
 
     if (name !== undefined && !name?.trim()) {
       return res.status(400).json({ success: false, message: 'Shelter name cannot be empty' });
+    }
+
+    // Ownership check: fetch shelter before updating
+    const existing = await Shelter.findById(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, message: 'Shelter not found' });
+
+    if (
+      req.user.role === 'shelter_manager' &&
+      existing.managedBy?.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({ success: false, message: 'You can only manage your own shelter' });
     }
 
     location  = location  ? safeParse(location,  null) : undefined;

@@ -52,6 +52,30 @@ export const createIncident = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid location: coordinates [lng, lat] are required' });
     }
 
+    // ── Duplicate detection ────────────────────────────────────────────────────
+    // Prevent spam: block if this user already reported an active incident
+    // within 500 m of this location in the last 30 minutes.
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60_000);
+    const duplicate = await Incident.findOne({
+      reportedBy: req.user._id,
+      status:     { $nin: ['resolved', 'closed'] },
+      createdAt:  { $gte: thirtyMinutesAgo },
+      location: {
+        $near: {
+          $geometry:   location,
+          $maxDistance: 500, // metres
+        },
+      },
+    }).select('_id title');
+
+    if (duplicate) {
+      return res.status(409).json({
+        success: false,
+        message: 'A similar incident was already reported from this location. Please check your existing reports.',
+        existingIncidentId: duplicate._id,
+      });
+    }
+
     // ── Media ──────────────────────────────────────────────────────────────────
     const media = buildMediaArray(req.files);
 
@@ -347,24 +371,30 @@ export const createSOSIncident = async (req, res) => {
 /**
  * @desc  Volunteer accepts an incident task
  * @route POST /api/incidents/:id/accept
- * @access Private
+ * @access Private (responder / admin)
  */
 export const acceptIncidentTask = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user._id;
 
-    const incident = await Incident.findById(id);
-    if (!incident) {
-      return res.status(404).json({ success: false, message: 'Incident not found' });
-    }
+    // Atomic add: the $ne filter ensures we only modify the document when the
+    // user is NOT already in assignedResponders. Two concurrent requests cannot
+    // both pass this filter, so duplicate assignments are impossible.
+    const incident = await Incident.findOneAndUpdate(
+      { _id: id, assignedResponders: { $ne: userId } },
+      { $addToSet: { assignedResponders: userId } },
+      { new: true },
+    ).populate('reportedBy', '_id');
 
-    if (incident.assignedResponders.some(r => r.toString() === userId.toString())) {
+    if (!incident) {
+      // Distinguish "not found" from "already assigned"
+      const exists = await Incident.exists({ _id: id });
+      if (!exists) return res.status(404).json({ success: false, message: 'Incident not found' });
       return res.status(400).json({ success: false, message: 'You have already accepted this task' });
     }
 
-    incident.assignedResponders.push(userId);
-
+    // Update status to 'responding' if still in an early stage
     if (['reported', 'acknowledged'].includes(incident.status)) {
       incident.status = 'responding';
       incident.statusHistory.push({
@@ -373,17 +403,28 @@ export const acceptIncidentTask = async (req, res) => {
         updatedBy: userId,
         updatedAt: new Date(),
       });
+      await incident.save();
     }
 
-    const updatedIncident = await incident.save();
-
+    // Broadcast assignment update to all dashboard clients
     io.emit('incidentUpdated', {
       incidentId:         id,
       status:             incident.status,
-      assignedResponders: updatedIncident.assignedResponders,
+      assignedResponders: incident.assignedResponders,
     });
 
-    return res.status(200).json({ success: true, message: 'Task accepted successfully', incident: updatedIncident });
+    // SOS acknowledgment — notify the original reporter via their personal socket room
+    if (incident.isSOS && incident.reportedBy) {
+      const reporterId = incident.reportedBy._id ?? incident.reportedBy;
+      io.to(`user:${reporterId}`).emit('sosAcknowledged', {
+        incidentId:     id,
+        responder:      { name: req.user.name, avatar: req.user.avatar || null },
+        message:        'Your SOS has been received. A responder is on their way.',
+        acknowledgedAt: new Date(),
+      });
+    }
+
+    return res.status(200).json({ success: true, message: 'Task accepted successfully', incident });
   } catch (error) {
     console.error('[acceptIncidentTask] Error:', error);
     return res.status(500).json({ success: false, message: 'Server error while accepting task' });

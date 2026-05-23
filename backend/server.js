@@ -69,10 +69,12 @@ const authLimiter = rateLimit({
 });
 
 app.use('/api', apiLimiter);
-app.use('/api/auth/login',      authLimiter);
-app.use('/api/auth/signup',     authLimiter);
-app.use('/api/auth/verify-otp', authLimiter);
-app.use('/api/auth/resend-otp', authLimiter);
+app.use('/api/auth/login',           authLimiter);
+app.use('/api/auth/signup',          authLimiter);
+app.use('/api/auth/verify-otp',      authLimiter);
+app.use('/api/auth/resend-otp',      authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/reset-password',  authLimiter);
 
 app.get('/', (req, res) => res.send('ResQAI API is running...'));
 

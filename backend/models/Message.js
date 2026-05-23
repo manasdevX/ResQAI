@@ -158,10 +158,16 @@ const MessageSchema = new Schema(
   }
 );
 
-// ─── Validation: content OR attachments required ──────────────────────────────
+// ─── Validation: non-whitespace content OR attachments required ───────────────
 
 MessageSchema.pre('validate', function (next) {
-  if (!this.content && (!this.attachments || this.attachments.length === 0)) {
+  // Normalise content before any checks so "   " is treated as empty
+  if (this.content != null) this.content = this.content.trim();
+
+  const hasContent     = this.content && this.content.length > 0;
+  const hasAttachments = this.attachments && this.attachments.length > 0;
+
+  if (!hasContent && !hasAttachments) {
     return next(new Error('A message must have either content or at least one attachment.'));
   }
   next();

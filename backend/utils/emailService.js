@@ -13,6 +13,73 @@ const createTransporter = () => {
   });
 };
 
+export const sendPasswordResetEmail = async (to, name, resetUrl) => {
+  const transporter = createTransporter();
+  const firstName = name?.split(' ')[0] || 'there';
+
+  if (!transporter) {
+    console.log(`\n  [ResQAI Email] ⚠ Email not configured — password reset link for ${to} : ${resetUrl}\n`);
+    return;
+  }
+
+  await transporter.sendMail({
+    from:    `"ResQAI Emergency Platform" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: 'Reset your ResQAI password',
+    text:    `Hi ${firstName},\n\nClick the link below to reset your password. It expires in 1 hour.\n\n${resetUrl}\n\nIf you didn't request this, ignore this email — your password won't change.`,
+    html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Reset your ResQAI password</title>
+</head>
+<body style="margin:0;padding:0;background:#09090b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#09090b;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" style="max-width:520px;background:#18181b;border-radius:16px;overflow:hidden;border:1px solid #27272a;">
+          <tr>
+            <td style="background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);padding:28px 36px;text-align:center;">
+              <div style="font-size:22px;font-weight:800;color:white;letter-spacing:-0.5px;">ResQAI</div>
+              <p style="color:rgba(255,255,255,0.7);margin:4px 0 0;font-size:13px;">Emergency Coordination Platform</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:36px 36px 28px;">
+              <h1 style="color:#f4f4f5;font-size:22px;font-weight:700;margin:0 0 12px;">Reset your password</h1>
+              <p style="color:#a1a1aa;font-size:14px;line-height:1.7;margin:0 0 28px;">
+                Hi ${firstName},<br>
+                We received a request to reset your ResQAI password. Click the button below — this link expires in <strong style="color:#fbbf24;">1 hour</strong>.
+              </p>
+              <div style="text-align:center;margin:0 0 28px;">
+                <a href="${resetUrl}" style="display:inline-block;background:#dc2626;color:white;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;text-decoration:none;letter-spacing:0.2px;">Reset Password</a>
+              </div>
+              <div style="background:#1c1917;border:1px solid #292524;border-radius:10px;padding:14px 16px;margin:0 0 24px;">
+                <p style="color:#a8a29e;font-size:12px;margin:0;line-height:1.6;">
+                  🔒 <strong style="color:#d6d3d1;">Didn't request this?</strong> You can safely ignore this email. Your password will not change.
+                </p>
+              </div>
+              <p style="color:#52525b;font-size:12px;line-height:1.6;margin:0;">
+                If the button doesn't work, copy and paste this link into your browser:<br>
+                <span style="color:#71717a;word-break:break-all;">${resetUrl}</span>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#09090b;padding:18px 36px;border-top:1px solid #27272a;text-align:center;">
+              <p style="color:#3f3f46;font-size:11px;margin:0;">© 2025 ResQAI Emergency Platform · All rights reserved</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  });
+};
+
 export const sendOTPEmail = async (to, name, otp) => {
   const transporter = createTransporter();
 

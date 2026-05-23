@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { User } from '../models/index.js';
 import Invite from '../models/Invite.js';
 import generateToken from '../utils/generateToken.js';
-import { sendOTPEmail } from '../utils/emailService.js';
+import { sendOTPEmail, sendPasswordResetEmail } from '../utils/emailService.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -286,6 +286,85 @@ export const loginUser = async (req, res) => {
     return res.json(buildAuthResponse(user));
   } catch (error) {
     return res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Request a password reset link
+// @route   POST /api/auth/forgot-password
+// @access  Public
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email?.trim()) return res.status(400).json({ message: 'Email is required' });
+    if (!EMAIL_REGEX.test(email.trim())) return res.status(400).json({ message: 'Please provide a valid email address' });
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() })
+      .select('+resetPasswordToken +resetPasswordExpires');
+
+    // Always respond with success to prevent email enumeration attacks
+    const genericResponse = { message: 'If that email is registered, a reset link has been sent.' };
+
+    if (!user) return res.status(200).json(genericResponse);
+
+    // Prevent token spam: block if a non-expired token was issued in the last 60 seconds
+    if (user.resetPasswordExpires && user.resetPasswordExpires > new Date(Date.now() - 59 * 60_000)) {
+      const alreadyRequested = user.resetPasswordExpires > new Date();
+      if (alreadyRequested) return res.status(200).json(genericResponse);
+    }
+
+    // Generate a cryptographically secure token
+    const rawToken  = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    user.resetPasswordToken   = hashedToken;
+    user.resetPasswordExpires = new Date(Date.now() + 60 * 60_000); // 1 hour
+    await user.save();
+
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${rawToken}`;
+    await sendPasswordResetEmail(user.email, user.name, resetUrl);
+
+    return res.status(200).json(genericResponse);
+  } catch (error) {
+    console.error('[forgotPassword] Error:', error);
+    return res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
+// @desc    Reset password using the emailed token
+// @route   POST /api/auth/reset-password
+// @access  Public
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token?.trim()) return res.status(400).json({ message: 'Reset token is required' });
+    if (!password)      return res.status(400).json({ message: 'New password is required' });
+
+    const pwdError = validatePassword(password);
+    if (pwdError) return res.status(400).json({ message: pwdError });
+
+    // Hash the incoming raw token to compare with the stored hash
+    const hashedToken = crypto.createHash('sha256').update(token.trim()).digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken:   hashedToken,
+      resetPasswordExpires: { $gt: new Date() }, // must not be expired
+    }).select('+resetPasswordToken +resetPasswordExpires');
+
+    if (!user) {
+      return res.status(400).json({ message: 'Reset link is invalid or has expired. Please request a new one.' });
+    }
+
+    user.password             = password; // pre-save hook hashes it
+    user.resetPasswordToken   = undefined;
+    user.resetPasswordExpires = undefined;
+    user.isEmailVerified      = true; // proves they own the inbox
+    await user.save();
+
+    return res.status(200).json({ message: 'Password reset successful. You can now log in.' });
+  } catch (error) {
+    console.error('[resetPassword] Error:', error);
+    return res.status(500).json({ message: 'Server error. Please try again.' });
   }
 };
 
