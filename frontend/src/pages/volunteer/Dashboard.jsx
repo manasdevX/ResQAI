@@ -19,14 +19,24 @@ const VolunteerDashboard = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [incRes] = await Promise.all([
-          api.get('/incidents?status=responding'),
+        const [incRes, allRes] = await Promise.all([
+          api.get('/incidents?limit=200'),
+          api.get('/resources/nearby?lat=0&lng=0&maxDistance=99999999').catch(() => ({ data: { requests: [] } })),
         ]);
-        setStats(prev => ({ ...prev, active: incRes.data.total || incRes.data.count || 0 }));
+        const incidents = incRes.data.incidents || [];
+        const activeCount = incidents.filter(i => !['resolved', 'closed'].includes(i.status)).length;
+        const mineCount   = incidents.filter(i =>
+          i.assignedResponders?.some(r => (r?._id?.toString() || r?.toString()) === user?._id?.toString())
+        ).length;
+        setStats({
+          active:    activeCount,
+          mine:      mineCount,
+          resources: (allRes.data.requests || []).length,
+        });
       } catch { /* silent */ }
     };
     fetchStats();
-  }, [api]);
+  }, [api, user]);
 
   useEffect(() => {
     if (!socket) return;
@@ -156,7 +166,7 @@ const VolunteerDashboard = () => {
           { to: '/volunteer/incidents',   icon: MapPin,        label: 'View Nearby Incidents', color: 'hover:border-blue-500/40 hover:bg-blue-950/20' },
           { to: '/volunteer/assignments', icon: ClipboardList, label: 'My Assignments',        color: 'hover:border-purple-500/40 hover:bg-purple-950/20' },
           { to: '/volunteer/resources',   icon: Package,       label: 'Fulfill Resources',     color: 'hover:border-orange-500/40 hover:bg-orange-950/20' },
-          { to: '/chat',                  icon: MessageCircle, label: 'Open Chat',             color: 'hover:border-green-500/40 hover:bg-green-950/20' },
+          { to: '/volunteer/chat',        icon: MessageCircle, label: 'Open Chat',             color: 'hover:border-green-500/40 hover:bg-green-950/20' },
         ].map(({ to, icon: Icon, label, color }) => (
           <Link
             key={to}

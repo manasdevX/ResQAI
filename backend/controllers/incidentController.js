@@ -380,10 +380,13 @@ export const broadcastAlert = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Alert message is required' });
     }
 
+    const VALID_ALERT_TYPES = ['evacuation', 'medical', 'shelter', 'general'];
+    const resolvedType = VALID_ALERT_TYPES.includes(alertType) ? alertType : 'general';
+
     const alertPayload = {
-      incidentId,
+      incidentId: incidentId || undefined,
       message:     message.trim(),
-      alertType:   alertType || 'general',
+      alertType:   resolvedType,
       broadcastBy: req.user.name,
       broadcastAt: new Date(),
     };

@@ -158,7 +158,7 @@ const VolunteerIncidents = () => {
       ) : (
         <div className="space-y-3">
           {displayed.map(inc => {
-            const isAssigned = inc.assignedResponders?.some(r => r === user?._id || r?._id === user?._id);
+            const isAssigned = inc.assignedResponders?.some(r => (r?._id?.toString() || r?.toString()) === user?._id?.toString());
             const distStr = location && inc.location?.coordinates
               ? `${haversine(location.lat, location.lng, inc.location.coordinates[1], inc.location.coordinates[0])} km`
               : null;

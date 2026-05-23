@@ -31,6 +31,7 @@ const ResourceRequestModal = ({ onClose, onSuccess }) => {
     e.preventDefault();
     if (!type) return;
     setPhase('sending');
+    setErrorMsg('');
 
     try {
       const coords = await new Promise((resolve, reject) => {
@@ -170,8 +171,8 @@ const ResourceRequestModal = ({ onClose, onSuccess }) => {
                 className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2"
               >
                 {phase === 'sending'
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Locating…</>
-                  : 'Submit Request'
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</>
+                  : phase === 'error' ? 'Try Again' : 'Submit Request'
                 }
               </button>
             </div>

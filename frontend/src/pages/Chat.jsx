@@ -449,10 +449,10 @@ const Chat = () => {
                   <Bubble
                     key={msg._id}
                     msg={msg}
-                    isMine={msg.sender?._id === user?._id || msg.sender === user?._id}
+                    isMine={msg.sender?._id?.toString() === user?._id?.toString()}
                     onReply={setReplyTo}
                     onDelete={handleDelete}
-                    canDelete={msg.sender?._id === user?._id || msg.sender === user?._id || user?.role === 'admin'}
+                    canDelete={msg.sender?._id?.toString() === user?._id?.toString() || user?.role === 'admin'}
                   />
                 ))
               )}

@@ -77,6 +77,7 @@ export const getMyResourceRequests = async (req, res) => {
   try {
     const requests = await ResourceRequest.find({ requestedBy: req.user._id })
       .sort({ createdAt: -1 })
+      .populate('requestedBy', 'name phone avatar')
       .populate('fulfilledBy', 'name avatar');
 
     return res.json({ success: true, requests });
@@ -129,19 +130,17 @@ export const getAllResourceRequests = async (req, res) => {
 // @access Private
 export const fulfillResourceRequest = async (req, res) => {
   try {
-    const request = await ResourceRequest.findById(req.params.id);
+    const request = await ResourceRequest.findOneAndUpdate(
+      { _id: req.params.id, status: { $ne: 'fulfilled' } },
+      { status: 'fulfilled', fulfilledBy: req.user._id, fulfilledAt: new Date() },
+      { new: true }
+    );
 
     if (!request) {
-      return res.status(404).json({ success: false, message: 'Resource request not found' });
-    }
-    if (request.status === 'fulfilled') {
+      const exists = await ResourceRequest.exists({ _id: req.params.id });
+      if (!exists) return res.status(404).json({ success: false, message: 'Resource request not found' });
       return res.status(400).json({ success: false, message: 'This request has already been fulfilled' });
     }
-
-    request.status      = 'fulfilled';
-    request.fulfilledBy = req.user._id;
-    request.fulfilledAt = new Date();
-    await request.save();
 
     io.emit('resourceRequestFulfilled', {
       requestId:   request._id,

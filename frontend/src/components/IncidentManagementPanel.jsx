@@ -328,7 +328,7 @@ const IncidentManagementPanel = ({ incident, onIncidentUpdated }) => {
                 >
                   <option value="">Select available responder…</option>
                   {availableResponders
-                    .filter(r => !assignedResponders.some(a => (a._id || a) === r._id))
+                    .filter(r => !assignedResponders.some(a => (a._id?.toString() || a?.toString()) === r._id?.toString()))
                     .map(r => (
                       <option key={r._id} value={r._id}>{r.name} ({r.role?.replace('_', ' ')})</option>
                     ))

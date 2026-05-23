@@ -73,12 +73,15 @@ const AdminInvites = () => {
     }
   };
 
-  const handleCopy = (invite) => {
+  const handleCopy = async (invite) => {
     const link = `${window.location.origin}/signup?invite=${invite.token}`;
-    navigator.clipboard.writeText(link).then(() => {
+    try {
+      await navigator.clipboard.writeText(link);
       setCopiedId(invite._id);
       setTimeout(() => setCopiedId(null), 2500);
-    });
+    } catch {
+      setError('Failed to copy link — try selecting and copying the link manually');
+    }
   };
 
   const isExpired = (invite) => !invite.usedAt && new Date(invite.expiresAt) < new Date();

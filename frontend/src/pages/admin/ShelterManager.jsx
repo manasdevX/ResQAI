@@ -4,7 +4,7 @@ import {
   RefreshCw, Plus, AlertTriangle, Building2, MapPin, Phone,
   Users, Edit2, Trash2, X, CheckCircle, Save,
 } from 'lucide-react';
-import { SHELTER_SHELTER_TYPE_OPTIONS, SHELTER_SHELTER_STATUS_OPTIONS, SHELTER_TYPE_META, SHELTER_STATUS_BADGE, AMENITIES } from '../../constants/shelter';
+import { SHELTER_TYPE_OPTIONS, SHELTER_STATUS_OPTIONS, SHELTER_TYPE_META, SHELTER_STATUS_BADGE, AMENITIES } from '../../constants/shelter';
 
 const OccupancyBar = ({ current, total, status }) => {
   const pct = total ? Math.min(100, Math.round((current / total) * 100)) : 0;

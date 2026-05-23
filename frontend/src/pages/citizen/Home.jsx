@@ -22,6 +22,7 @@ const CitizenHome = () => {
 
   const [nearbyIncidents,  setNearbyIncidents]  = useState([]);
   const [location,         setLocation]         = useState(null);
+  const [locationError,    setLocationError]    = useState(null);
   const [markingSafe,      setMarkingSafe]       = useState(false);
   const [safeDone,         setSafeDone]          = useState(false);
   const [showResources,    setShowResources]     = useState(false);
@@ -38,9 +39,14 @@ const CitizenHome = () => {
         try {
           const { data } = await api.get(`/incidents/nearby?lat=${loc.lat}&lng=${loc.lng}&maxDistance=20000`);
           setNearbyIncidents(data.incidents?.slice(0, 5) || []);
-        } catch { /* silent */ }
+        } catch { /* silent — nearby incidents are non-critical */ }
       },
-      () => {},
+      (err) => {
+        const msg = err.code === 1
+          ? 'Location access denied — enable it in browser settings to see nearby incidents'
+          : 'Unable to get your location';
+        setLocationError(msg);
+      },
       { timeout: 10000, maximumAge: 120000 }
     );
   }, [api]);
@@ -125,6 +131,12 @@ const CitizenHome = () => {
         </h1>
         <p className="text-sm text-zinc-500 mt-0.5">Stay safe. Help is always nearby.</p>
       </div>
+
+      {locationError && (
+        <div className="flex items-center gap-2 p-3 bg-zinc-800/60 border border-zinc-700/50 rounded-xl text-zinc-400 text-xs">
+          <MapPin className="w-3.5 h-3.5 shrink-0 text-zinc-500" /> {locationError}
+        </div>
+      )}
 
       {/* SOS + Mark Safe */}
       <div className="space-y-3">
