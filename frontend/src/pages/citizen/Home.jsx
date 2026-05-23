@@ -5,7 +5,7 @@ import { useSocket } from '../../context/SocketContext';
 import SOSButton from '../../components/SOSButton';
 import WeatherWidget from '../../components/WeatherWidget';
 import ResourceRequestModal from '../../components/ResourceRequestModal';
-import { AlertOctagon, Building2, Package, MessageCircle, FileText, CheckCircle, MapPin, Clock, Zap } from 'lucide-react';
+import { AlertOctagon, Building2, Package, MessageCircle, FileText, CheckCircle, MapPin, Zap, X } from 'lucide-react';
 
 import { SEVERITY_BADGE, TYPE_ICONS } from '../../constants/incident';
 
@@ -20,12 +20,13 @@ const CitizenHome = () => {
   const { user, api, updateUser } = useAuth();
   const socket = useSocket();
 
-  const [nearbyIncidents, setNearbyIncidents] = useState([]);
-  const [location,        setLocation]        = useState(null);
-  const [markingSafe,     setMarkingSafe]      = useState(false);
-  const [safeDone,        setSafeDone]         = useState(false);
-  const [showResources,   setShowResources]    = useState(false);
-  const [sosAlert,        setSOSAlert]         = useState(null);
+  const [nearbyIncidents,  setNearbyIncidents]  = useState([]);
+  const [location,         setLocation]         = useState(null);
+  const [markingSafe,      setMarkingSafe]       = useState(false);
+  const [safeDone,         setSafeDone]          = useState(false);
+  const [showResources,    setShowResources]     = useState(false);
+  const [sosAlert,         setSOSAlert]          = useState(null);
+  const [sosAcknowledged,  setSOSAcknowledged]   = useState(null);
 
   // Get location + nearby incidents on mount
   useEffect(() => {
@@ -44,17 +45,29 @@ const CitizenHome = () => {
     );
   }, [api]);
 
-  // Socket: listen for SOS alerts & new incidents
+  // Socket: listen for SOS alerts, new incidents, and SOS acknowledgments
   useEffect(() => {
     if (!socket) return;
+
     const onSOS = (payload) => {
       setSOSAlert(payload);
       setTimeout(() => setSOSAlert(null), 10000);
     };
     const onNew = (incident) => setNearbyIncidents(prev => [incident, ...prev].slice(0, 5));
-    socket.on('sosAlert',    onSOS);
-    socket.on('newIncident', onNew);
-    return () => { socket.off('sosAlert', onSOS); socket.off('newIncident', onNew); };
+    // Fired when a responder accepts OUR SOS — only reaches this user's socket room
+    const onAck = (payload) => {
+      setSOSAcknowledged(payload);
+      setTimeout(() => setSOSAcknowledged(null), 20000);
+    };
+
+    socket.on('sosAlert',       onSOS);
+    socket.on('newIncident',    onNew);
+    socket.on('sosAcknowledged', onAck);
+    return () => {
+      socket.off('sosAlert',       onSOS);
+      socket.off('newIncident',    onNew);
+      socket.off('sosAcknowledged', onAck);
+    };
   }, [socket]);
 
   const handleMarkSafe = async () => {
@@ -71,7 +84,30 @@ const CitizenHome = () => {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
-      {/* SOS Alert banner */}
+      {/* SOS Acknowledged banner — shown only to the citizen who triggered SOS */}
+      {sosAcknowledged && (
+        <div className="flex items-start gap-3 p-4 bg-green-950/80 border-2 border-green-600/60 rounded-2xl">
+          <span className="text-2xl shrink-0">✅</span>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-green-300">Help is on the way!</p>
+            <p className="text-xs text-green-400/80 mt-0.5">
+              {sosAcknowledged.responder?.name
+                ? <><span className="font-semibold">{sosAcknowledged.responder.name}</span> has accepted your emergency and is responding.</>
+                : 'A responder has accepted your emergency and is responding.'}
+            </p>
+            <p className="text-xs text-green-600 mt-1">Stay safe and wait for assistance to arrive.</p>
+          </div>
+          <button
+            onClick={() => setSOSAcknowledged(null)}
+            className="text-green-600 hover:text-green-400 transition-colors shrink-0"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* SOS Alert banner — shown to ALL citizens when someone nearby triggers SOS */}
       {sosAlert && (
         <div className="flex items-start gap-3 p-4 bg-red-950/80 border-2 border-red-600/60 rounded-2xl animate-pulse">
           <span className="text-2xl shrink-0">🚨</span>

@@ -10,9 +10,11 @@ import VolunteerLayout from './layouts/VolunteerLayout';
 import CitizenLayout   from './layouts/CitizenLayout';
 
 // Public pages
-import Login    from './pages/Login';
-import Signup   from './pages/Signup';
-import NotFound from './pages/NotFound';
+import Login          from './pages/Login';
+import Signup         from './pages/Signup';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword  from './pages/ResetPassword';
+import NotFound       from './pages/NotFound';
 
 // Admin pages
 import AdminDashboard      from './pages/admin/Dashboard';
@@ -46,9 +48,11 @@ function App() {
         <div className="min-h-screen bg-zinc-950 text-zinc-100">
           <Routes>
             {/* ── Public ──────────────────────────────────────────────────────── */}
-            <Route path="/"       element={<Navigate to="/login" replace />} />
-            <Route path="/login"  element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
+            <Route path="/"                 element={<Navigate to="/login" replace />} />
+            <Route path="/login"            element={<Login />} />
+            <Route path="/signup"           element={<Signup />} />
+            <Route path="/forgot-password"  element={<ForgotPassword />} />
+            <Route path="/reset-password"   element={<ResetPassword />} />
 
             {/* ── Admin ───────────────────────────────────────────────────────── */}
             <Route element={<ProtectedRoute allowedRoles={['admin']} />}>

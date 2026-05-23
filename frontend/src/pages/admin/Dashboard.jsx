@@ -20,6 +20,7 @@ const AdminDashboard = () => {
   const [newIds,           setNewIds]           = useState(new Set());
   const [globalAlert,      setGlobalAlert]      = useState(null);
   const [sosAlerts,        setSOSAlerts]        = useState([]);
+  const [escalations,      setEscalations]      = useState([]);
 
   const sidebarRef = useRef(null);
 
@@ -72,16 +73,35 @@ const AdminDashboard = () => {
       }]);
     };
 
-    socket.on('newIncident',    handleNew);
-    socket.on('incidentUpdated', handleUpdated);
-    socket.on('alertBroadcast', handleAlert);
-    socket.on('sosAlert',       handleSOS);
+    const handleEscalated = (payload) => {
+      const id = payload.incidentId?.toString();
+      setEscalations(prev => [payload, ...prev].slice(0, 5));
+      const toastId = `esc-${Date.now()}`;
+      setToasts(prev => [...prev, {
+        id: toastId,
+        incident: {
+          title:       `⚠️ No responder: ${payload.title}`,
+          description: payload.message,
+          severity:    payload.severity,
+          type:        payload.type,
+        },
+      }]);
+      // Auto-clear the escalation banner after 60 seconds
+      setTimeout(() => setEscalations(prev => prev.filter(e => e.incidentId?.toString() !== id)), 60000);
+    };
+
+    socket.on('newIncident',      handleNew);
+    socket.on('incidentUpdated',  handleUpdated);
+    socket.on('alertBroadcast',   handleAlert);
+    socket.on('sosAlert',         handleSOS);
+    socket.on('incidentEscalated', handleEscalated);
 
     return () => {
-      socket.off('newIncident',    handleNew);
-      socket.off('incidentUpdated', handleUpdated);
-      socket.off('alertBroadcast', handleAlert);
-      socket.off('sosAlert',       handleSOS);
+      socket.off('newIncident',      handleNew);
+      socket.off('incidentUpdated',  handleUpdated);
+      socket.off('alertBroadcast',   handleAlert);
+      socket.off('sosAlert',         handleSOS);
+      socket.off('incidentEscalated', handleEscalated);
     };
   }, [socket]);
 
@@ -115,6 +135,28 @@ const AdminDashboard = () => {
           <span className="text-xs text-red-400/70">— SOS incidents are highlighted in the feed below</span>
         </div>
       )}
+
+      {/* Escalation banners — unaccepted incidents after 15 min */}
+      {escalations.map(esc => (
+        <div
+          key={esc.incidentId?.toString()}
+          className="flex items-center gap-3 px-5 py-2.5 bg-orange-950/90 border-b border-orange-800 shrink-0"
+        >
+          <span className="text-lg shrink-0">⚠️</span>
+          <div className="flex-1 min-w-0">
+            <span className="text-sm font-bold text-orange-300">Escalation: </span>
+            <span className="text-sm text-orange-200 font-medium">{esc.title}</span>
+            <span className="text-xs text-orange-400/70 ml-2">{esc.message}</span>
+          </div>
+          <button
+            onClick={() => setEscalations(prev => prev.filter(e => e.incidentId?.toString() !== esc.incidentId?.toString()))}
+            className="text-orange-400 hover:text-orange-200 transition-colors shrink-0 text-lg leading-none"
+            aria-label="Dismiss escalation"
+          >
+            ×
+          </button>
+        </div>
+      ))}
 
       {/* Alert banner */}
       {globalAlert && (

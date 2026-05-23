@@ -9,11 +9,12 @@ const VolunteerDashboard = () => {
   const { user, api, updateUser } = useAuth();
   const socket = useSocket();
 
-  const [stats,       setStats]       = useState({ active: 0, mine: 0, resources: 0 });
-  const [skills,      setSkills]      = useState(user?.skills || []);
-  const [newSkill,    setNewSkill]    = useState('');
-  const [skillSaving, setSkillSaving] = useState(false);
-  const [sosAlerts,   setSOSAlerts]   = useState([]);
+  const [stats,           setStats]           = useState({ active: 0, mine: 0, resources: 0 });
+  const [skills,          setSkills]          = useState(user?.skills || []);
+  const [newSkill,        setNewSkill]        = useState('');
+  const [skillSaving,     setSkillSaving]     = useState(false);
+  const [sosAlerts,       setSOSAlerts]       = useState([]);
+  const [dispatchAlerts,  setDispatchAlerts]  = useState([]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -29,12 +30,27 @@ const VolunteerDashboard = () => {
 
   useEffect(() => {
     if (!socket) return;
+
     const onSOS = (payload) => {
       setSOSAlerts(prev => [payload, ...prev].slice(0, 3));
       setTimeout(() => setSOSAlerts(prev => prev.filter(a => a.incidentId !== payload.incidentId)), 15000);
     };
-    socket.on('sosAlert', onSOS);
-    return () => socket.off('sosAlert', onSOS);
+
+    // Fired when a new incident is dispatched to this responder based on skill match
+    const onDispatched = (payload) => {
+      const id = payload.incidentId?.toString();
+      setDispatchAlerts(prev => [payload, ...prev].slice(0, 5));
+      setTimeout(() => setDispatchAlerts(prev => prev.filter(a => a.incidentId?.toString() !== id)), 30000);
+      // Increment active count so the stat badge refreshes
+      setStats(prev => ({ ...prev, active: prev.active + 1 }));
+    };
+
+    socket.on('sosAlert',            onSOS);
+    socket.on('newIncidentAssigned', onDispatched);
+    return () => {
+      socket.off('sosAlert',            onSOS);
+      socket.off('newIncidentAssigned', onDispatched);
+    };
   }, [socket]);
 
   const addSkill = async () => {
@@ -64,7 +80,40 @@ const VolunteerDashboard = () => {
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
-      {/* SOS alerts */}
+      {/* Dispatch alerts — incidents matched to this responder's skills */}
+      {dispatchAlerts.map(alert => (
+        <div
+          key={alert.incidentId?.toString()}
+          className={`flex items-start gap-3 p-4 border-2 rounded-2xl ${
+            alert.isSOS
+              ? 'bg-red-950/70 border-red-600/60 animate-pulse'
+              : 'bg-blue-950/60 border-blue-600/50'
+          }`}
+        >
+          <span className="text-xl shrink-0">{alert.isSOS ? '🚨' : '📋'}</span>
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-bold ${alert.isSOS ? 'text-red-300' : 'text-blue-300'}`}>
+              {alert.isSOS ? 'SOS — Dispatched to you' : 'New incident assigned to you'}
+            </p>
+            <p className="text-xs font-semibold text-zinc-200 mt-0.5 truncate">{alert.title}</p>
+            <p className={`text-xs mt-0.5 ${alert.isSOS ? 'text-red-400/70' : 'text-blue-400/70'}`}>
+              {alert.severity?.toUpperCase()} · {alert.type} · Go to Nearby Incidents to accept
+            </p>
+            {alert.aiSummary && (
+              <p className="text-xs text-zinc-400 mt-1 line-clamp-1">{alert.aiSummary}</p>
+            )}
+          </div>
+          <button
+            onClick={() => setDispatchAlerts(prev => prev.filter(a => a.incidentId?.toString() !== alert.incidentId?.toString()))}
+            className={alert.isSOS ? 'text-red-400 hover:text-red-200' : 'text-blue-400 hover:text-blue-200'}
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ))}
+
+      {/* SOS alerts from nearby users */}
       {sosAlerts.map(alert => (
         <div key={alert.incidentId} className="flex items-start gap-3 p-4 bg-red-950/70 border-2 border-red-600/60 rounded-2xl animate-pulse">
           <span className="text-2xl shrink-0">🚨</span>

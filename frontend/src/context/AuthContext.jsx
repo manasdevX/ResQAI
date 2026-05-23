@@ -123,6 +123,16 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
+  const forgotPassword = async (email) => {
+    const { data } = await api.post('/auth/forgot-password', { email });
+    return data;
+  };
+
+  const resetPassword = async (token, password) => {
+    const { data } = await api.post('/auth/reset-password', { token, password });
+    return data;
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     fetchedRef.current = false;
@@ -141,6 +151,8 @@ export const AuthProvider = ({ children }) => {
     verifyOTP,
     resendOTP,
     googleLogin,
+    forgotPassword,
+    resetPassword,
     logout,
     updateUser,
     roleHome,

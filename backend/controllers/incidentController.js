@@ -1,6 +1,22 @@
 import Incident from '../models/Incident.js';
+import User from '../models/User.js';
 import { analyzeIncident } from '../utils/aiTriage.js';
 import { io } from '../server.js';
+
+// Incident type → skill keywords for targeted dispatch
+const INCIDENT_SKILL_MAP = {
+  fire:           ['firefighting', 'fire', 'rescue'],
+  flood:          ['water rescue', 'swimming', 'flood', 'search and rescue'],
+  earthquake:     ['search and rescue', 'structural', 'earthquake'],
+  medical:        ['medical', 'first aid', 'cpr', 'paramedic', 'nurse', 'doctor', 'healthcare'],
+  accident:       ['first aid', 'traffic', 'accident', 'driving'],
+  violence:       ['law enforcement', 'security', 'conflict'],
+  infrastructure: ['engineering', 'electrical', 'infrastructure'],
+  chemical:       ['hazmat', 'chemical', 'decontamination'],
+  landslide:      ['search and rescue', 'geology', 'landslide'],
+  cyclone:        ['evacuation', 'rescue', 'cyclone'],
+  other:          [],
+};
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -107,6 +123,70 @@ export const createIncident = async (req, res) => {
 
     // Broadcast to all dashboard clients
     io.emit('newIncident', savedIncident);
+
+    // ── Smart Dispatch ─────────────────────────────────────────────────────────
+    // Run asynchronously so it never delays the HTTP response.
+    // Find available responders; prefer skill-matched, fall back to all available.
+    setImmediate(async () => {
+      try {
+        const keywords = INCIDENT_SKILL_MAP[type] || [];
+        const available = await User.find({ role: 'responder', isAvailable: true, isActive: true })
+          .select('_id skills');
+
+        let targets = keywords.length
+          ? available.filter(r =>
+              r.skills?.some(s => keywords.some(kw => s.includes(kw) || kw.includes(s)))
+            )
+          : [];
+        // No skill-matched responders → notify all available ones
+        if (!targets.length) targets = available;
+
+        const dispatchPayload = {
+          incidentId:   savedIncident._id,
+          title:        savedIncident.title,
+          type:         savedIncident.type,
+          severity:     savedIncident.severity,
+          location:     savedIncident.location,
+          isSOS:        savedIncident.isSOS || false,
+          aiSummary:    savedIncident.aiTriage?.summary || null,
+          dispatchedAt: new Date(),
+        };
+
+        targets.forEach(r => io.to(`user:${r._id}`).emit('newIncidentAssigned', dispatchPayload));
+        console.log(`[dispatch] Incident ${savedIncident._id} → ${targets.length} responder(s) (type: ${type})`);
+      } catch (dispatchErr) {
+        console.error('[dispatch]', dispatchErr.message);
+      }
+    });
+
+    // ── Auto-escalation ────────────────────────────────────────────────────────
+    // If nobody accepts within 15 minutes, alert all admins via their socket room.
+    const escalationIncidentId = savedIncident._id;
+    setTimeout(async () => {
+      try {
+        const fresh = await Incident.findById(escalationIncidentId)
+          .select('assignedResponders status title type severity');
+        if (
+          !fresh ||
+          fresh.assignedResponders.length > 0 ||
+          ['resolved', 'closed'].includes(fresh.status)
+        ) return;
+
+        const admins = await User.find({ role: 'admin', isActive: true }).select('_id');
+        const escalationPayload = {
+          incidentId:  fresh._id,
+          title:       fresh.title,
+          type:        fresh.type,
+          severity:    fresh.severity,
+          message:     'No responder accepted this incident in 15 minutes. Manual assignment needed.',
+          escalatedAt: new Date(),
+        };
+        admins.forEach(a => io.to(`user:${a._id}`).emit('incidentEscalated', escalationPayload));
+        console.log(`[escalation] Incident ${escalationIncidentId} escalated to ${admins.length} admin(s)`);
+      } catch (escalationErr) {
+        console.error('[escalation]', escalationErr.message);
+      }
+    }, 15 * 60_000);
 
     return res.status(201).json({
       success:  true,

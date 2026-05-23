@@ -267,6 +267,11 @@ export const setupChatSocket = (io) => {
 
   io.on('connection', (socket) => {
 
+    // Auto-join personal room immediately on connection so targeted events
+    // (sosAcknowledged, newIncidentAssigned, incidentEscalated) always reach
+    // the right socket regardless of whether chat:join has been called yet.
+    if (socket.userId) socket.join(`user:${socket.userId}`);
+
     // ── Join: register name/role/avatar for this verified socket ────────────
     // socket.userId is already set and verified by server.js JWT middleware
     socket.on('chat:join', ({ name, role, avatar }) => {
@@ -278,7 +283,7 @@ export const setupChatSocket = (io) => {
       // Broadcast updated online users list
       io.emit('chat:onlineUsers', Array.from(onlineUsers.values()));
 
-      // Join a personal room so we can deliver DMs directly
+      // Ensure personal room membership (idempotent — safe to call again)
       socket.join(`user:${userId}`);
     });
 
