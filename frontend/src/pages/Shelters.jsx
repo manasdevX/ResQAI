@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import LiveMap from '../components/LiveMap';
 import {
   MapPin, Search, Filter, RefreshCw, Phone, Users,
-  X, AlertTriangle, ChevronRight, Building2,
+  X, AlertTriangle, ChevronRight, Building2, LogIn, LogOut as LogOutIcon, Loader2,
 } from 'lucide-react';
 import { SHELTER_TYPE_META, SHELTER_STATUS_BADGE, AMENITIES } from '../constants/shelter';
 
@@ -28,17 +29,17 @@ const OccupancyBar = ({ current, total, status }) => {
   );
 };
 
-const ShelterCard = ({ shelter, isHighlit, onClick }) => {
+const ShelterCard = ({ shelter, isHighlit, onClick, isCheckedIn, onCheckIn, onCheckOut, checkInLoading }) => {
   const typeInfo = SHELTER_TYPE_META[shelter.type] || SHELTER_TYPE_META.other;
   return (
-    <button
-      onClick={onClick}
+    <div
       className={`w-full text-left p-4 rounded-xl border transition-all duration-200 ${
         isHighlit
           ? 'border-blue-500/60 bg-blue-950/30 ring-1 ring-blue-500/30'
           : 'border-zinc-700/60 bg-zinc-900/60 hover:border-zinc-600 hover:bg-zinc-800/60'
       }`}
     >
+    <button onClick={onClick} className="w-full text-left">
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex items-start gap-2.5">
           <span className="text-2xl shrink-0 mt-0.5">{typeInfo.icon}</span>
@@ -96,6 +97,31 @@ const ShelterCard = ({ shelter, isHighlit, onClick }) => {
         </div>
       )}
     </button>
+
+      {/* Check-in / Check-out button */}
+      {shelter.status !== 'closed' && (
+        <button
+          onClick={e => { e.stopPropagation(); isCheckedIn ? onCheckOut() : onCheckIn(); }}
+          disabled={checkInLoading || (!isCheckedIn && shelter.status === 'full')}
+          className={`mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold border transition disabled:opacity-50 disabled:cursor-not-allowed ${
+            isCheckedIn
+              ? 'bg-orange-950/30 border-orange-800/40 text-orange-400 hover:bg-orange-950/50'
+              : shelter.status === 'full'
+                ? 'bg-zinc-800/50 border-zinc-700 text-zinc-600 cursor-not-allowed'
+                : 'bg-green-950/30 border-green-800/40 text-green-400 hover:bg-green-950/50'
+          }`}
+        >
+          {checkInLoading
+            ? <Loader2 className="w-3 h-3 animate-spin" />
+            : isCheckedIn
+              ? <><LogOutIcon className="w-3 h-3" /> Check Out</>
+              : shelter.status === 'full'
+                ? 'Shelter Full'
+                : <><LogIn className="w-3 h-3" /> Check In</>
+          }
+        </button>
+      )}
+    </div>
   );
 };
 
@@ -143,23 +169,27 @@ const PlaceCard = ({ place, isHighlit, onClick }) => (
 // ── Main page ──────────────────────────────────────────────────────────────────
 const Shelters = () => {
   const { api } = useAuth();
+  const socket = useSocket();
 
   // DB shelters state
-  const [shelters,       setShelters]       = useState([]);
-  const [loading,        setLoading]        = useState(true);
-  const [error,          setError]          = useState(null);
-  const [highlighted,    setHighlighted]    = useState(null);
-  const [userLocation,   setUserLocation]   = useState(null);
-  const [locLoading,     setLocLoading]     = useState(false);
-  const [searchNearby,   setSearchNearby]   = useState(false);
-  const [radius,         setRadius]         = useState(50);
-  const [appliedRadius,  setAppliedRadius]  = useState(50);
-  const [filterType,     setFilterType]     = useState('all');
-  const [filterStatus,   setFilterStatus]   = useState('active');
-  const [filterAmenity,  setFilterAmenity]  = useState('');
-  const [searchQuery,    setSearchQuery]    = useState('');
-  const [showFilters,    setShowFilters]    = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [shelters,             setShelters]             = useState([]);
+  const [myCheckedInShelterId, setMyCheckedInShelterId] = useState(null);
+  const [checkInLoading,       setCheckInLoading]       = useState(null); // shelterId or null
+  const [checkInMsg,           setCheckInMsg]           = useState(null); // { type, text }
+  const [loading,              setLoading]              = useState(true);
+  const [error,                setError]                = useState(null);
+  const [highlighted,          setHighlighted]          = useState(null);
+  const [userLocation,         setUserLocation]         = useState(null);
+  const [locLoading,           setLocLoading]           = useState(false);
+  const [searchNearby,         setSearchNearby]         = useState(false);
+  const [radius,               setRadius]               = useState(50);
+  const [appliedRadius,        setAppliedRadius]        = useState(50);
+  const [filterType,           setFilterType]           = useState('all');
+  const [filterStatus,         setFilterStatus]         = useState('active');
+  const [filterAmenity,        setFilterAmenity]        = useState('');
+  const [searchQuery,          setSearchQuery]          = useState('');
+  const [showFilters,          setShowFilters]          = useState(false);
+  const [refreshTrigger,       setRefreshTrigger]       = useState(0);
 
   // Google Places state
   const [tab,            setTab]            = useState('registered'); // 'registered' | 'nearby'
@@ -177,7 +207,8 @@ const Shelters = () => {
       setLoading(true);
       setError(null);
       try {
-        let result;
+        let shelterList = [];
+        let checkedInId = null;
         if (searchNearby && userLocation) {
           const params = new URLSearchParams({
             lng: userLocation.lng, lat: userLocation.lat,
@@ -185,15 +216,19 @@ const Shelters = () => {
           });
           if (filterType !== 'all') params.append('type', filterType);
           const { data } = await api.get(`/shelters/nearby?${params}`);
-          result = data.shelters || [];
+          shelterList = data.shelters || [];
         } else {
           const params = new URLSearchParams();
           if (filterStatus !== 'all') params.append('status', filterStatus);
           if (filterType   !== 'all') params.append('type',   filterType);
           const { data } = await api.get(`/shelters?${params}`);
-          result = data.shelters || [];
+          shelterList = data.shelters || [];
+          checkedInId = data.myCheckedInShelterId || null;
         }
-        if (!cancelled) setShelters(result);
+        if (!cancelled) {
+          setShelters(shelterList);
+          setMyCheckedInShelterId(checkedInId);
+        }
       } catch (err) {
         if (!cancelled) setError(err.response?.data?.message || 'Failed to load shelters');
       } finally {
@@ -257,6 +292,54 @@ const Shelters = () => {
     const t = setTimeout(() => setError(null), 5000);
     return () => clearTimeout(t);
   }, [error]);
+
+  // Live occupancy updates via socket
+  useEffect(() => {
+    if (!socket) return;
+    const onOccupancy = ({ shelterId, currentOccupancy, status }) => {
+      setShelters(prev => prev.map(s =>
+        s._id === shelterId ? { ...s, currentOccupancy, status } : s
+      ));
+    };
+    socket.on('shelterOccupancyUpdated', onOccupancy);
+    return () => socket.off('shelterOccupancyUpdated', onOccupancy);
+  }, [socket]);
+
+  const handleCheckIn = async (shelterId) => {
+    setCheckInLoading(shelterId);
+    setCheckInMsg(null);
+    try {
+      const { data } = await api.post(`/shelters/${shelterId}/checkin`);
+      setMyCheckedInShelterId(shelterId);
+      setShelters(prev => prev.map(s =>
+        s._id === shelterId ? { ...s, currentOccupancy: data.shelter.currentOccupancy, status: data.shelter.status } : s
+      ));
+      setCheckInMsg({ type: 'success', text: data.message });
+    } catch (err) {
+      setCheckInMsg({ type: 'error', text: err.response?.data?.message || 'Failed to check in' });
+    } finally {
+      setCheckInLoading(null);
+      setTimeout(() => setCheckInMsg(null), 4000);
+    }
+  };
+
+  const handleCheckOut = async (shelterId) => {
+    setCheckInLoading(shelterId);
+    setCheckInMsg(null);
+    try {
+      const { data } = await api.post(`/shelters/${shelterId}/checkout`);
+      setMyCheckedInShelterId(null);
+      setShelters(prev => prev.map(s =>
+        s._id === shelterId ? { ...s, currentOccupancy: data.shelter.currentOccupancy, status: data.shelter.status } : s
+      ));
+      setCheckInMsg({ type: 'success', text: data.message });
+    } catch (err) {
+      setCheckInMsg({ type: 'error', text: err.response?.data?.message || 'Failed to check out' });
+    } finally {
+      setCheckInLoading(null);
+      setTimeout(() => setCheckInMsg(null), 4000);
+    }
+  };
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const filtered = shelters.filter(s => {
@@ -411,6 +494,16 @@ const Shelters = () => {
             </div>
           )}
 
+          {checkInMsg && (
+            <div className={`flex items-center gap-2 p-3 rounded-xl text-xs font-medium border ${
+              checkInMsg.type === 'success'
+                ? 'bg-green-950/30 border-green-800/30 text-green-400'
+                : 'bg-red-950/30 border-red-800/30 text-red-400'
+            }`}>
+              {checkInMsg.type === 'success' ? '✓' : '✗'} {checkInMsg.text}
+            </div>
+          )}
+
           {tab === 'registered' && (
             loading ? (
               Array.from({ length: 3 }).map((_, i) => (
@@ -433,6 +526,10 @@ const Shelters = () => {
                     shelter={shelter}
                     isHighlit={highlighted === shelter._id}
                     onClick={() => setHighlighted(prev => prev === shelter._id ? null : shelter._id)}
+                    isCheckedIn={myCheckedInShelterId === shelter._id}
+                    onCheckIn={() => handleCheckIn(shelter._id)}
+                    onCheckOut={() => handleCheckOut(shelter._id)}
+                    checkInLoading={checkInLoading === shelter._id}
                   />
                 </div>
               ))

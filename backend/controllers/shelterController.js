@@ -1,5 +1,6 @@
 import Shelter from '../models/Shelter.js';
 import { io } from '../server.js';
+import { notify } from '../utils/notify.js'; // eslint-disable-line no-unused-vars
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -34,13 +35,16 @@ export const getAllShelters = async (req, res) => {
       Shelter.countDocuments(filter),
     ]);
 
+    const myCheckedIn = await Shelter.findOne({ registeredOccupants: req.user._id }).select('_id');
+
     return res.status(200).json({
-      success: true,
-      count:   shelters.length,
+      success:             true,
+      count:               shelters.length,
       total,
       page,
-      pages:   Math.ceil(total / limit),
-      hasMore: skip + shelters.length < total,
+      pages:               Math.ceil(total / limit),
+      hasMore:             skip + shelters.length < total,
+      myCheckedInShelterId: myCheckedIn?._id || null,
       shelters,
     });
   } catch (error) {
@@ -377,5 +381,89 @@ export const deleteShelter = async (req, res) => {
   } catch (error) {
     console.error('[deleteShelter]', error);
     return res.status(500).json({ success: false, message: 'Failed to delete shelter' });
+  }
+};
+
+/**
+ * @desc  Citizen checks in to a shelter
+ * @route POST /api/shelters/:id/checkin
+ * @access Private
+ */
+export const checkInShelter = async (req, res) => {
+  try {
+    const { id }   = req.params;
+    const userId   = req.user._id;
+
+    const shelter = await Shelter.findById(id);
+    if (!shelter)                    return res.status(404).json({ success: false, message: 'Shelter not found' });
+    if (shelter.status === 'closed') return res.status(400).json({ success: false, message: 'This shelter is closed' });
+    if (shelter.status === 'full')   return res.status(400).json({ success: false, message: 'This shelter is full' });
+
+    // Already checked in here
+    if (shelter.registeredOccupants.some(uid => uid.equals(userId))) {
+      return res.json({ success: true, message: 'Already checked in', shelter });
+    }
+
+    // Ensure user isn't checked in elsewhere
+    const elsewhere = await Shelter.findOne({ registeredOccupants: userId, _id: { $ne: id } }).select('name');
+    if (elsewhere) {
+      return res.status(409).json({
+        success: false,
+        message: `You are already checked in to "${elsewhere.name}". Please check out first.`,
+      });
+    }
+
+    shelter.registeredOccupants.push(userId);
+    shelter.currentOccupancy = shelter.registeredOccupants.length;
+    if (shelter.autoCloseWhenFull && shelter.currentOccupancy >= shelter.totalCapacity) {
+      shelter.status = 'full';
+    }
+    await shelter.save();
+
+    io.emit('shelterOccupancyUpdated', {
+      shelterId:        id,
+      currentOccupancy: shelter.currentOccupancy,
+      status:           shelter.status,
+    });
+
+    return res.json({ success: true, message: `Checked in to ${shelter.name}`, shelter });
+  } catch (error) {
+    console.error('[checkInShelter]', error);
+    return res.status(500).json({ success: false, message: 'Failed to check in' });
+  }
+};
+
+/**
+ * @desc  Citizen checks out of a shelter
+ * @route POST /api/shelters/:id/checkout
+ * @access Private
+ */
+export const checkOutShelter = async (req, res) => {
+  try {
+    const { id }   = req.params;
+    const userId   = req.user._id;
+
+    const shelter = await Shelter.findById(id);
+    if (!shelter) return res.status(404).json({ success: false, message: 'Shelter not found' });
+
+    if (!shelter.registeredOccupants.some(uid => uid.equals(userId))) {
+      return res.status(400).json({ success: false, message: 'You are not checked in to this shelter' });
+    }
+
+    shelter.registeredOccupants = shelter.registeredOccupants.filter(uid => !uid.equals(userId));
+    shelter.currentOccupancy    = shelter.registeredOccupants.length;
+    if (shelter.status === 'full') shelter.status = 'active';
+    await shelter.save();
+
+    io.emit('shelterOccupancyUpdated', {
+      shelterId:        id,
+      currentOccupancy: shelter.currentOccupancy,
+      status:           shelter.status,
+    });
+
+    return res.json({ success: true, message: `Checked out of ${shelter.name}`, shelter });
+  } catch (error) {
+    console.error('[checkOutShelter]', error);
+    return res.status(500).json({ success: false, message: 'Failed to check out' });
   }
 };

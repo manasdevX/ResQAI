@@ -4,6 +4,7 @@ import {
   LayoutDashboard, AlertTriangle, Building2, Radio, BarChart3,
   Link2, MessageCircle, Users, User, LogOut, ChevronRight,
 } from 'lucide-react';
+import NotificationBell from '../components/NotificationBell';
 
 const NAV = [
   { to: '/admin',           icon: LayoutDashboard, label: 'Operations Map',  exact: true },
@@ -72,10 +73,11 @@ const AdminLayout = () => {
             <div className="w-8 h-8 rounded-full bg-red-600/80 flex items-center justify-center text-xs font-bold shrink-0">
               {user?.name?.[0]?.toUpperCase() || 'A'}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-zinc-200 truncate">{user?.name}</p>
               <p className="text-[10px] text-zinc-500 truncate">{user?.email}</p>
             </div>
+            <NotificationBell />
           </div>
           <button
             onClick={handleLogout}

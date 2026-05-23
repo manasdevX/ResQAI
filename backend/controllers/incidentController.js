@@ -2,6 +2,7 @@ import Incident from '../models/Incident.js';
 import User from '../models/User.js';
 import { analyzeIncident } from '../utils/aiTriage.js';
 import { io } from '../server.js';
+import { notify } from '../utils/notify.js';
 
 // Incident type → skill keywords for targeted dispatch
 const INCIDENT_SKILL_MAP = {
@@ -232,7 +233,8 @@ export const getAllIncidents = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('reportedBy', 'name email avatar role'),
+        .populate('reportedBy', 'name email avatar role')
+        .populate('assignedResponders', 'name email avatar role isAvailable'),
       Incident.countDocuments(filter),
     ]);
 
@@ -312,6 +314,24 @@ export const updateIncidentStatus = async (req, res) => {
     const updated = await incident.save();
 
     io.emit('incidentUpdated', { incidentId: id, status, note, updatedBy: req.user.name });
+
+    // Notify the reporter when their incident status changes (skip self-updates)
+    const STATUS_NOTIFY = {
+      acknowledged: 'Your incident has been acknowledged by responders',
+      responding:   'Responders are on their way to your incident',
+      resolved:     'Your incident has been marked as resolved',
+      closed:       'Your incident has been closed',
+    };
+    if (incident.reportedBy && STATUS_NOTIFY[status]) {
+      if (!incident.reportedBy.equals(req.user._id)) {
+        notify(incident.reportedBy, {
+          type:  'incident_status',
+          title: `Incident ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+          body:  `"${incident.title}" — ${STATUS_NOTIFY[status]}`,
+          link:  '/my-reports',
+        });
+      }
+    }
 
     return res.status(200).json({ success: true, message: 'Status updated', incident: updated });
   } catch (error) {
@@ -522,5 +542,80 @@ export const acceptIncidentTask = async (req, res) => {
   } catch (error) {
     console.error('[acceptIncidentTask] Error:', error);
     return res.status(500).json({ success: false, message: 'Server error while accepting task' });
+  }
+};
+
+/**
+ * @desc  Admin manually assigns a responder to an incident
+ * @route POST /api/incidents/:id/assign
+ * @access Private (admin)
+ */
+export const assignResponder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { responderId } = req.body;
+
+    if (!responderId) return res.status(400).json({ success: false, message: 'responderId is required' });
+
+    const [incident, responder] = await Promise.all([
+      Incident.findById(id),
+      User.findById(responderId).select('name email avatar role isActive'),
+    ]);
+
+    if (!incident) return res.status(404).json({ success: false, message: 'Incident not found' });
+    if (!responder) return res.status(404).json({ success: false, message: 'Responder not found' });
+    if (!['responder', 'admin'].includes(responder.role)) {
+      return res.status(400).json({ success: false, message: 'User is not a responder or admin' });
+    }
+    if (!responder.isActive) {
+      return res.status(400).json({ success: false, message: 'Responder account is inactive' });
+    }
+
+    if (incident.assignedResponders.some(r => r.equals(responderId))) {
+      return res.status(409).json({ success: false, message: 'Responder already assigned to this incident' });
+    }
+
+    incident.assignedResponders.push(responderId);
+    await incident.save();
+
+    notify(responderId, {
+      type:  'assignment',
+      title: 'You have been assigned to an incident',
+      body:  `"${incident.title}" — assigned by ${req.user.name}`,
+      link:  '/volunteer/assignments',
+    });
+
+    await incident.populate('assignedResponders', 'name email avatar role isAvailable');
+    io.emit('incidentUpdated', { incidentId: id, assignedResponders: incident.assignedResponders });
+
+    return res.json({ success: true, message: `${responder.name} assigned`, incident });
+  } catch (error) {
+    console.error('[assignResponder]', error);
+    return res.status(500).json({ success: false, message: 'Failed to assign responder' });
+  }
+};
+
+/**
+ * @desc  Admin unassigns a responder from an incident
+ * @route DELETE /api/incidents/:id/assign/:responderId
+ * @access Private (admin)
+ */
+export const unassignResponder = async (req, res) => {
+  try {
+    const { id, responderId } = req.params;
+
+    const incident = await Incident.findById(id);
+    if (!incident) return res.status(404).json({ success: false, message: 'Incident not found' });
+
+    incident.assignedResponders = incident.assignedResponders.filter(r => !r.equals(responderId));
+    await incident.save();
+
+    await incident.populate('assignedResponders', 'name email avatar role isAvailable');
+    io.emit('incidentUpdated', { incidentId: id, assignedResponders: incident.assignedResponders });
+
+    return res.json({ success: true, message: 'Responder unassigned', incident });
+  } catch (error) {
+    console.error('[unassignResponder]', error);
+    return res.status(500).json({ success: false, message: 'Failed to unassign responder' });
   }
 };

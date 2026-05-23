@@ -4,6 +4,7 @@ import {
   LayoutDashboard, MapPin, ClipboardList, Package,
   MessageCircle, User, LogOut, ChevronRight, Zap,
 } from 'lucide-react';
+import NotificationBell from '../components/NotificationBell';
 
 const NAV = [
   { to: '/volunteer',              icon: LayoutDashboard, label: 'Dashboard',       exact: true },
@@ -96,10 +97,11 @@ const VolunteerLayout = () => {
             <div className="w-8 h-8 rounded-full bg-blue-600/80 flex items-center justify-center text-xs font-bold shrink-0">
               {user?.name?.[0]?.toUpperCase() || 'V'}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-zinc-200 truncate">{user?.name}</p>
               <p className="text-[10px] text-zinc-500 capitalize truncate">{user?.role?.replace('_', ' ')}</p>
             </div>
+            <NotificationBell />
           </div>
           <button
             onClick={handleLogout}

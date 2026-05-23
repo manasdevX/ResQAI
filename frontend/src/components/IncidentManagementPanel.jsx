@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { UserPlus, X, Loader2 } from 'lucide-react';
 
 const STATUS_OPTIONS = [
   { value: 'reported',     label: 'Reported',     color: 'text-zinc-400' },
@@ -50,6 +51,13 @@ const IncidentManagementPanel = ({ incident, onIncidentUpdated }) => {
   const [loading,           setLoading]           = useState(false);
   const [feedback,          setFeedback]          = useState(null);
 
+  // Assign tab
+  const [assignedResponders, setAssignedResponders] = useState(incident.assignedResponders || []);
+  const [availableResponders, setAvailableResponders] = useState([]);
+  const [respLoading,         setRespLoading]         = useState(false);
+  const [selectedResponder,   setSelectedResponder]   = useState('');
+  const [assignLoading,       setAssignLoading]       = useState(false);
+
   const showFeedback = (type, text) => {
     setFeedback({ type, text });
     setTimeout(() => setFeedback(null), 3000);
@@ -98,6 +106,48 @@ const IncidentManagementPanel = ({ incident, onIncidentUpdated }) => {
     }
   };
 
+  // Fetch available responders when assign tab is opened
+  useEffect(() => {
+    if (activeTab !== 'assign') return;
+    setRespLoading(true);
+    api.get('/users/responders')
+      .then(({ data }) => setAvailableResponders(data.responders || []))
+      .catch(() => {})
+      .finally(() => setRespLoading(false));
+  }, [activeTab, api]);
+
+  const handleAssign = async () => {
+    if (!selectedResponder) return;
+    setAssignLoading(true);
+    try {
+      const { data } = await api.post(`/incidents/${incident._id}/assign`, { responderId: selectedResponder });
+      const updated = data.incident;
+      setAssignedResponders(updated.assignedResponders || []);
+      onIncidentUpdated(updated);
+      showFeedback('success', 'Responder assigned');
+      setSelectedResponder('');
+    } catch (err) {
+      showFeedback('error', err.response?.data?.message || 'Failed to assign responder');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const handleUnassign = async (responderId) => {
+    setAssignLoading(true);
+    try {
+      const { data } = await api.delete(`/incidents/${incident._id}/assign/${responderId}`);
+      const updated = data.incident;
+      setAssignedResponders(updated.assignedResponders || []);
+      onIncidentUpdated(updated);
+      showFeedback('success', 'Responder removed');
+    } catch (err) {
+      showFeedback('error', err.response?.data?.message || 'Failed to remove responder');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
   const history = incident.statusHistory ? [...incident.statusHistory].reverse() : [];
 
   return (
@@ -109,6 +159,7 @@ const IncidentManagementPanel = ({ incident, onIncidentUpdated }) => {
           { key: 'status',   label: '🔄 Status' },
           { key: 'priority', label: '⚡ Priority' },
           { key: 'alert',    label: '📡 Broadcast' },
+          { key: 'assign',   label: '👤 Assign' },
           { key: 'timeline', label: '📋 Timeline' },
         ].map(tab => (
           <button
@@ -224,6 +275,78 @@ const IncidentManagementPanel = ({ incident, onIncidentUpdated }) => {
               {loading ? 'Broadcasting…' : '📡 Send Alert to All Users'}
             </button>
           </>
+        )}
+
+        {/* ── Assign Tab ── */}
+        {activeTab === 'assign' && (
+          <div className="space-y-3">
+            {/* Currently assigned */}
+            {assignedResponders.length > 0 ? (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Assigned</p>
+                {assignedResponders.map(r => {
+                  const id       = r._id || r;
+                  const name     = r.name || 'Responder';
+                  const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+                  return (
+                    <div key={id} className="flex items-center gap-2 px-2.5 py-1.5 bg-blue-900/20 border border-blue-800/30 rounded-lg">
+                      <div className="w-6 h-6 rounded-full bg-blue-600/70 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
+                        {r.avatar ? <img src={r.avatar} alt={name} className="w-full h-full object-cover rounded-full" /> : initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-zinc-200 truncate">{name}</p>
+                        {r.role && <p className="text-[10px] text-zinc-500 capitalize">{r.role.replace('_', ' ')}</p>}
+                      </div>
+                      <button
+                        onClick={() => handleUnassign(id)}
+                        disabled={assignLoading}
+                        className="p-1 text-zinc-500 hover:text-red-400 hover:bg-red-950/30 rounded transition disabled:opacity-40"
+                        title="Remove"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-600 text-center py-2">No responders assigned yet</p>
+            )}
+
+            {/* Assign new */}
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Add Responder</p>
+              {respLoading ? (
+                <div className="flex items-center justify-center py-3">
+                  <Loader2 className="w-4 h-4 animate-spin text-zinc-500" />
+                </div>
+              ) : (
+                <select
+                  value={selectedResponder}
+                  onChange={e => setSelectedResponder(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">Select available responder…</option>
+                  {availableResponders
+                    .filter(r => !assignedResponders.some(a => (a._id || a) === r._id))
+                    .map(r => (
+                      <option key={r._id} value={r._id}>{r.name} ({r.role?.replace('_', ' ')})</option>
+                    ))
+                  }
+                </select>
+              )}
+              <button
+                onClick={handleAssign}
+                disabled={assignLoading || !selectedResponder}
+                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {assignLoading
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Assigning…</>
+                  : <><UserPlus className="w-3.5 h-3.5" /> Assign Responder</>
+                }
+              </button>
+            </div>
+          </div>
         )}
 
         {/* ── Timeline Tab ── */}

@@ -10,6 +10,8 @@ import {
   broadcastAlert,
   getNearbyIncidents,
   acceptIncidentTask,
+  assignResponder,
+  unassignResponder,
 } from '../controllers/incidentController.js';
 import upload from '../middleware/upload.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
@@ -56,6 +58,10 @@ router.patch('/:id/severity', protect, authorize('admin', 'responder'), updateIn
 
 // Volunteer accepts an incident (Responder only)
 router.post('/:id/accept', protect, authorize('responder', 'admin'), acceptIncidentTask);
+
+// Admin assigns / unassigns a responder
+router.post('/:id/assign',                  protect, authorize('admin'), assignResponder);
+router.delete('/:id/assign/:responderId',   protect, authorize('admin'), unassignResponder);
 
 // Upload media to a specific incident
 router.post('/:id/media', protect, withUpload('media', 5), uploadIncidentMedia);

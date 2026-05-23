@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
+import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -47,6 +48,7 @@ function App() {
     <ErrorBoundary>
     <AuthProvider>
       <SocketProvider>
+      <NotificationProvider>
         <div className="min-h-screen bg-zinc-950 text-zinc-100">
           <Routes>
             {/* ── Public ──────────────────────────────────────────────────────── */}
@@ -100,6 +102,7 @@ function App() {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </div>
+      </NotificationProvider>
       </SocketProvider>
     </AuthProvider>
     </ErrorBoundary>

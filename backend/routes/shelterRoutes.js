@@ -9,6 +9,8 @@ import {
   updateOccupancy,
   updateShelterStatus,
   deleteShelter,
+  checkInShelter,
+  checkOutShelter,
 } from '../controllers/shelterController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -41,6 +43,10 @@ router.patch('/:id/occupancy', protect, authorize('admin', 'shelter_manager'), u
 
 // PATCH update shelter status (Admin/Shelter Manager)
 router.patch('/:id/status', protect, authorize('admin', 'shelter_manager'), updateShelterStatus);
+
+// Citizen self check-in / check-out
+router.post('/:id/checkin',  protect, checkInShelter);
+router.post('/:id/checkout', protect, checkOutShelter);
 
 // DELETE remove a shelter (Admin only)
 router.delete('/:id', protect, authorize('admin'), deleteShelter);

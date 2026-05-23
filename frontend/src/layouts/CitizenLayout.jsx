@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Home, AlertOctagon, Building2, Package, FileText, MessageCircle, User, LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import NotificationBell from '../components/NotificationBell';
 
 const NAV = [
   { to: '/home',        icon: Home,          label: 'Home' },
@@ -53,8 +54,9 @@ const CitizenLayout = () => {
             ))}
           </nav>
 
-          {/* Right: user + logout */}
-          <div className="flex items-center gap-3">
+          {/* Right: notifications + user + logout */}
+          <div className="flex items-center gap-2">
+            <NotificationBell />
             <span className="hidden sm:block text-xs text-zinc-500">
               Hi, <span className="text-zinc-300 font-medium">{user?.name?.split(' ')[0]}</span>
             </span>
