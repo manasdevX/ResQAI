@@ -7,6 +7,7 @@ import {
   getProfile,
   updateProfile,
   uploadAvatar,
+  changePassword,
   getAllUsers,
   updateUserRole,
   toggleUserActive,
@@ -20,6 +21,7 @@ const router = express.Router();
 router.get('/profile',              protect, getProfile);
 router.patch('/profile',            protect, updateProfile);
 router.patch('/avatar',             protect, avatarUpload.single('avatar'), uploadAvatar);
+router.patch('/password',           protect, changePassword);
 
 // Availability / safe / skills
 router.patch('/availability',       protect, toggleAvailability);

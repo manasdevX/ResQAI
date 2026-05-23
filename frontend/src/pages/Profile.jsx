@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Camera, Save, Loader2, CheckCircle, AlertTriangle, User, Mail, Phone, Shield, Calendar } from 'lucide-react';
+import { Camera, Save, Loader2, CheckCircle, AlertTriangle, User, Mail, Phone, Shield, Calendar, Lock, Eye, EyeOff } from 'lucide-react';
 
 const ROLE_BADGE = {
   admin:           { label: 'Admin',           bg: 'bg-red-500/15 text-red-400 border-red-500/30' },
@@ -18,11 +18,59 @@ const Profile = () => {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [message,         setMessage]         = useState(null); // { type, text }
 
+  // Password change state
+  const [currentPassword,  setCurrentPassword]  = useState('');
+  const [newPassword,      setNewPassword]      = useState('');
+  const [confirmPassword,  setConfirmPassword]  = useState('');
+  const [showCurrent,      setShowCurrent]      = useState(false);
+  const [showNew,          setShowNew]          = useState(false);
+  const [showConfirm,      setShowConfirm]      = useState(false);
+  const [pwSaving,         setPwSaving]         = useState(false);
+  const [pwMessage,        setPwMessage]        = useState(null); // { type, text }
+
   const fileInputRef = useRef(null);
 
   const showMsg = (type, text) => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 4000);
+  };
+
+  const showPwMsg = (type, text) => {
+    setPwMessage({ type, text });
+    setTimeout(() => setPwMessage(null), 4000);
+  };
+
+  const pwStrength = (p) => {
+    let score = 0;
+    if (p.length >= 8)                                            score++;
+    if (/[A-Z]/.test(p))                                         score++;
+    if (/[a-z]/.test(p))                                         score++;
+    if (/\d/.test(p))                                            score++;
+    if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(p))       score++;
+    return score; // 0-5
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword) { showPwMsg('error', 'Enter your current password'); return; }
+    if (!newPassword)      { showPwMsg('error', 'Enter a new password'); return; }
+    if (pwStrength(newPassword) < 5) {
+      showPwMsg('error', 'New password must be 8+ characters with uppercase, lowercase, number, and special character');
+      return;
+    }
+    if (newPassword !== confirmPassword) { showPwMsg('error', 'Passwords do not match'); return; }
+
+    setPwSaving(true);
+    try {
+      const { data } = await api.patch('/users/password', { currentPassword, newPassword });
+      showPwMsg('success', data.message || 'Password changed successfully');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      showPwMsg('error', err.response?.data?.message || 'Failed to change password');
+    } finally {
+      setPwSaving(false);
+    }
   };
 
   const handleSave = async () => {
@@ -216,6 +264,126 @@ const Profile = () => {
           {saving
             ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
             : <><Save className="w-4 h-4" /> Save Changes</>}
+        </button>
+      </div>
+
+      {/* Security card */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
+        <h2 className="text-sm font-bold text-zinc-200 flex items-center gap-2">
+          <Lock className="w-4 h-4 text-zinc-500" /> Change Password
+        </h2>
+
+        {pwMessage && (
+          <div className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-medium ${
+            pwMessage.type === 'success'
+              ? 'bg-green-950/40 border-green-700/40 text-green-400'
+              : 'bg-red-950/40 border-red-700/40 text-red-400'
+          }`}>
+            {pwMessage.type === 'success'
+              ? <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+              : <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
+            {pwMessage.text}
+          </div>
+        )}
+
+        {/* Current password */}
+        <div>
+          <label className="block text-xs font-semibold text-zinc-400 mb-1.5">Current Password</label>
+          <div className="relative">
+            <input
+              type={showCurrent ? 'text' : 'password'}
+              value={currentPassword}
+              onChange={e => setCurrentPassword(e.target.value)}
+              placeholder="Your current password"
+              className="w-full px-3.5 py-2.5 pr-10 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition"
+            />
+            <button
+              type="button"
+              onClick={() => setShowCurrent(v => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition"
+            >
+              {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        {/* New password */}
+        <div>
+          <label className="block text-xs font-semibold text-zinc-400 mb-1.5">New Password</label>
+          <div className="relative">
+            <input
+              type={showNew ? 'text' : 'password'}
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              placeholder="At least 8 chars, upper, lower, number, symbol"
+              className="w-full px-3.5 py-2.5 pr-10 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition"
+            />
+            <button
+              type="button"
+              onClick={() => setShowNew(v => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition"
+            >
+              {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          {/* Strength bar */}
+          {newPassword && (() => {
+            const s = pwStrength(newPassword);
+            const bars  = [
+              'bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-lime-500', 'bg-green-500',
+            ];
+            const labels = ['Very weak', 'Weak', 'Fair', 'Good', 'Strong'];
+            return (
+              <div className="mt-2 space-y-1">
+                <div className="flex gap-1">
+                  {[0,1,2,3,4].map(i => (
+                    <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i < s ? bars[s - 1] : 'bg-zinc-700'}`} />
+                  ))}
+                </div>
+                <p className={`text-[10px] font-semibold ${s <= 1 ? 'text-red-400' : s <= 2 ? 'text-orange-400' : s <= 3 ? 'text-yellow-400' : s <= 4 ? 'text-lime-400' : 'text-green-400'}`}>
+                  {labels[s - 1] || 'Very weak'}
+                </p>
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Confirm new password */}
+        <div>
+          <label className="block text-xs font-semibold text-zinc-400 mb-1.5">Confirm New Password</label>
+          <div className="relative">
+            <input
+              type={showConfirm ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              placeholder="Repeat new password"
+              className={`w-full px-3.5 py-2.5 pr-10 bg-zinc-800 border rounded-xl text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-1 transition ${
+                confirmPassword && confirmPassword !== newPassword
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/30'
+                  : 'border-zinc-700 focus:border-blue-500 focus:ring-blue-500/30'
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirm(v => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition"
+            >
+              {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          {confirmPassword && confirmPassword !== newPassword && (
+            <p className="text-[11px] text-red-400 mt-1">Passwords do not match</p>
+          )}
+        </div>
+
+        <button
+          onClick={handleChangePassword}
+          disabled={pwSaving || !currentPassword || !newPassword || !confirmPassword}
+          className="w-full flex items-center justify-center gap-2 py-2.5 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition"
+        >
+          {pwSaving
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Updating…</>
+            : <><Lock className="w-4 h-4" /> Update Password</>}
         </button>
       </div>
     </div>

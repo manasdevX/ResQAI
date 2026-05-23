@@ -206,6 +206,54 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
+// @desc   Change own password
+// @route  PATCH /api/users/password
+// @access Private
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Current and new password are required' });
+    }
+
+    // Password strength: 8+ chars, upper, lower, digit, special
+    const strongEnough = (p) =>
+      p.length >= 8 &&
+      /[A-Z]/.test(p) &&
+      /[a-z]/.test(p) &&
+      /\d/.test(p) &&
+      /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(p);
+
+    if (!strongEnough(newPassword)) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 8 characters and include uppercase, lowercase, a number, and a special character',
+      });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ success: false, message: 'New password must differ from your current password' });
+    }
+
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Current password is incorrect' });
+    }
+
+    user.password = newPassword; // pre-save hook hashes it
+    await user.save();
+
+    return res.json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('[changePassword]', error);
+    return res.status(500).json({ success: false, message: 'Failed to change password' });
+  }
+};
+
 // @desc   Change a user's role
 // @route  PATCH /api/users/:id/role
 // @access Private (admin)
