@@ -17,22 +17,38 @@ const SEVERITY_OPTIONS = [
 ];
 
 const ALERT_TYPES = [
-  { value: 'general',    label: '📢 General',    desc: 'General public information' },
-  { value: 'evacuation', label: '🚨 Evacuation',  desc: 'Immediate area evacuation' },
-  { value: 'shelter',    label: '🏠 Shelter',     desc: 'Move to nearest shelter' },
-  { value: 'medical',    label: '🚑 Medical',     desc: 'Medical emergency response' },
+  { value: 'general',    label: '📢 General',   desc: 'General public information' },
+  { value: 'evacuation', label: '🚨 Evacuation', desc: 'Immediate area evacuation' },
+  { value: 'shelter',    label: '🏠 Shelter',    desc: 'Move to nearest shelter' },
+  { value: 'medical',    label: '🚑 Medical',    desc: 'Medical emergency response' },
 ];
+
+const STATUS_DOT = {
+  reported:     'bg-zinc-500',
+  acknowledged: 'bg-blue-500',
+  responding:   'bg-yellow-500',
+  resolved:     'bg-green-500',
+  closed:       'bg-zinc-600',
+};
+
+const STATUS_LABEL_COLOR = {
+  reported:     'text-zinc-400',
+  acknowledged: 'text-blue-400',
+  responding:   'text-yellow-400',
+  resolved:     'text-green-400',
+  closed:       'text-zinc-600',
+};
 
 const IncidentManagementPanel = ({ incident, onIncidentUpdated }) => {
   const { api } = useAuth();
-  const [activeTab, setActiveTab]     = useState('status'); // 'status' | 'priority' | 'alert'
-  const [selectedStatus, setSelectedStatus]   = useState(incident.status);
-  const [statusNote, setStatusNote]           = useState('');
-  const [selectedSeverity, setSelectedSeverity] = useState(incident.severity);
-  const [alertMessage, setAlertMessage]       = useState('');
-  const [alertType, setAlertType]             = useState('general');
-  const [loading, setLoading]                 = useState(false);
-  const [feedback, setFeedback]               = useState(null); // { type: 'success'|'error', text }
+  const [activeTab,         setActiveTab]         = useState('status');
+  const [selectedStatus,    setSelectedStatus]    = useState(incident.status);
+  const [statusNote,        setStatusNote]        = useState('');
+  const [selectedSeverity,  setSelectedSeverity]  = useState(incident.severity);
+  const [alertMessage,      setAlertMessage]      = useState('');
+  const [alertType,         setAlertType]         = useState('general');
+  const [loading,           setLoading]           = useState(false);
+  const [feedback,          setFeedback]          = useState(null);
 
   const showFeedback = (type, text) => {
     setFeedback({ type, text });
@@ -43,10 +59,7 @@ const IncidentManagementPanel = ({ incident, onIncidentUpdated }) => {
     if (selectedStatus === incident.status && !statusNote) return;
     setLoading(true);
     try {
-      const { data } = await api.patch(
-        `/incidents/${incident._id}/status`,
-        { status: selectedStatus, note: statusNote }
-      );
+      const { data } = await api.patch(`/incidents/${incident._id}/status`, { status: selectedStatus, note: statusNote });
       onIncidentUpdated(data.incident);
       showFeedback('success', `Status updated to "${selectedStatus}"`);
       setStatusNote('');
@@ -61,10 +74,7 @@ const IncidentManagementPanel = ({ incident, onIncidentUpdated }) => {
     if (selectedSeverity === incident.severity) return;
     setLoading(true);
     try {
-      const { data } = await api.patch(
-        `/incidents/${incident._id}/severity`,
-        { severity: selectedSeverity }
-      );
+      const { data } = await api.patch(`/incidents/${incident._id}/severity`, { severity: selectedSeverity });
       onIncidentUpdated(data.incident);
       showFeedback('success', `Priority set to "${selectedSeverity}"`);
     } catch {
@@ -78,10 +88,7 @@ const IncidentManagementPanel = ({ incident, onIncidentUpdated }) => {
     if (!alertMessage.trim()) return;
     setLoading(true);
     try {
-      await api.post(
-        '/incidents/broadcast-alert',
-        { incidentId: incident._id, message: alertMessage, alertType }
-      );
+      await api.post('/incidents/broadcast-alert', { incidentId: incident._id, message: alertMessage, alertType });
       showFeedback('success', 'Alert broadcast sent to all users!');
       setAlertMessage('');
     } catch {
@@ -90,6 +97,8 @@ const IncidentManagementPanel = ({ incident, onIncidentUpdated }) => {
       setLoading(false);
     }
   };
+
+  const history = incident.statusHistory ? [...incident.statusHistory].reverse() : [];
 
   return (
     <div className="mt-3 rounded-xl border border-zinc-700/60 bg-zinc-900/80 overflow-hidden text-sm">
@@ -100,6 +109,7 @@ const IncidentManagementPanel = ({ incident, onIncidentUpdated }) => {
           { key: 'status',   label: '🔄 Status' },
           { key: 'priority', label: '⚡ Priority' },
           { key: 'alert',    label: '📡 Broadcast' },
+          { key: 'timeline', label: '📋 Timeline' },
         ].map(tab => (
           <button
             key={tab.key}
@@ -144,7 +154,7 @@ const IncidentManagementPanel = ({ incident, onIncidentUpdated }) => {
             />
             <button
               onClick={handleStatusUpdate}
-              disabled={loading || selectedStatus === incident.status && !statusNote}
+              disabled={loading || (selectedStatus === incident.status && !statusNote)}
               className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {loading ? 'Saving…' : 'Update Status'}
@@ -214,6 +224,50 @@ const IncidentManagementPanel = ({ incident, onIncidentUpdated }) => {
               {loading ? 'Broadcasting…' : '📡 Send Alert to All Users'}
             </button>
           </>
+        )}
+
+        {/* ── Timeline Tab ── */}
+        {activeTab === 'timeline' && (
+          <div>
+            {history.length === 0 ? (
+              <p className="text-xs text-zinc-600 text-center py-4">No status history yet.</p>
+            ) : (
+              <div className="relative pl-5">
+                {/* Vertical connector line */}
+                <div className="absolute left-[7px] top-2 bottom-2 w-px bg-zinc-700" />
+
+                <div className="space-y-4">
+                  {history.map((h, i) => (
+                    <div key={i} className="relative flex items-start gap-3">
+                      {/* Dot */}
+                      <div className={`absolute -left-5 mt-0.5 w-3.5 h-3.5 rounded-full border-2 border-zinc-900 shrink-0 ${STATUS_DOT[h.status] || 'bg-zinc-600'}`} />
+
+                      <div className="flex-1 min-w-0 pb-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-xs font-bold capitalize ${STATUS_LABEL_COLOR[h.status] || 'text-zinc-400'}`}>
+                            {h.status}
+                          </span>
+                          {i === 0 && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded-full">
+                              Current
+                            </span>
+                          )}
+                        </div>
+                        {h.note && (
+                          <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">{h.note}</p>
+                        )}
+                        <p className="text-[10px] text-zinc-600 mt-0.5">
+                          {h.updatedAt
+                            ? new Date(h.updatedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                            : '—'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Feedback message */}

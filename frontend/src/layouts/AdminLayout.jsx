@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, AlertTriangle, Building2, Radio, BarChart3,
-  Link2, MessageCircle, LogOut, ChevronRight,
+  Link2, MessageCircle, Users, User, LogOut, ChevronRight,
 } from 'lucide-react';
 
 const NAV = [
@@ -11,8 +11,10 @@ const NAV = [
   { to: '/admin/shelters',  icon: Building2,       label: 'Shelters' },
   { to: '/admin/alerts',    icon: Radio,           label: 'Broadcast Alerts' },
   { to: '/admin/analytics', icon: BarChart3,       label: 'Analytics' },
+  { to: '/admin/users',     icon: Users,           label: 'Users' },
   { to: '/admin/invites',   icon: Link2,           label: 'Invite Links' },
   { to: '/admin/chat',      icon: MessageCircle,   label: 'Chat' },
+  { to: '/admin/profile',   icon: User,            label: 'Profile' },
 ];
 
 const AdminLayout = () => {

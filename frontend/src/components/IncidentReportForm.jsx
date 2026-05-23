@@ -70,7 +70,7 @@ const MediaPreview = ({ file, onRemove }) => {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 const IncidentReportForm = () => {
-  const { api } = useAuth();
+  const { api, user } = useAuth();
   const navigate = useNavigate();
 
   const [mapCenter,      setMapCenter]      = useState(DEFAULT_CENTER);
@@ -78,6 +78,7 @@ const IncidentReportForm = () => {
   const [mediaFiles,     setMediaFiles]     = useState([]);
   const [fileError,      setFileError]      = useState('');
   const [isSubmitting,   setIsSubmitting]   = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [submitMessage,  setSubmitMessage]  = useState(null); // { type, text }
   const [dragOver,       setDragOver]       = useState(false);
 
@@ -168,6 +169,7 @@ const IncidentReportForm = () => {
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
+    setUploadProgress(0);
     setSubmitMessage(null);
 
     try {
@@ -182,9 +184,11 @@ const IncidentReportForm = () => {
       }));
       mediaFiles.forEach(file => formData.append('media', file));
 
-      // Use AuthContext api instance (token injected automatically)
       const response = await api.post('/report', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (e) => {
+          if (e.total) setUploadProgress(Math.round((e.loaded * 100) / e.total));
+        },
       });
 
       if (response.data.success) {
@@ -203,6 +207,7 @@ const IncidentReportForm = () => {
       });
     } finally {
       setIsSubmitting(false);
+      setUploadProgress(0);
     }
   };
 
@@ -441,6 +446,22 @@ const IncidentReportForm = () => {
           )}
         </div>
 
+        {/* ── Upload progress ── */}
+        {isSubmitting && uploadProgress > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-zinc-400">
+              <span>{uploadProgress < 100 ? 'Uploading…' : 'Processing…'}</span>
+              <span className="font-semibold tabular-nums">{uploadProgress}%</span>
+            </div>
+            <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-red-600 to-orange-500 rounded-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* ── Submit ── */}
         <button
           type="submit"
@@ -448,7 +469,7 @@ const IncidentReportForm = () => {
           className="w-full py-3 px-4 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-red-900/30"
         >
           {isSubmitting ? (
-            <><Loader2 className="w-4 h-4 animate-spin" /> Submitting Report…</>
+            <><Loader2 className="w-4 h-4 animate-spin" /> {uploadProgress > 0 && uploadProgress < 100 ? `Uploading ${uploadProgress}%…` : 'Submitting Report…'}</>
           ) : (
             <><AlertTriangle className="w-4 h-4" /> Submit Incident Report</>
           )}

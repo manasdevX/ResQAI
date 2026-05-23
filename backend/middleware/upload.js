@@ -48,4 +48,24 @@ const upload = multer({
   },
 });
 
+// Single-image avatar upload (2 MB, images only, stored in resqai_avatars/)
+const avatarStorage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req) => ({
+    folder:        'resqai_avatars',
+    resource_type: 'image',
+    public_id:     `avatar_${req.user._id}_${Date.now()}`,
+    transformation: [{ width: 300, height: 300, crop: 'fill', gravity: 'face', quality: 'auto' }],
+  }),
+});
+
+export const avatarUpload = multer({
+  storage: avatarStorage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files are allowed for avatars'), false);
+  },
+  limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+});
+
 export default upload;

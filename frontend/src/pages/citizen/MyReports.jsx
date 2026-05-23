@@ -6,6 +6,22 @@ import { SEVERITY_BADGE, TYPE_ICONS, INCIDENT_STATUS } from '../../constants/inc
 
 const STATUS_STEPS = ['reported', 'acknowledged', 'responding', 'resolved'];
 
+const STATUS_DOT = {
+  reported:     'bg-zinc-500',
+  acknowledged: 'bg-blue-500',
+  responding:   'bg-yellow-500',
+  resolved:     'bg-green-500',
+  closed:       'bg-zinc-600',
+};
+
+const STATUS_LABEL_COLOR = {
+  reported:     'text-zinc-400',
+  acknowledged: 'text-blue-400',
+  responding:   'text-yellow-400',
+  resolved:     'text-green-400',
+  closed:       'text-zinc-600',
+};
+
 const MyReports = () => {
   const { api } = useAuth();
   const [incidents, setIncidents] = useState([]);
@@ -141,18 +157,36 @@ const MyReports = () => {
 
                     {inc.statusHistory?.length > 0 && (
                       <div>
-                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Status History</p>
-                        <div className="space-y-1.5">
-                          {[...inc.statusHistory].reverse().map((h, i) => (
-                            <div key={i} className="flex items-start gap-2 text-xs">
-                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0" />
-                              <div>
-                                <span className="font-semibold text-zinc-300 capitalize">{h.status}</span>
-                                {h.note && <span className="text-zinc-500 ml-1.5">— {h.note}</span>}
-                                <p className="text-zinc-600 mt-0.5">{new Date(h.updatedAt).toLocaleString()}</p>
+                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Status Timeline</p>
+                        <div className="relative pl-5">
+                          <div className="absolute left-[7px] top-2 bottom-2 w-px bg-zinc-700" />
+                          <div className="space-y-4">
+                            {[...inc.statusHistory].reverse().map((h, i) => (
+                              <div key={i} className="relative flex items-start gap-3">
+                                <div className={`absolute -left-5 mt-0.5 w-3.5 h-3.5 rounded-full border-2 border-zinc-900 shrink-0 ${STATUS_DOT[h.status] || 'bg-zinc-600'}`} />
+                                <div className="flex-1 min-w-0 pb-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`text-xs font-bold capitalize ${STATUS_LABEL_COLOR[h.status] || 'text-zinc-400'}`}>
+                                      {h.status}
+                                    </span>
+                                    {i === 0 && (
+                                      <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded-full">
+                                        Current
+                                      </span>
+                                    )}
+                                  </div>
+                                  {h.note && (
+                                    <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">{h.note}</p>
+                                  )}
+                                  <p className="text-[10px] text-zinc-600 mt-0.5">
+                                    {h.updatedAt
+                                      ? new Date(h.updatedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                      : '—'}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )}

@@ -95,3 +95,172 @@ export const getAvailableResponders = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to fetch responders' });
   }
 };
+
+// @desc   Get own profile
+// @route  GET /api/users/profile
+// @access Private
+export const getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .select('name email phone avatar role skills isAvailable isSafe isActive createdAt lastSeen');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    return res.json({ success: true, user });
+  } catch (error) {
+    console.error('[getProfile]', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch profile' });
+  }
+};
+
+// @desc   Update own profile (name, phone)
+// @route  PATCH /api/users/profile
+// @access Private
+export const updateProfile = async (req, res) => {
+  try {
+    const { name, phone } = req.body;
+
+    if (name !== undefined && !String(name).trim()) {
+      return res.status(400).json({ success: false, message: 'Name cannot be empty' });
+    }
+    if (phone !== undefined && phone && !/^\+?[\d\s\-().]{7,20}$/.test(phone)) {
+      return res.status(400).json({ success: false, message: 'Invalid phone number format' });
+    }
+
+    const updates = {};
+    if (name  !== undefined) updates.name  = String(name).trim();
+    if (phone !== undefined) updates.phone = phone ? String(phone).trim() : undefined;
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select('name email phone avatar role skills');
+
+    return res.json({ success: true, message: 'Profile updated', user });
+  } catch (error) {
+    console.error('[updateProfile]', error);
+    return res.status(500).json({ success: false, message: 'Failed to update profile' });
+  }
+};
+
+// @desc   Upload / replace avatar image
+// @route  PATCH /api/users/avatar
+// @access Private
+export const uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No image file provided' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { avatar: req.file.path }, // Cloudinary secure URL
+      { new: true }
+    ).select('name email avatar');
+
+    return res.json({ success: true, message: 'Avatar updated', avatar: user.avatar, user });
+  } catch (error) {
+    console.error('[uploadAvatar]', error);
+    return res.status(500).json({ success: false, message: 'Failed to upload avatar' });
+  }
+};
+
+// @desc   Get all users (paginated, searchable)
+// @route  GET /api/users/all
+// @access Private (admin)
+export const getAllUsers = async (req, res) => {
+  try {
+    const { search, role } = req.query;
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip  = (page - 1) * limit;
+
+    const filter = {};
+    if (role && role !== 'all') filter.role = role;
+    if (search) {
+      filter.$or = [
+        { name:  { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      User.find(filter)
+        .select('name email phone avatar role skills isActive isAvailable createdAt lastSeen')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      User.countDocuments(filter),
+    ]);
+
+    return res.json({
+      success: true,
+      users,
+      total,
+      page,
+      pages:   Math.ceil(total / limit),
+      hasMore: skip + users.length < total,
+    });
+  } catch (error) {
+    console.error('[getAllUsers]', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch users' });
+  }
+};
+
+// @desc   Change a user's role
+// @route  PATCH /api/users/:id/role
+// @access Private (admin)
+export const updateUserRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    const VALID_ROLES = ['citizen', 'responder', 'shelter_manager'];
+    if (!VALID_ROLES.includes(role)) {
+      return res.status(400).json({ success: false, message: `Role must be one of: ${VALID_ROLES.join(', ')}` });
+    }
+    if (id === req.user._id.toString()) {
+      return res.status(400).json({ success: false, message: 'You cannot change your own role' });
+    }
+
+    const target = await User.findById(id);
+    if (!target)               return res.status(404).json({ success: false, message: 'User not found' });
+    if (target.role === 'admin') return res.status(403).json({ success: false, message: 'Cannot change another admin\'s role' });
+
+    target.role = role;
+    await target.save();
+
+    return res.json({ success: true, message: `Role changed to ${role}`, user: { _id: target._id, role: target.role } });
+  } catch (error) {
+    console.error('[updateUserRole]', error);
+    return res.status(500).json({ success: false, message: 'Failed to update role' });
+  }
+};
+
+// @desc   Activate or deactivate a user account
+// @route  PATCH /api/users/:id/active
+// @access Private (admin)
+export const toggleUserActive = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (id === req.user._id.toString()) {
+      return res.status(400).json({ success: false, message: 'You cannot deactivate yourself' });
+    }
+
+    const target = await User.findById(id);
+    if (!target)               return res.status(404).json({ success: false, message: 'User not found' });
+    if (target.role === 'admin') return res.status(403).json({ success: false, message: 'Cannot deactivate another admin' });
+
+    target.isActive = !target.isActive;
+    await target.save();
+
+    return res.json({
+      success:  true,
+      isActive: target.isActive,
+      message:  target.isActive ? 'Account activated' : 'Account deactivated',
+    });
+  } catch (error) {
+    console.error('[toggleUserActive]', error);
+    return res.status(500).json({ success: false, message: 'Failed to toggle account status' });
+  }
+};

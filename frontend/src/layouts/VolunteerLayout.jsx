@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, MapPin, ClipboardList, Package,
-  MessageCircle, LogOut, ChevronRight, Zap,
+  MessageCircle, User, LogOut, ChevronRight, Zap,
 } from 'lucide-react';
 
 const NAV = [
@@ -11,6 +11,7 @@ const NAV = [
   { to: '/volunteer/assignments',  icon: ClipboardList,   label: 'My Assignments' },
   { to: '/volunteer/resources',    icon: Package,         label: 'Resource Requests' },
   { to: '/volunteer/chat',         icon: MessageCircle,   label: 'Chat' },
+  { to: '/volunteer/profile',      icon: User,            label: 'Profile' },
 ];
 
 const VolunteerLayout = () => {

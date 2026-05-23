@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Home, AlertOctagon, Building2, Package, FileText, MessageCircle, LogOut, Menu, X } from 'lucide-react';
+import { Home, AlertOctagon, Building2, Package, FileText, MessageCircle, User, LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
 const NAV = [
@@ -10,6 +10,7 @@ const NAV = [
   { to: '/resources',   icon: Package,       label: 'Request Help' },
   { to: '/my-reports',  icon: FileText,      label: 'My Reports' },
   { to: '/chat',        icon: MessageCircle, label: 'Chat' },
+  { to: '/profile',     icon: User,          label: 'Profile' },
 ];
 
 const CitizenLayout = () => {

@@ -23,6 +23,7 @@ import AdminShelterManager  from './pages/admin/ShelterManager';
 import AdminAlerts         from './pages/admin/Alerts';
 import AdminAnalytics      from './pages/admin/Analytics';
 import AdminInvites        from './pages/admin/Invites';
+import AdminUserManager    from './pages/admin/UserManager';
 
 // Volunteer pages
 import VolunteerDashboard   from './pages/volunteer/Dashboard';
@@ -36,6 +37,7 @@ import CitizenResources from './pages/citizen/Resources';
 import CitizenMyReports from './pages/citizen/MyReports';
 
 // Shared pages
+import Profile  from './pages/Profile';
 import Report   from './pages/Report';
 import Shelters from './pages/Shelters';
 import Chat     from './pages/Chat';
@@ -63,7 +65,9 @@ function App() {
                 <Route path="/admin/alerts"     element={<AdminAlerts />} />
                 <Route path="/admin/analytics"  element={<AdminAnalytics />} />
                 <Route path="/admin/invites"    element={<AdminInvites />} />
+                <Route path="/admin/users"      element={<AdminUserManager />} />
                 <Route path="/admin/chat"       element={<Chat />} />
+                <Route path="/admin/profile"    element={<Profile />} />
               </Route>
             </Route>
 
@@ -75,6 +79,7 @@ function App() {
                 <Route path="/volunteer/assignments" element={<VolunteerAssignments />} />
                 <Route path="/volunteer/resources"   element={<VolunteerResources />} />
                 <Route path="/volunteer/chat"        element={<Chat />} />
+                <Route path="/volunteer/profile"     element={<Profile />} />
               </Route>
             </Route>
 
@@ -87,6 +92,7 @@ function App() {
                 <Route path="/resources"   element={<CitizenResources />} />
                 <Route path="/my-reports"  element={<CitizenMyReports />} />
                 <Route path="/chat"        element={<Chat />} />
+                <Route path="/profile"     element={<Profile />} />
               </Route>
             </Route>
 
