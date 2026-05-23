@@ -15,6 +15,7 @@ import chatRoutes from './routes/chatRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import resourceRoutes from './routes/resourceRoutes.js';
 import inviteRoutes from './routes/inviteRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
 import { setupChatSocket } from './controllers/chatController.js';
 
 dotenv.config({ quiet: true });
@@ -84,8 +85,9 @@ app.use('/api/report',    reportRoutes);
 app.use('/api/shelters',  shelterRoutes);
 app.use('/api/chat',      chatRoutes);
 app.use('/api/users',     userRoutes);
-app.use('/api/resources', resourceRoutes);
-app.use('/api/invites',   inviteRoutes);
+app.use('/api/resources',  resourceRoutes);
+app.use('/api/invites',    inviteRoutes);
+app.use('/api/analytics',  analyticsRoutes);
 
 // Verify JWT on every socket connection
 io.use((socket, next) => {

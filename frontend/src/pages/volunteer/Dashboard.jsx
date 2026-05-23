@@ -22,7 +22,7 @@ const VolunteerDashboard = () => {
         const [incRes] = await Promise.all([
           api.get('/incidents?status=responding'),
         ]);
-        setStats(prev => ({ ...prev, active: incRes.data.count || 0 }));
+        setStats(prev => ({ ...prev, active: incRes.data.total || incRes.data.count || 0 }));
       } catch { /* silent */ }
     };
     fetchStats();

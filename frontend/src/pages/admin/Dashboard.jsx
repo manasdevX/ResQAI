@@ -12,28 +12,33 @@ const AdminDashboard = () => {
   const socket = useSocket();
   const { token, api } = useAuth();
 
-  const [incidents,        setIncidents]        = useState([]);
-  const [loading,          setLoading]          = useState(true);
-  const [selectedPanel,    setSelectedPanel]    = useState(null);
-  const [latestIncidentId, setLatestIncidentId] = useState(null);
-  const [toasts,           setToasts]           = useState([]);
-  const [newIds,           setNewIds]           = useState(new Set());
-  const [globalAlert,      setGlobalAlert]      = useState(null);
-  const [sosAlerts,        setSOSAlerts]        = useState([]);
-  const [escalations,      setEscalations]      = useState([]);
+  const [incidents,          setIncidents]          = useState([]);
+  const [loading,            setLoading]            = useState(true);
+  const [selectedPanel,      setSelectedPanel]      = useState(null);
+  const [latestIncidentId,   setLatestIncidentId]   = useState(null);
+  const [toasts,             setToasts]             = useState([]);
+  const [newIds,             setNewIds]             = useState(new Set());
+  const [globalAlert,        setGlobalAlert]        = useState(null);
+  const [sosAlerts,          setSOSAlerts]          = useState([]);
+  const [escalations,        setEscalations]        = useState([]);
+  const [availableResponders, setAvailableResponders] = useState(null);
 
   const sidebarRef = useRef(null);
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchInitial = async () => {
       try {
-        const { data } = await api.get('/incidents');
-        if (data.success) setIncidents(data.incidents);
+        const [incRes, respRes] = await Promise.all([
+          api.get('/incidents?limit=200'),
+          api.get('/users/responders'),
+        ]);
+        if (incRes.data.success)  setIncidents(incRes.data.incidents);
+        if (respRes.data.success) setAvailableResponders(respRes.data.count);
       } catch { /* silent */ } finally {
         setLoading(false);
       }
     };
-    fetch();
+    fetchInitial();
   }, [api]);
 
   const dismissToast = useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), []);
@@ -90,18 +95,24 @@ const AdminDashboard = () => {
       setTimeout(() => setEscalations(prev => prev.filter(e => e.incidentId?.toString() !== id)), 60000);
     };
 
-    socket.on('newIncident',      handleNew);
-    socket.on('incidentUpdated',  handleUpdated);
-    socket.on('alertBroadcast',   handleAlert);
-    socket.on('sosAlert',         handleSOS);
-    socket.on('incidentEscalated', handleEscalated);
+    const handleAvailability = ({ isAvailable }) => {
+      setAvailableResponders(prev => prev !== null ? Math.max(0, prev + (isAvailable ? 1 : -1)) : prev);
+    };
+
+    socket.on('newIncident',                 handleNew);
+    socket.on('incidentUpdated',             handleUpdated);
+    socket.on('alertBroadcast',             handleAlert);
+    socket.on('sosAlert',                   handleSOS);
+    socket.on('incidentEscalated',          handleEscalated);
+    socket.on('responderAvailabilityChanged', handleAvailability);
 
     return () => {
-      socket.off('newIncident',      handleNew);
-      socket.off('incidentUpdated',  handleUpdated);
-      socket.off('alertBroadcast',   handleAlert);
-      socket.off('sosAlert',         handleSOS);
-      socket.off('incidentEscalated', handleEscalated);
+      socket.off('newIncident',                 handleNew);
+      socket.off('incidentUpdated',             handleUpdated);
+      socket.off('alertBroadcast',             handleAlert);
+      socket.off('sosAlert',                   handleSOS);
+      socket.off('incidentEscalated',          handleEscalated);
+      socket.off('responderAvailabilityChanged', handleAvailability);
     };
   }, [socket]);
 
@@ -204,9 +215,12 @@ const AdminDashboard = () => {
           {/* Stats bar */}
           <div className="absolute bottom-6 right-4 flex flex-col gap-2 z-10">
             {[
-              { label: `${activeCount} Active`,   color: 'bg-green-400' },
+              { label: `${activeCount} Active`,    color: 'bg-green-400' },
               { label: `${criticalCount} Critical`, color: 'bg-red-500' },
               { label: `${resolvedCount} Resolved`, color: 'bg-zinc-400' },
+              ...(availableResponders !== null
+                ? [{ label: `${availableResponders} Responders on duty`, color: 'bg-blue-400' }]
+                : []),
             ].map(({ label, color }) => (
               <div key={label} className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900/90 backdrop-blur-sm rounded-full border border-zinc-700 text-xs font-medium">
                 <span className={`w-2 h-2 rounded-full ${color}`} />

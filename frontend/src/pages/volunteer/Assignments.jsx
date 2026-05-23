@@ -15,7 +15,7 @@ const VolunteerAssignments = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.get('/incidents');
+      const { data } = await api.get('/incidents?limit=200');
       const mine = (data.incidents || []).filter(inc =>
         inc.assignedResponders?.some(r => r === user?._id || r?._id === user?._id)
       );

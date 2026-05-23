@@ -21,11 +21,28 @@ export const getAllShelters = async (req, res) => {
     if (req.query.status) filter.status = req.query.status;
     if (req.query.type)   filter.type   = req.query.type;
 
-    const shelters = await Shelter.find(filter)
-      .populate('managedBy', 'name email phone')
-      .sort({ createdAt: -1 });
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const skip  = (page - 1) * limit;
 
-    return res.status(200).json({ success: true, count: shelters.length, shelters });
+    const [shelters, total] = await Promise.all([
+      Shelter.find(filter)
+        .populate('managedBy', 'name email phone')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Shelter.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      count:   shelters.length,
+      total,
+      page,
+      pages:   Math.ceil(total / limit),
+      hasMore: skip + shelters.length < total,
+      shelters,
+    });
   } catch (error) {
     console.error('[getAllShelters]', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch shelters' });

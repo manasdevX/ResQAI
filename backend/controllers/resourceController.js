@@ -95,12 +95,29 @@ export const getAllResourceRequests = async (req, res) => {
     if (req.query.status) filter.status = req.query.status;
     if (req.query.type)   filter.type   = req.query.type;
 
-    const requests = await ResourceRequest.find(filter)
-      .sort({ createdAt: -1 })
-      .populate('requestedBy', 'name email phone')
-      .populate('fulfilledBy', 'name');
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const skip  = (page - 1) * limit;
 
-    return res.json({ success: true, count: requests.length, requests });
+    const [requests, total] = await Promise.all([
+      ResourceRequest.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('requestedBy', 'name email phone')
+        .populate('fulfilledBy', 'name'),
+      ResourceRequest.countDocuments(filter),
+    ]);
+
+    return res.json({
+      success: true,
+      count:   requests.length,
+      total,
+      page,
+      pages:   Math.ceil(total / limit),
+      hasMore: skip + requests.length < total,
+      requests,
+    });
   } catch (error) {
     console.error('[getAllResourceRequests]', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch requests' });

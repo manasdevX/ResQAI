@@ -1,4 +1,5 @@
 import { User } from '../models/index.js';
+import { io } from '../server.js';
 
 // @desc   Toggle volunteer availability (ON/OFF DUTY)
 // @route  PATCH /api/users/availability
@@ -10,6 +11,16 @@ export const toggleAvailability = async (req, res) => {
 
     user.isAvailable = !user.isAvailable;
     await user.save();
+
+    // Notify all admins so their dashboards reflect the change in real-time
+    const admins = await User.find({ role: 'admin', isActive: true }).select('_id');
+    admins.forEach(a =>
+      io.to(`user:${a._id}`).emit('responderAvailabilityChanged', {
+        responderId:   user._id,
+        responderName: user.name,
+        isAvailable:   user.isAvailable,
+      })
+    );
 
     return res.json({
       success:     true,

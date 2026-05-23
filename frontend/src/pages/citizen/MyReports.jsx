@@ -17,7 +17,7 @@ const MyReports = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.get('/incidents');
+      const { data } = await api.get('/incidents?limit=200');
       setIncidents(data.incidents || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load reports');

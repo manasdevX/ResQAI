@@ -28,7 +28,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchIncidents = async () => {
       try {
-        const { data } = await api.get('/incidents');
+        const { data } = await api.get('/incidents?limit=200');
         if (data.success) setIncidents(data.incidents);
       } catch (err) {
         console.error('Failed to fetch incidents:', err);

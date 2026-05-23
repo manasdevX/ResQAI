@@ -219,16 +219,30 @@ export const createIncident = async (req, res) => {
 export const getAllIncidents = async (req, res) => {
   try {
     const filter = {};
-    if (req.query.status) filter.status = req.query.status;
-    if (req.query.type)   filter.type   = req.query.type;
+    if (req.query.status)   filter.status   = req.query.status;
+    if (req.query.type)     filter.type     = req.query.type;
+    if (req.query.severity) filter.severity = req.query.severity;
 
-    const incidents = await Incident.find(filter)
-      .sort({ createdAt: -1 })
-      .populate('reportedBy', 'name email avatar role');
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+    const skip  = (page - 1) * limit;
+
+    const [incidents, total] = await Promise.all([
+      Incident.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('reportedBy', 'name email avatar role'),
+      Incident.countDocuments(filter),
+    ]);
 
     return res.status(200).json({
-      success:   true,
-      count:     incidents.length,
+      success: true,
+      count:   incidents.length,
+      total,
+      page,
+      pages:   Math.ceil(total / limit),
+      hasMore: skip + incidents.length < total,
       incidents,
     });
   } catch (error) {

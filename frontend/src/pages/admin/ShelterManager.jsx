@@ -191,7 +191,7 @@ const AdminShelterManager = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.get('/shelters');
+      const { data } = await api.get('/shelters?limit=100');
       setShelters(data.shelters || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load shelters');
