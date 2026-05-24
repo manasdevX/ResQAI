@@ -5,6 +5,7 @@ import {
   createSOSIncident,
   uploadIncidentMedia,
   getAllIncidents,
+  getIncidentById,
   updateIncidentStatus,
   updateIncidentSeverity,
   broadcastAlert,
@@ -46,6 +47,9 @@ router.get('/', protect, getAllIncidents);
 
 // Get nearby active incidents
 router.get('/nearby', protect, getNearbyIncidents);
+
+// Get a single incident by ID — must be before all /:id/sub-path routes
+router.get('/:id', protect, getIncidentById);
 
 // Broadcast emergency alert (Admin/Responder only)
 router.post('/broadcast-alert', protect, authorize('admin', 'responder'), broadcastAlert);

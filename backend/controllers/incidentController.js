@@ -622,3 +622,26 @@ export const unassignResponder = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to unassign responder' });
   }
 };
+
+/**
+ * @desc  Get a single incident by ID
+ * @route GET /api/incidents/:id
+ * @access Private
+ */
+export const getIncidentById = async (req, res) => {
+  try {
+    const incident = await Incident.findById(req.params.id)
+      .populate('reportedBy', 'name email avatar role phone')
+      .populate('assignedResponders', 'name email avatar role isAvailable')
+      .populate('statusHistory.updatedBy', 'name role');
+
+    if (!incident) {
+      return res.status(404).json({ success: false, message: 'Incident not found' });
+    }
+
+    return res.json({ success: true, incident });
+  } catch (error) {
+    console.error('[getIncidentById]', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch incident' });
+  }
+};

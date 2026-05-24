@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { RefreshCw, MapPin, Clock, AlertTriangle, FileText } from 'lucide-react';
+import { RefreshCw, MapPin, Clock, AlertTriangle, FileText, ChevronRight } from 'lucide-react';
 
 import { SEVERITY_BADGE, TYPE_ICONS, INCIDENT_STATUS } from '../../constants/incident';
 
@@ -139,6 +140,15 @@ const MyReports = () => {
                     </span>
                   </div>
                 </button>
+
+                {/* View details link */}
+                <Link
+                  to={`/incidents/${inc._id}`}
+                  className="flex items-center justify-between px-4 py-2.5 border-t border-zinc-800 text-xs text-zinc-500 hover:text-blue-400 hover:bg-zinc-800/40 transition group"
+                >
+                  <span>View full details, AI triage & timeline</span>
+                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </Link>
 
                 {isExpanded && (
                   <div className="px-4 pb-4 space-y-3 border-t border-zinc-800 pt-3">

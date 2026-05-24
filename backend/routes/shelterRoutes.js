@@ -4,6 +4,7 @@ import {
   getShelterById,
   getNearbyShelters,
   getNearbyPlaces,
+  getMyShelter,
   createShelter,
   updateShelter,
   updateOccupancy,
@@ -24,8 +25,11 @@ router.get('/', protect, getAllShelters);
 // GET nearby shelters — must be BEFORE /:id to avoid param collision
 router.get('/nearby', protect, getNearbyShelters);
 
-// GET real places from Google Places API
+// GET real places from OpenStreetMap Overpass API
 router.get('/places', protect, getNearbyPlaces);
+
+// GET the shelter managed by the currently logged-in user — must be BEFORE /:id
+router.get('/mine', protect, getMyShelter);
 
 // GET a single shelter
 router.get('/:id', protect, getShelterById);

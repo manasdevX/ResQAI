@@ -27,15 +27,17 @@ import AdminInvites        from './pages/admin/Invites';
 import AdminUserManager    from './pages/admin/UserManager';
 
 // Volunteer pages
-import VolunteerDashboard   from './pages/volunteer/Dashboard';
-import VolunteerIncidents   from './pages/volunteer/Incidents';
-import VolunteerAssignments from './pages/volunteer/Assignments';
-import VolunteerResources   from './pages/volunteer/Resources';
+import VolunteerDashboard     from './pages/volunteer/Dashboard';
+import VolunteerIncidents     from './pages/volunteer/Incidents';
+import VolunteerAssignments   from './pages/volunteer/Assignments';
+import VolunteerResources     from './pages/volunteer/Resources';
+import ShelterManagerPanel    from './pages/volunteer/ShelterManagerPanel';
 
 // Citizen pages
-import CitizenHome      from './pages/citizen/Home';
-import CitizenResources from './pages/citizen/Resources';
-import CitizenMyReports from './pages/citizen/MyReports';
+import CitizenHome        from './pages/citizen/Home';
+import CitizenResources   from './pages/citizen/Resources';
+import CitizenMyReports   from './pages/citizen/MyReports';
+import IncidentDetail     from './pages/citizen/IncidentDetail';
 
 // Shared pages
 import Profile  from './pages/Profile';
@@ -76,10 +78,11 @@ function App() {
             {/* ── Volunteer / Shelter Manager ──────────────────────────────────── */}
             <Route element={<ProtectedRoute allowedRoles={['responder', 'shelter_manager']} />}>
               <Route element={<VolunteerLayout />}>
-                <Route path="/volunteer"             element={<VolunteerDashboard />} />
+                <Route path="/volunteer"              element={<VolunteerDashboard />} />
                 <Route path="/volunteer/incidents"   element={<VolunteerIncidents />} />
                 <Route path="/volunteer/assignments" element={<VolunteerAssignments />} />
                 <Route path="/volunteer/resources"   element={<VolunteerResources />} />
+                <Route path="/volunteer/shelter"     element={<ShelterManagerPanel />} />
                 <Route path="/volunteer/chat"        element={<Chat />} />
                 <Route path="/volunteer/profile"     element={<Profile />} />
               </Route>
@@ -88,13 +91,14 @@ function App() {
             {/* ── Citizen ─────────────────────────────────────────────────────── */}
             <Route element={<ProtectedRoute allowedRoles={['citizen']} />}>
               <Route element={<CitizenLayout />}>
-                <Route path="/home"        element={<CitizenHome />} />
-                <Route path="/report"      element={<Report />} />
-                <Route path="/shelters"    element={<Shelters />} />
-                <Route path="/resources"   element={<CitizenResources />} />
-                <Route path="/my-reports"  element={<CitizenMyReports />} />
-                <Route path="/chat"        element={<Chat />} />
-                <Route path="/profile"     element={<Profile />} />
+                <Route path="/home"              element={<CitizenHome />} />
+                <Route path="/report"            element={<Report />} />
+                <Route path="/shelters"           element={<Shelters />} />
+                <Route path="/resources"          element={<CitizenResources />} />
+                <Route path="/my-reports"         element={<CitizenMyReports />} />
+                <Route path="/incidents/:id"      element={<IncidentDetail />} />
+                <Route path="/chat"               element={<Chat />} />
+                <Route path="/profile"            element={<Profile />} />
               </Route>
             </Route>
 

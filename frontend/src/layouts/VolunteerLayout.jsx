@@ -2,22 +2,32 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, MapPin, ClipboardList, Package,
-  MessageCircle, User, LogOut, ChevronRight, Zap,
+  MessageCircle, User, LogOut, ChevronRight, Zap, Building2,
 } from 'lucide-react';
 import NotificationBell from '../components/NotificationBell';
 
-const NAV = [
-  { to: '/volunteer',              icon: LayoutDashboard, label: 'Dashboard',       exact: true },
+const NAV_RESPONDER = [
+  { to: '/volunteer',              icon: LayoutDashboard, label: 'Dashboard',        exact: true },
   { to: '/volunteer/incidents',    icon: MapPin,          label: 'Nearby Incidents' },
-  { to: '/volunteer/assignments',  icon: ClipboardList,   label: 'My Assignments' },
-  { to: '/volunteer/resources',    icon: Package,         label: 'Resource Requests' },
-  { to: '/volunteer/chat',         icon: MessageCircle,   label: 'Chat' },
-  { to: '/volunteer/profile',      icon: User,            label: 'Profile' },
+  { to: '/volunteer/assignments',  icon: ClipboardList,   label: 'My Assignments'   },
+  { to: '/volunteer/resources',    icon: Package,         label: 'Resource Requests'},
+  { to: '/volunteer/chat',         icon: MessageCircle,   label: 'Chat'             },
+  { to: '/volunteer/profile',      icon: User,            label: 'Profile'          },
+];
+
+const NAV_SHELTER_MANAGER = [
+  { to: '/volunteer',              icon: LayoutDashboard, label: 'Dashboard',        exact: true },
+  { to: '/volunteer/shelter',      icon: Building2,       label: 'My Shelter'       },
+  { to: '/volunteer/chat',         icon: MessageCircle,   label: 'Chat'             },
+  { to: '/volunteer/profile',      icon: User,            label: 'Profile'          },
 ];
 
 const VolunteerLayout = () => {
   const { user, api, logout, updateUser } = useAuth();
   const navigate = useNavigate();
+
+  const isShelterManager = user?.role === 'shelter_manager';
+  const NAV = isShelterManager ? NAV_SHELTER_MANAGER : NAV_RESPONDER;
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -39,10 +49,18 @@ const VolunteerLayout = () => {
         {/* Logo */}
         <div className="px-4 py-4 border-b border-zinc-800">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-black text-sm shadow-lg shadow-blue-600/30">V</div>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shadow-lg ${
+              isShelterManager
+                ? 'bg-teal-600 shadow-teal-600/30'
+                : 'bg-blue-600 shadow-blue-600/30'
+            }`}>
+              {isShelterManager ? <Building2 className="w-4 h-4 text-white" /> : 'V'}
+            </div>
             <div>
               <p className="text-sm font-bold leading-none">ResQAI</p>
-              <p className="text-[10px] text-zinc-500 mt-0.5">Volunteer Portal</p>
+              <p className="text-[10px] text-zinc-500 mt-0.5">
+                {isShelterManager ? 'Shelter Portal' : 'Volunteer Portal'}
+              </p>
             </div>
           </div>
         </div>

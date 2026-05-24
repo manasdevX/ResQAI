@@ -256,54 +256,107 @@ export const updateShelterStatus = async (req, res) => {
 };
 
 /**
- * @desc  Get real hospitals/shelters from Google Places API
+ * @desc  Get real hospitals/shelters from OpenStreetMap Overpass API (no API key required)
  * @route GET /api/shelters/places?lat=&lng=&type=&radius=
  * @access Private
  */
 export const getNearbyPlaces = async (req, res) => {
   try {
     const { lat, lng, type = 'hospital', radius = 5000 } = req.query;
-    const key = process.env.GOOGLE_MAPS_API_KEY;
 
     if (!lat || !lng) {
       return res.status(400).json({ success: false, message: 'lat and lng are required' });
     }
-    const parsedPlacesLng = parseFloat(lng);
-    const parsedPlacesLat = parseFloat(lat);
-    if (parsedPlacesLng < -180 || parsedPlacesLng > 180 || parsedPlacesLat < -90 || parsedPlacesLat > 90) {
+    const parsedLat = parseFloat(lat);
+    const parsedLng = parseFloat(lng);
+    if (parsedLng < -180 || parsedLng > 180 || parsedLat < -90 || parsedLat > 90) {
       return res.status(400).json({ success: false, message: 'Invalid coordinates' });
     }
-    if (!key) {
-      return res.status(503).json({ success: false, message: 'Nearby places search is not available (Google Maps API key not configured)' });
+
+    const radiusMetres = Math.min(parseInt(radius) || 5000, 50000);
+
+    // Map our type aliases → OSM amenity/healthcare tags
+    const OSM_TAG_MAP = {
+      hospital:       '["amenity"="hospital"]',
+      clinic:         '["amenity"="clinic"]',
+      pharmacy:       '["amenity"="pharmacy"]',
+      fire_station:   '["amenity"="fire_station"]',
+      police:         '["amenity"="police"]',
+      shelter:        '["social_facility"="shelter"]',
+      school:         '["amenity"="school"]',
+      community_hall: '["amenity"="community_hall"]',
+    };
+
+    const osmFilter = OSM_TAG_MAP[type] || `["amenity"="${type}"]`;
+
+    // Overpass QL — fetch nodes + ways near the user
+    const query = `
+      [out:json][timeout:15];
+      (
+        node${osmFilter}(around:${radiusMetres},${parsedLat},${parsedLng});
+        way${osmFilter}(around:${radiusMetres},${parsedLat},${parsedLng});
+      );
+      out center tags 20;
+    `;
+
+    const response = await fetch('https://overpass-api.de/api/interpreter', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    `data=${encodeURIComponent(query)}`,
+      signal:  AbortSignal.timeout(18000),
+    });
+
+    if (!response.ok) {
+      console.warn('[getNearbyPlaces] Overpass error:', response.status);
+      return res.json({ success: true, places: [], source: 'overpass' });
     }
 
-    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${Math.min(parseInt(radius), 50000)}&type=${type}&key=${key}`;
-    const response = await fetch(url);
     const data     = await response.json();
+    const elements = data.elements || [];
 
-    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-      console.error('[getNearbyPlaces] Google API error:', data.status, data.error_message);
-      return res.json({ success: true, places: [] });
-    }
+    const places = elements
+      .map((el) => {
+        // Ways have a `center` object; nodes have `lat`/`lon` directly
+        const elLat = el.lat ?? el.center?.lat;
+        const elLon = el.lon ?? el.center?.lon;
+        if (!elLat || !elLon) return null;
 
-    const places = (data.results || []).map(p => ({
-      placeId:  p.place_id,
-      name:     p.name,
-      vicinity: p.vicinity,
-      location: {
-        type:        'Point',
-        coordinates: [p.geometry.location.lng, p.geometry.location.lat],
-      },
-      rating:   p.rating || null,
-      isOpen:   p.opening_hours?.open_now ?? null,
-      types:    p.types || [],
-      icon:     p.icon,
-    }));
+        const tags = el.tags || {};
+        const name = tags.name || tags['name:en'] || `${type.charAt(0).toUpperCase() + type.slice(1)} (unnamed)`;
 
-    return res.json({ success: true, count: places.length, places });
+        // Haversine distance
+        const R    = 6371000;
+        const dLat = ((elLat - parsedLat) * Math.PI) / 180;
+        const dLon = ((elLon - parsedLng) * Math.PI) / 180;
+        const a    =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos((parsedLat * Math.PI) / 180) *
+            Math.cos((elLat * Math.PI) / 180) *
+            Math.sin(dLon / 2) ** 2;
+        const distanceM = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return {
+          placeId:    `osm:${el.type}:${el.id}`,
+          name,
+          vicinity:   [tags['addr:street'], tags['addr:housenumber'], tags['addr:city']].filter(Boolean).join(', ') || tags['addr:full'] || '',
+          location:   { type: 'Point', coordinates: [elLon, elLat] },
+          distanceM:  Math.round(distanceM),
+          distanceKm: Math.round(distanceM / 100) / 10,
+          phone:      tags.phone || tags['contact:phone'] || null,
+          website:    tags.website || tags['contact:website'] || null,
+          opening:    tags.opening_hours || null,
+          types:      [type],
+          source:     'openstreetmap',
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.distanceM - b.distanceM);
+
+    return res.json({ success: true, count: places.length, places, source: 'overpass' });
   } catch (error) {
     console.error('[getNearbyPlaces]', error);
-    return res.json({ success: true, places: [] });
+    // Return empty gracefully — never crash the shelter page
+    return res.json({ success: true, places: [], source: 'overpass' });
   }
 };
 
@@ -465,5 +518,27 @@ export const checkOutShelter = async (req, res) => {
   } catch (error) {
     console.error('[checkOutShelter]', error);
     return res.status(500).json({ success: false, message: 'Failed to check out' });
+  }
+};
+
+/**
+ * @desc  Get the shelter managed by the current user
+ * @route GET /api/shelters/mine
+ * @access Private (shelter_manager)
+ */
+export const getMyShelter = async (req, res) => {
+  try {
+    const shelter = await Shelter.findOne({ managedBy: req.user._id })
+      .populate('managedBy', 'name email phone')
+      .populate('registeredOccupants', 'name email avatar');
+
+    if (!shelter) {
+      return res.json({ success: true, shelter: null, message: 'No shelter assigned to you yet. Ask an admin to assign one.' });
+    }
+
+    return res.json({ success: true, shelter });
+  } catch (error) {
+    console.error('[getMyShelter]', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch your shelter' });
   }
 };
