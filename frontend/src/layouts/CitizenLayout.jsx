@@ -173,7 +173,7 @@ const CitizenLayout = () => {
             {({ isActive }) => (
               <>
                 <span className={`p-1 rounded-lg transition-all ${isActive ? 'bg-blue-600/20' : ''}`}>
-                  <Icon className="w-4.5 h-4.5" />
+                  <Icon className="w-[18px] h-[18px]" />
                 </span>
                 <span>{label}</span>
               </>

@@ -82,6 +82,7 @@ const STATUS_DOT = {
   responding:   'bg-yellow-500',
   resolved:     'bg-green-500',
   closed:       'bg-zinc-400',
+  false_alarm:  'bg-zinc-500',
 };
 
 const StatusTimeline = ({ history }) => {

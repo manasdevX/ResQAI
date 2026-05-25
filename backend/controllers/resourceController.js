@@ -1,6 +1,9 @@
+import mongoose from 'mongoose';
 import ResourceRequest from '../models/ResourceRequest.js';
 import User from '../models/User.js';
 import { io } from '../server.js';
+
+const badId = (res) => res.status(400).json({ success: false, message: 'Invalid ID format' });
 
 // @desc   Create a resource request (citizen)
 // @route  POST /api/resources
@@ -134,6 +137,8 @@ export const getAllResourceRequests = async (req, res) => {
 // @access Private
 export const acknowledgeResourceRequest = async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) return badId(res);
+
     const request = await ResourceRequest.findOneAndUpdate(
       { _id: req.params.id, status: 'pending' },
       {
@@ -172,6 +177,8 @@ export const acknowledgeResourceRequest = async (req, res) => {
 // @access Private
 export const fulfillResourceRequest = async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) return badId(res);
+
     // Can fulfill from either pending or acknowledged state
     const request = await ResourceRequest.findOneAndUpdate(
       { _id: req.params.id, status: { $ne: 'fulfilled' } },

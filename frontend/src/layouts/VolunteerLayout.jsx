@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, MapPin, ClipboardList, Package,
   MessageCircle, User, LogOut, Zap, Building2, Bell,
-  ChevronRight, Activity, Menu, X,
+  ChevronRight, Activity, Menu,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import NotificationBell from '../components/NotificationBell';
@@ -26,41 +26,17 @@ const NAV_SHELTER_MANAGER = [
   { to: '/volunteer/profile',     icon: User,            label: 'Profile',    exact: false },
 ];
 
-const VolunteerLayout = () => {
-  const { user, api, logout, updateUser } = useAuth();
-  const navigate  = useNavigate();
-  const location  = useLocation();
-  const [toggling,    setToggling]    = useState(false);
-  const [mobileOpen,  setMobileOpen]  = useState(false);
-
-  const isShelterManager = user?.role === 'shelter_manager';
-  const NAV = isShelterManager ? NAV_SHELTER_MANAGER : NAV_RESPONDER;
-  const accentColor = isShelterManager ? 'teal' : 'blue';
-
-  // Close mobile menu on route change
-  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
-
-  const handleLogout = () => { logout(); navigate('/login'); };
-
-  const toggleAvailability = async () => {
-    if (toggling) return;
-    setToggling(true);
-    try {
-      const { data } = await api.patch('/users/availability');
-      updateUser({ isAvailable: data.isAvailable });
-    } catch { /* silent */ } finally {
-      setToggling(false);
-    }
-  };
-
+const VolunteerSidebar = ({ nav, isShelterManager, user, toggling, onToggleAvailability, onLogout }) => {
   const navLinkClass = ({ isActive }) =>
     `group flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all duration-200 relative ${
       isActive
-        ? `bg-${accentColor}-600/15 text-${accentColor}-400 font-semibold`
+        ? isShelterManager
+          ? 'bg-teal-600/15 text-teal-400 font-semibold'
+          : 'bg-blue-600/15 text-blue-400 font-semibold'
         : 'text-zinc-400 hover:bg-zinc-800/80 hover:text-zinc-100 font-medium'
     }`;
 
-  const SidebarContent = () => (
+  return (
     <>
       {/* Logo */}
       <div className="px-4 py-4 border-b border-zinc-800/80">
@@ -71,13 +47,13 @@ const VolunteerLayout = () => {
               : 'bg-blue-600 shadow-blue-600/40'
           }`}>
             {isShelterManager
-              ? <Building2 className="w-4.5 h-4.5 text-white" />
-              : <Activity className="w-4.5 h-4.5 text-white" />
+              ? <Building2 className="w-[18px] h-[18px] text-white" />
+              : <Activity className="w-[18px] h-[18px] text-white" />
             }
           </div>
           <div>
             <p className="text-sm font-black text-zinc-100 tracking-tight">
-              ResQ<span className={`text-${accentColor}-400`}>AI</span>
+              ResQ<span className={isShelterManager ? 'text-teal-400' : 'text-blue-400'}>AI</span>
             </p>
             <p className="text-[9px] text-zinc-500 mt-0.5 font-medium">
               {isShelterManager ? 'Shelter Portal' : 'Responder Portal'}
@@ -90,7 +66,7 @@ const VolunteerLayout = () => {
       {!isShelterManager && (
         <div className="px-3 py-3 border-b border-zinc-800/80">
           <button
-            onClick={toggleAvailability}
+            onClick={onToggleAvailability}
             disabled={toggling}
             className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all duration-300 ${
               user?.isAvailable
@@ -114,12 +90,14 @@ const VolunteerLayout = () => {
       {/* Nav links */}
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
         <p className="px-3 py-1 text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-1">Navigation</p>
-        {NAV.map(({ to, icon: Icon, label, exact }) => (
+        {nav.map(({ to, icon: Icon, label, exact }) => (
           <NavLink key={to} to={to} end={exact} className={navLinkClass}>
             {({ isActive }) => (
               <>
                 {isActive && (
-                  <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-${accentColor}-400 rounded-r-full`} />
+                  <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 rounded-r-full ${
+                    isShelterManager ? 'bg-teal-400' : 'bg-blue-400'
+                  }`} />
                 )}
                 <Icon className="w-4 h-4 shrink-0" />
                 <span className="flex-1 truncate">{label}</span>
@@ -148,7 +126,7 @@ const VolunteerLayout = () => {
           <NotificationBell />
         </div>
         <button
-          onClick={handleLogout}
+          onClick={onLogout}
           className="w-full flex items-center justify-center gap-2 py-2 text-xs font-semibold text-zinc-400 hover:text-red-400 hover:bg-red-950/30 border border-zinc-700/60 hover:border-red-800/50 rounded-xl transition-all duration-200"
         >
           <LogOut className="w-3.5 h-3.5" /> Sign Out
@@ -156,13 +134,48 @@ const VolunteerLayout = () => {
       </div>
     </>
   );
+};
+
+const VolunteerLayout = () => {
+  const { user, api, logout, updateUser } = useAuth();
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const [toggling,   setToggling]   = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const isShelterManager = user?.role === 'shelter_manager';
+  const nav = isShelterManager ? NAV_SHELTER_MANAGER : NAV_RESPONDER;
+
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+
+  const handleLogout = () => { logout(); navigate('/login'); };
+
+  const toggleAvailability = async () => {
+    if (toggling) return;
+    setToggling(true);
+    try {
+      const { data } = await api.patch('/users/availability');
+      updateUser({ isAvailable: data.isAvailable });
+    } catch { /* silent */ } finally {
+      setToggling(false);
+    }
+  };
+
+  const sidebarProps = {
+    nav,
+    isShelterManager,
+    user,
+    toggling,
+    onToggleAvailability: toggleAvailability,
+    onLogout: handleLogout,
+  };
 
   return (
     <div className="flex h-screen bg-zinc-950 text-zinc-100 overflow-hidden">
 
       {/* Desktop sidebar */}
       <aside className="hidden md:flex w-56 shrink-0 bg-zinc-900/95 border-r border-zinc-800/80 flex-col overflow-hidden">
-        <SidebarContent />
+        <VolunteerSidebar {...sidebarProps} />
       </aside>
 
       {/* Mobile overlay sidebar */}
@@ -175,7 +188,7 @@ const VolunteerLayout = () => {
             className="w-64 h-full bg-zinc-900 border-r border-zinc-800 flex flex-col overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            <SidebarContent />
+            <VolunteerSidebar {...sidebarProps} />
           </aside>
         </div>
       )}
@@ -192,7 +205,7 @@ const VolunteerLayout = () => {
             <Menu className="w-5 h-5 text-zinc-400" />
           </button>
           <span className="font-black text-sm">
-            ResQ<span className={`text-${accentColor}-400`}>AI</span>
+            ResQ<span className={isShelterManager ? 'text-teal-400' : 'text-blue-400'}>AI</span>
           </span>
           <div className="ml-auto">
             <NotificationBell />

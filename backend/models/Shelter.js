@@ -175,6 +175,7 @@ ShelterSchema.index({ location: '2dsphere' });
 ShelterSchema.index({ status: 1 });
 ShelterSchema.index({ type: 1 });
 ShelterSchema.index({ managedBy: 1 });
+ShelterSchema.index({ registeredOccupants: 1 });
 
 // ─── Pre-save: Auto-update status based on occupancy ─────────────────────────
 

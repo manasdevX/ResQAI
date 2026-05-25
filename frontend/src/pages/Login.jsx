@@ -157,6 +157,7 @@ const Login = () => {
                   onChange={(e) => { setEmail(e.target.value); setEmailTouched(false); }}
                   onBlur={() => { if (email.trim()) setEmailTouched(true); }}
                   placeholder="Email address"
+                  disabled={isSubmitting}
                   className={`w-full pl-10 pr-10 py-3 bg-zinc-900 border rounded-xl text-sm placeholder-zinc-500 focus:outline-none transition-all
                     ${showEmailError
                       ? 'border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/30'
@@ -188,6 +189,7 @@ const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Password"
+                  disabled={isSubmitting}
                   className="w-full pl-10 pr-10 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-sm placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all"
                 />
                 <button

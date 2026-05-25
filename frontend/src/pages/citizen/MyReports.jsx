@@ -13,6 +13,7 @@ const STATUS_DOT = {
   responding:   'bg-yellow-500',
   resolved:     'bg-green-500',
   closed:       'bg-zinc-600',
+  false_alarm:  'bg-zinc-600',
 };
 
 const STATUS_LABEL_COLOR = {
@@ -21,6 +22,7 @@ const STATUS_LABEL_COLOR = {
   responding:   'text-yellow-400',
   resolved:     'text-green-400',
   closed:       'text-zinc-600',
+  false_alarm:  'text-zinc-500',
 };
 
 const MyReports = () => {
@@ -90,7 +92,7 @@ const MyReports = () => {
           {incidents.map(inc => {
             const statusStyle = INCIDENT_STATUS[inc.status] || INCIDENT_STATUS.reported;
             const currentStep = stepIndex(inc.status);
-            const isResolved  = inc.status === 'resolved' || inc.status === 'closed';
+            const isResolved  = ['resolved', 'closed', 'false_alarm'].includes(inc.status);
             const isExpanded  = expanded === inc._id;
 
             return (

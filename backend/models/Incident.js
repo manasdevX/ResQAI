@@ -48,7 +48,7 @@ const AiTriageSchema = new Schema(
     estimatedAffected: { type: Number },      // AI estimate of affected people
     riskScore: { type: Number, min: 0, max: 100 }, // 0–100 risk score
     processedAt: { type: Date },
-    modelUsed: { type: String, default: 'gemini-pro' },
+    modelUsed: { type: String, default: 'gemini-2.0-flash' },
   },
   { _id: false }
 );
@@ -57,7 +57,7 @@ const StatusUpdateSchema = new Schema(
   {
     status: {
       type: String,
-      enum: ['reported', 'acknowledged', 'responding', 'resolved', 'closed'],
+      enum: ['reported', 'acknowledged', 'responding', 'resolved', 'closed', 'false_alarm'],
       required: true,
     },
     note: { type: String, trim: true },
@@ -115,7 +115,7 @@ const IncidentSchema = new Schema(
 
     status: {
       type: String,
-      enum: ['reported', 'acknowledged', 'responding', 'resolved', 'closed'],
+      enum: ['reported', 'acknowledged', 'responding', 'resolved', 'closed', 'false_alarm'],
       default: 'reported',
     },
 
@@ -196,6 +196,7 @@ IncidentSchema.index({ location: '2dsphere' });
 IncidentSchema.index({ status: 1, severity: 1 });
 IncidentSchema.index({ type: 1 });
 IncidentSchema.index({ reportedBy: 1 });
+IncidentSchema.index({ assignedResponders: 1 });
 IncidentSchema.index({ createdAt: -1 });
 
 // ─── Pre-save: Auto-set resolvedAt when status becomes 'resolved' ─────────────
@@ -216,7 +217,7 @@ IncidentSchema.virtual('responseTimeMinutes').get(function () {
 // ─── Virtual: Is active ───────────────────────────────────────────────────────
 
 IncidentSchema.virtual('isActive').get(function () {
-  return !['resolved', 'closed'].includes(this.status);
+  return !['resolved', 'closed', 'false_alarm'].includes(this.status);
 });
 
 export default model('Incident', IncidentSchema);

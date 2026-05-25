@@ -224,7 +224,7 @@ const AdminIncidentManager = () => {
             <div>
               <p className="text-zinc-500 mb-1 font-medium">Status</p>
               <div className="flex gap-1 flex-wrap">
-                {['all', 'reported', 'acknowledged', 'responding', 'resolved', 'closed'].map(s => (
+                {['all', 'reported', 'acknowledged', 'responding', 'resolved', 'closed', 'false_alarm'].map(s => (
                   <button key={s} onClick={() => setFilterStatus(s)}
                     className={`px-2 py-0.5 rounded-full border capitalize transition ${filterStatus === s ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>
                     {s === 'all' ? 'All' : s}

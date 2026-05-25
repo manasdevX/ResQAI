@@ -1,4 +1,5 @@
 import Shelter from '../models/Shelter.js';
+import User from '../models/User.js';
 import { io } from '../server.js';
 import { notify } from '../utils/notify.js'; // eslint-disable-line no-unused-vars
 
@@ -456,20 +457,10 @@ export const deleteShelter = async (req, res) => {
  */
 export const checkInShelter = async (req, res) => {
   try {
-    const { id }   = req.params;
-    const userId   = req.user._id;
+    const { id } = req.params;
+    const userId = req.user._id;
 
-    const shelter = await Shelter.findById(id);
-    if (!shelter)                    return res.status(404).json({ success: false, message: 'Shelter not found' });
-    if (shelter.status === 'closed') return res.status(400).json({ success: false, message: 'This shelter is closed' });
-    if (shelter.status === 'full')   return res.status(400).json({ success: false, message: 'This shelter is full' });
-
-    // Already checked in here
-    if (shelter.registeredOccupants.some(uid => uid.equals(userId))) {
-      return res.json({ success: true, message: 'Already checked in', shelter });
-    }
-
-    // Ensure user isn't checked in elsewhere
+    // Pre-check: user already checked in elsewhere
     const elsewhere = await Shelter.findOne({ registeredOccupants: userId, _id: { $ne: id } }).select('name');
     if (elsewhere) {
       return res.status(409).json({
@@ -478,12 +469,37 @@ export const checkInShelter = async (req, res) => {
       });
     }
 
-    shelter.registeredOccupants.push(userId);
-    shelter.currentOccupancy = shelter.registeredOccupants.length;
-    if (shelter.autoCloseWhenFull && shelter.currentOccupancy >= shelter.totalCapacity) {
-      shelter.status = 'full';
+    // Atomic check-in: only succeeds if shelter is open, has capacity, and user not already registered.
+    // $expr compares currentOccupancy < totalCapacity at the DB level so two concurrent requests
+    // cannot both add themselves when only 1 spot remains.
+    const shelter = await Shelter.findOneAndUpdate(
+      {
+        _id:    id,
+        status: { $in: ['active', 'preparing'] },
+        registeredOccupants: { $ne: userId },
+        $expr:  { $lt: ['$currentOccupancy', '$totalCapacity'] },
+      },
+      {
+        $addToSet: { registeredOccupants: userId },
+        $inc:      { currentOccupancy: 1 },
+      },
+      { new: true }
+    );
+
+    if (!shelter) {
+      // Distinguish the failure reason
+      const existing = await Shelter.findById(id).select('status currentOccupancy totalCapacity registeredOccupants');
+      if (!existing)                                                    return res.status(404).json({ success: false, message: 'Shelter not found' });
+      if (existing.status === 'closed')                                 return res.status(400).json({ success: false, message: 'This shelter is closed' });
+      if (existing.registeredOccupants.some(u => u.equals(userId)))    return res.json({ success: true, message: 'Already checked in', shelter: existing });
+      return res.status(400).json({ success: false, message: 'This shelter is full' });
     }
-    await shelter.save();
+
+    // Auto-mark full if at capacity after this check-in
+    if (shelter.autoCloseWhenFull && shelter.currentOccupancy >= shelter.totalCapacity && shelter.status === 'active') {
+      shelter.status = 'full';
+      await shelter.save();
+    }
 
     io.emit('shelterOccupancyUpdated', {
       shelterId:        id,
@@ -569,7 +585,7 @@ export const assignShelterManager = async (req, res) => {
 
     if (managerId) {
       // Validate the user exists and has the right role
-      const manager = await import('../models/User.js').then(m => m.default.findById(managerId).select('name email role'));
+      const manager = await User.findById(managerId).select('name email role');
       if (!manager) return res.status(404).json({ success: false, message: 'User not found' });
       if (manager.role !== 'shelter_manager') {
         return res.status(400).json({ success: false, message: 'User must have the shelter_manager role' });

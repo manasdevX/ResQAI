@@ -15,7 +15,7 @@ router.post('/',                     protect, createResourceRequest);
 router.get('/nearby',                protect, getNearbyResourceRequests);
 router.get('/mine',                  protect, getMyResourceRequests);
 router.get('/',                      protect, authorize('admin'), getAllResourceRequests);
-router.patch('/:id/acknowledge',     protect, acknowledgeResourceRequest);
-router.patch('/:id/fulfill',         protect, fulfillResourceRequest);
+router.patch('/:id/acknowledge',     protect, authorize('responder', 'admin'), acknowledgeResourceRequest);
+router.patch('/:id/fulfill',         protect, authorize('responder', 'admin'), fulfillResourceRequest);
 
 export default router;

@@ -65,6 +65,7 @@ export const INCIDENT_STATUS = {
   responding:   { label: 'Responding',   color: 'bg-yellow-500/20 text-yellow-400' },
   resolved:     { label: 'Resolved',     color: 'bg-green-500/20 text-green-400' },
   closed:       { label: 'Closed',       color: 'bg-zinc-600/30 text-zinc-500' },
+  false_alarm:  { label: 'False Alarm',  color: 'bg-zinc-700/40 text-zinc-400' },
 };
 
 // { bar, text } for analytics chart bars
@@ -74,4 +75,5 @@ export const INCIDENT_STATUS_BAR = {
   responding:   { bar: 'bg-yellow-500', text: 'text-yellow-400' },
   resolved:     { bar: 'bg-green-500',  text: 'text-green-400' },
   closed:       { bar: 'bg-zinc-600',   text: 'text-zinc-500' },
+  false_alarm:  { bar: 'bg-zinc-700',   text: 'text-zinc-400' },
 };

@@ -4,12 +4,13 @@ import { useAuth } from './AuthContext';
 
 const SocketContext = createContext(null);
 
-// eslint-disable-next-line react-refresh/only-export-components
-export const useSocket = () => useContext(SocketContext);
+export const useSocket = () => useContext(SocketContext)?.socket || null;
+export const useSocketStatus = () => useContext(SocketContext)?.isConnected || false;
 
 export const SocketProvider = ({ children }) => {
   const { user, token } = useAuth();
   const [socket, setSocket] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef(null);
 
   useEffect(() => {
@@ -20,6 +21,7 @@ export const SocketProvider = ({ children }) => {
         socketRef.current.disconnect();
         socketRef.current = null;
         setSocket(null);
+        setIsConnected(false);
       }
       return;
     }
@@ -36,15 +38,9 @@ export const SocketProvider = ({ children }) => {
     socketRef.current = s;
     setSocket(s);
 
-    s.on('connect', () =>
-      console.log('[Socket] Connected:', s.id)
-    );
-    s.on('disconnect', (reason) =>
-      console.log('[Socket] Disconnected:', reason)
-    );
-    s.on('connect_error', (err) =>
-      console.warn('[Socket] Connection error:', err.message)
-    );
+    s.on('connect',       () => setIsConnected(true));
+    s.on('disconnect',    () => setIsConnected(false));
+    s.on('connect_error', () => setIsConnected(false));
 
     return () => {
       s.disconnect();
@@ -54,7 +50,7 @@ export const SocketProvider = ({ children }) => {
   }, [user, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <SocketContext.Provider value={socket}>
+    <SocketContext.Provider value={{ socket, isConnected }}>
       {children}
     </SocketContext.Provider>
   );

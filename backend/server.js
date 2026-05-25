@@ -6,6 +6,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import mongoSanitize from 'express-mongo-sanitize';
 import jwt from 'jsonwebtoken';
 import authRoutes from './routes/authRoutes.js';
 import incidentRoutes from './routes/incidentRoutes.js';
@@ -52,6 +53,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(mongoSanitize());
 
 const apiLimiter = rateLimit({
   windowMs:        15 * 60 * 1000,
@@ -73,12 +75,14 @@ const authLimiter = rateLimit({
 app.use('/api', apiLimiter);
 app.use('/api/auth/login',           authLimiter);
 app.use('/api/auth/signup',          authLimiter);
+app.use('/api/auth/google',          authLimiter);
 app.use('/api/auth/verify-otp',      authLimiter);
 app.use('/api/auth/resend-otp',      authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/auth/reset-password',  authLimiter);
 
 app.get('/', (req, res) => res.send('ResQAI API is running...'));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
 app.use('/api/auth',      authRoutes);
 app.use('/api/incidents', incidentRoutes);
@@ -139,8 +143,7 @@ mongoose.connect(process.env.MONGO_URI)
     httpServer.listen(PORT, () => {
       console.log(`\n  ResQAI Server`);
       console.log(`  ✓ MongoDB    connected`);
-      console.log(`  ✓ Socket.IO  running`);
-      console.log(`  ✓ API        http://localhost:${PORT}/api\n`);
+      console.log(`  ✓ Socket.IO  running\n`);
     });
   })
   .catch((err) => {

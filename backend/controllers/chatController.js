@@ -19,9 +19,21 @@ const dmRoomId = (a, b) =>
  */
 export const getChatUsers = async (req, res) => {
   try {
-    const users = await User.find({ _id: { $ne: req.user._id }, isActive: true })
+    const { search } = req.query;
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+
+    const filter = { _id: { $ne: req.user._id }, isActive: true };
+    if (search?.trim()) {
+      filter.$or = [
+        { name:  { $regex: search.trim(), $options: 'i' } },
+        { email: { $regex: search.trim(), $options: 'i' } },
+      ];
+    }
+
+    const users = await User.find(filter)
       .select('name email role avatar lastSeen')
-      .sort({ name: 1 });
+      .sort({ name: 1 })
+      .limit(limit);
     return res.status(200).json({ success: true, users });
   } catch (err) {
     console.error('[getChatUsers]', err);

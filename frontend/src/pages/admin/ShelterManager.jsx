@@ -27,7 +27,7 @@ const BLANK_FORM = {
   location: { address: '', city: '', state: '', lat: '', lng: '' },
   amenities: { food: false, water: false, medical: false, electricity: false, wifi: false, bedding: false, childCare: false, wheelchairAccessible: false },
   contacts: [{ name: '', phone: '', role: '' }],
-  notes: '',
+  description: '',
 };
 
 const ShelterForm = ({ initial, onSave, onCancel, saving }) => {
@@ -151,8 +151,8 @@ const ShelterForm = ({ initial, onSave, onCancel, saving }) => {
 
       {/* Notes */}
       <div>
-        <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5 block">Notes</label>
-        <textarea value={form.notes} onChange={e => set(['notes'], e.target.value)}
+        <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5 block">Description</label>
+        <textarea value={form.description} onChange={e => set(['description'], e.target.value)}
           rows={2} placeholder="Additional information…"
           className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-blue-500 transition resize-none" />
       </div>

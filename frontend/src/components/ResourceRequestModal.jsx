@@ -35,6 +35,10 @@ const ResourceRequestModal = ({ onClose, onSuccess }) => {
 
     try {
       const coords = await new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocation not supported by this browser'));
+          return;
+        }
         navigator.geolocation.getCurrentPosition(
           pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
           err => reject(err),
@@ -57,6 +61,7 @@ const ResourceRequestModal = ({ onClose, onSuccess }) => {
       setTimeout(() => { onSuccess?.(); onClose?.(); }, 2500);
     } catch (err) {
       const msg = err.code === 1 ? 'Location permission denied. Enable GPS and try again.'
+               : err.message === 'Geolocation not supported by this browser' ? err.message
                : err.response?.data?.message || 'Failed to submit request. Try again.';
       setErrorMsg(msg);
       setPhase('error');

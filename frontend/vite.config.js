@@ -2,10 +2,20 @@ import { defineConfig, createLogger } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
 
+const cyan = (s) => `\x1b[36m${s}\x1b[0m`
+
 const logger = createLogger()
 const _info  = logger.info.bind(logger)
 logger.info  = (msg, opts) => {
-  if (msg.includes('--host') || msg.includes('press h')) return
+  // Suppress Vite's own banner, URL lines, and dep-optimisation noise
+  if (
+    msg.includes('--host')        ||
+    msg.includes('press h')       ||
+    msg.includes('ready in')      ||
+    msg.includes('Local:')        ||
+    msg.includes('Network:')      ||
+    msg.includes('Re-optimizing')
+  ) return
   _info(msg, opts)
 }
 
@@ -13,11 +23,10 @@ function resqaiBanner() {
   return {
     name: 'resqai-banner',
     configureServer(server) {
-      const original = server.printUrls.bind(server)
       server.printUrls = () => {
-        original()
-        console.log(`  ✓ API        http://localhost:5000/api`)
-        console.log(`  ✓ Socket.IO  ws://localhost:5000\n`)
+        console.log(`\n  ResQAI Client`)
+        console.log(`  ✓ Running    ${cyan('http://localhost:5173/')}`)
+        console.log(`  ✓ Backend    ${cyan('http://localhost:5000')}\n`)
       }
     },
   }

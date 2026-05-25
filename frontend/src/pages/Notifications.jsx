@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
 import {
   Bell, CheckCheck, Loader2, ChevronDown, AlertTriangle,
-  Filter, X, ExternalLink, AlertCircle, Users, Building2, Radio, Cpu,
+  Package, X, ExternalLink, AlertOctagon, Users, Building2, Radio, Cpu,
 } from 'lucide-react';
 
 /* ─── Type metadata ──────────────────────────────────────────────────────────── */
@@ -33,6 +33,16 @@ const TYPE_META = {
     bg:    'bg-zinc-500/10 border-zinc-500/20',
     label: 'System',
   },
+  resource: {
+    icon:  <Package className="w-4 h-4 text-purple-400" />,
+    bg:    'bg-purple-500/10 border-purple-500/20',
+    label: 'Resource',
+  },
+  sos: {
+    icon:  <AlertOctagon className="w-4 h-4 text-red-400" />,
+    bg:    'bg-red-500/15 border-red-500/20',
+    label: 'SOS',
+  },
 };
 
 const FILTER_TABS = [
@@ -42,6 +52,8 @@ const FILTER_TABS = [
   { key: 'assignment',     label: 'Assignments' },
   { key: 'alert',          label: 'Alerts' },
   { key: 'shelter',        label: 'Shelter' },
+  { key: 'resource',       label: 'Resources' },
+  { key: 'sos',            label: 'SOS' },
   { key: 'system',         label: 'System' },
 ];
 

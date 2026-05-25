@@ -9,18 +9,19 @@ const badId = (res) => res.status(400).json({ success: false, message: 'Invalid 
 
 
 // Incident type → skill keywords for targeted dispatch
+// Keys must match Incident model enum exactly
 const INCIDENT_SKILL_MAP = {
-  fire:           ['firefighting', 'fire', 'rescue'],
-  flood:          ['water rescue', 'swimming', 'flood', 'search and rescue'],
-  earthquake:     ['search and rescue', 'structural', 'earthquake'],
-  medical:        ['medical', 'first aid', 'cpr', 'paramedic', 'nurse', 'doctor', 'healthcare'],
-  accident:       ['first aid', 'traffic', 'accident', 'driving'],
-  violence:       ['law enforcement', 'security', 'conflict'],
-  infrastructure: ['engineering', 'electrical', 'infrastructure'],
-  chemical:       ['hazmat', 'chemical', 'decontamination'],
-  landslide:      ['search and rescue', 'geology', 'landslide'],
-  cyclone:        ['evacuation', 'rescue', 'cyclone'],
-  other:          [],
+  fire:              ['firefighting', 'fire', 'rescue'],
+  flood:             ['water rescue', 'swimming', 'flood', 'search and rescue'],
+  earthquake:        ['search and rescue', 'structural', 'earthquake'],
+  medical_emergency: ['medical', 'first aid', 'cpr', 'paramedic', 'nurse', 'doctor', 'healthcare'],
+  accident:          ['first aid', 'traffic', 'accident', 'driving'],
+  riot:              ['law enforcement', 'security', 'conflict'],
+  building_collapse: ['engineering', 'structural', 'search and rescue'],
+  chemical_spill:    ['hazmat', 'chemical', 'decontamination'],
+  landslide:         ['search and rescue', 'geology', 'landslide'],
+  cyclone:           ['evacuation', 'rescue', 'cyclone'],
+  other:             [],
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -284,6 +285,16 @@ export const uploadIncidentMedia = async (req, res) => {
     if (!incident) {
       return res.status(404).json({ success: false, message: 'Incident not found' });
     }
+
+    // Authorization check
+    const isAdmin = req.user.role === 'admin';
+    const isReporter = incident.reportedBy.equals(req.user._id);
+    const isResponder = req.user.role === 'responder' && incident.assignedResponders.some(id => id.equals(req.user._id));
+
+    if (!isAdmin && !isReporter && !isResponder) {
+      return res.status(403).json({ success: false, message: 'Not authorized to upload media for this incident' });
+    }
+
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ success: false, message: 'No media files uploaded' });
     }
@@ -314,7 +325,7 @@ export const updateIncidentStatus = async (req, res) => {
     if (!mongoose.isValidObjectId(id)) return badId(res);
     const { status, note } = req.body;
 
-    const VALID_STATUSES = ['reported', 'acknowledged', 'responding', 'resolved', 'closed'];
+    const VALID_STATUSES = ['reported', 'acknowledged', 'responding', 'resolved', 'closed', 'false_alarm'];
     if (!VALID_STATUSES.includes(status)) {
       return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` });
     }
