@@ -1,4 +1,6 @@
+import mongoose from 'mongoose';
 import { User } from '../models/index.js';
+
 import { io } from '../server.js';
 
 // @desc   Toggle volunteer availability (ON/OFF DUTY)
@@ -171,7 +173,7 @@ export const getAllUsers = async (req, res) => {
   try {
     const { search, role } = req.query;
     const page  = Math.max(1, parseInt(req.query.page)  || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const skip  = (page - 1) * limit;
 
     const filter = {};
@@ -239,6 +241,15 @@ export const changePassword = async (req, res) => {
     const user = await User.findById(req.user._id).select('+password');
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
+    // Google OAuth users have no password — direct them to reset flow
+    if (!user.password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Your account uses Google Sign-In and has no password. Use "Forgot Password" to set one.',
+      });
+    }
+
+
     const isMatch = await user.comparePassword(currentPassword);
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Current password is incorrect' });
@@ -261,6 +272,9 @@ export const updateUserRole = async (req, res) => {
   try {
     const { id } = req.params;
     const { role } = req.body;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
 
     const VALID_ROLES = ['citizen', 'responder', 'shelter_manager'];
     if (!VALID_ROLES.includes(role)) {
@@ -290,6 +304,9 @@ export const updateUserRole = async (req, res) => {
 export const toggleUserActive = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
 
     if (id === req.user._id.toString()) {
       return res.status(400).json({ success: false, message: 'You cannot deactivate yourself' });

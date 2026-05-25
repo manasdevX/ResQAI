@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
   RefreshCw, Plus, AlertTriangle, Building2, MapPin, Phone,
-  Users, Edit2, Trash2, X, CheckCircle, Save,
+  Users, Edit2, Trash2, X, CheckCircle, Save, UserCheck, ChevronDown,
 } from 'lucide-react';
 import { SHELTER_TYPE_OPTIONS, SHELTER_STATUS_OPTIONS, SHELTER_TYPE_META, SHELTER_STATUS_BADGE, AMENITIES } from '../../constants/shelter';
 
@@ -176,16 +176,22 @@ const ShelterForm = ({ initial, onSave, onCancel, saving }) => {
 const AdminShelterManager = () => {
   const { api } = useAuth();
 
-  const [shelters,    setShelters]    = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState(null);
-  const [success,     setSuccess]     = useState('');
-  const [mode,        setMode]        = useState(null); // null | 'create' | 'edit'
-  const [editing,     setEditing]     = useState(null);
-  const [saving,      setSaving]      = useState(false);
-  const [deleting,    setDeleting]    = useState(null);
-  const [filterStatus,setFilterStatus]= useState('all');
-  const [updatingOcc, setUpdatingOcc] = useState(null);
+  const [shelters,       setShelters]       = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState(null);
+  const [success,        setSuccess]        = useState('');
+  const [mode,           setMode]           = useState(null); // null | 'create' | 'edit'
+  const [editing,        setEditing]        = useState(null);
+  const [saving,         setSaving]         = useState(false);
+  const [deleting,       setDeleting]       = useState(null);
+  const [filterStatus,   setFilterStatus]   = useState('all');
+  const [updatingOcc,    setUpdatingOcc]    = useState(null);
+
+  // Assign manager state
+  const [managers,       setManagers]       = useState([]);  // shelter_manager users
+  const [loadingMgrs,    setLoadingMgrs]    = useState(false);
+  const [assigningMgr,   setAssigningMgr]   = useState(null); // shelterId being assigned
+  const [selectedMgrId,  setSelectedMgrId]  = useState('');
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -200,7 +206,18 @@ const AdminShelterManager = () => {
     }
   }, [api]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  // Fetch shelter_manager users for the assign dropdown
+  const fetchManagers = useCallback(async () => {
+    setLoadingMgrs(true);
+    try {
+      const { data } = await api.get('/users/all?role=shelter_manager&limit=100');
+      setManagers(data.users || []);
+    } catch { /* silent */ } finally {
+      setLoadingMgrs(false);
+    }
+  }, [api]);
+
+  useEffect(() => { fetch(); fetchManagers(); }, [fetch, fetchManagers]);
 
   const showSuccess = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(''), 3500); };
 
@@ -251,6 +268,23 @@ const AdminShelterManager = () => {
       setError(err.response?.data?.message || 'Failed to update occupancy');
     } finally {
       setUpdatingOcc(null);
+    }
+  };
+
+  const handleAssignManager = async (shelterId, managerId) => {
+    setAssigningMgr(shelterId);
+    setError(null);
+    try {
+      const { data } = await api.patch(`/shelters/${shelterId}/assign-manager`, { managerId: managerId || null });
+      setShelters(prev => prev.map(s => s._id === shelterId ? data.shelter : s));
+      // Also update editing if it's the same shelter
+      if (editing?._id === shelterId) setEditing(data.shelter);
+      showSuccess(managerId ? 'Manager assigned successfully.' : 'Manager unassigned.');
+      setSelectedMgrId('');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to assign manager');
+    } finally {
+      setAssigningMgr(null);
     }
   };
 
@@ -377,6 +411,14 @@ const AdminShelterManager = () => {
                       ))}
                     </div>
 
+                    {/* Manager badge */}
+                    {s.managedBy && (
+                      <div className="flex items-center gap-1.5 mt-2 text-xs text-purple-400">
+                        <UserCheck className="w-3 h-3" />
+                        <span className="truncate">{s.managedBy.name}</span>
+                      </div>
+                    )}
+
                     {/* Contact */}
                     {s.contacts?.[0]?.phone && (
                       <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-800">
@@ -431,6 +473,65 @@ const AdminShelterManager = () => {
               onCancel={() => { setMode(null); setEditing(null); }}
               saving={saving}
             />
+
+            {/* ── Assign Manager section (edit mode only) ─────────── */}
+            {mode === 'edit' && editing && (
+              <div className="mt-6 pt-6 border-t border-zinc-800">
+                <div className="flex items-center gap-2 mb-3">
+                  <UserCheck className="w-4 h-4 text-purple-400" />
+                  <h3 className="text-sm font-bold text-zinc-100">Assign Shelter Manager</h3>
+                </div>
+
+                {editing.managedBy && (
+                  <div className="flex items-center justify-between mb-3 p-2.5 bg-purple-950/30 border border-purple-800/30 rounded-xl">
+                    <div>
+                      <p className="text-xs font-semibold text-purple-300">{editing.managedBy.name}</p>
+                      <p className="text-[10px] text-purple-400/70">{editing.managedBy.email}</p>
+                    </div>
+                    <button
+                      onClick={() => handleAssignManager(editing._id, null)}
+                      disabled={assigningMgr === editing._id}
+                      className="text-[10px] text-red-400 hover:text-red-300 border border-red-800/40 px-2 py-1 rounded-lg transition"
+                    >
+                      {assigningMgr === editing._id ? <RefreshCw className="w-3 h-3 animate-spin" /> : 'Unassign'}
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <select
+                      value={selectedMgrId}
+                      onChange={e => setSelectedMgrId(e.target.value)}
+                      className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 focus:outline-none focus:border-purple-500 transition appearance-none"
+                    >
+                      <option value="">Select a manager…</option>
+                      {loadingMgrs && <option disabled>Loading…</option>}
+                      {managers.map(m => (
+                        <option key={m._id} value={m._id}>
+                          {m.name} — {m.email}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+                  </div>
+                  <button
+                    onClick={() => selectedMgrId && handleAssignManager(editing._id, selectedMgrId)}
+                    disabled={!selectedMgrId || assigningMgr === editing._id}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white rounded-lg text-xs font-semibold transition"
+                  >
+                    {assigningMgr === editing._id
+                      ? <RefreshCw className="w-3 h-3 animate-spin" />
+                      : <UserCheck className="w-3 h-3" />
+                    }
+                    Assign
+                  </button>
+                </div>
+                {managers.length === 0 && !loadingMgrs && (
+                  <p className="text-[10px] text-zinc-600 mt-2">No shelter_manager users found. Promote a user in User Manager first.</p>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

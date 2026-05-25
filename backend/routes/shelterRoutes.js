@@ -12,6 +12,7 @@ import {
   deleteShelter,
   checkInShelter,
   checkOutShelter,
+  assignShelterManager,
 } from '../controllers/shelterController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -54,5 +55,8 @@ router.post('/:id/checkout', protect, checkOutShelter);
 
 // DELETE remove a shelter (Admin only)
 router.delete('/:id', protect, authorize('admin'), deleteShelter);
+
+// PATCH assign a shelter_manager to a shelter (Admin only)
+router.patch('/:id/assign-manager', protect, authorize('admin'), assignShelterManager);
 
 export default router;

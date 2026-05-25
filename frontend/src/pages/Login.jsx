@@ -72,37 +72,54 @@ const Login = () => {
 
       {/* Left hero */}
       <div className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between p-10 bg-zinc-900 border-r border-zinc-800 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-72 h-72 bg-red-600/10 rounded-full blur-3xl -translate-x-1/3 -translate-y-1/3 pointer-events-none" />
+        {/* Ambient glows */}
+        <div className="absolute top-0 left-0 w-96 h-96 bg-red-600/12 rounded-full blur-3xl -translate-x-1/3 -translate-y-1/3 pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-600/8 rounded-full blur-3xl translate-x-1/3 translate-y-1/3 pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-orange-600/3 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative">
+          {/* Logo */}
           <div className="flex items-center gap-3 mb-12">
-            <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center text-base font-black shadow-lg shadow-red-600/30">R</div>
-            <span className="text-xl font-bold tracking-tight">ResQAI</span>
+            <div className="w-11 h-11 rounded-2xl bg-red-600 flex items-center justify-center font-black text-lg shadow-xl shadow-red-600/40">
+              <span className="text-white">R</span>
+            </div>
+            <div>
+              <span className="text-xl font-black tracking-tight">ResQ<span className="text-red-400">AI</span></span>
+              <p className="text-[10px] text-zinc-500 font-medium -mt-0.5">Emergency Response Platform</p>
+            </div>
           </div>
 
           <h2 className="text-4xl xl:text-5xl font-black leading-[1.1] text-zinc-100 mb-5">
             Emergency<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400">Coordination</span><br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400">
+              Coordination
+            </span><br />
             Made Smart.
           </h2>
           <p className="text-zinc-400 text-base leading-relaxed max-w-sm">
-            AI-powered real-time incident response for civilians, volunteers, and emergency administrators.
+            AI-powered real-time incident response for civilians,
+            volunteers, and emergency administrators.
           </p>
         </div>
 
-        <div className="relative space-y-3">
+        <div className="relative space-y-3.5">
           {[
-            { icon: '🗺️', label: 'Live incident map with geospatial search' },
-            { icon: '🤖', label: 'AI triage and risk scoring via Gemini' },
-            { icon: '🏥', label: 'Real-time shelter & hospital finder' },
-            { icon: '🚨', label: 'One-tap SOS with GPS location broadcast' },
-          ].map(({ icon, label }) => (
-            <div key={label} className="flex items-center gap-3 text-sm text-zinc-400">
-              <span className="text-lg shrink-0">{icon}</span>
-              <span>{label}</span>
+            { icon: '🗺️', label: 'Live incident map with geospatial search', color: 'text-blue-400' },
+            { icon: '🤖', label: 'AI triage and risk scoring via Gemini',     color: 'text-purple-400' },
+            { icon: '🏥', label: 'Real-time shelter & hospital finder',        color: 'text-teal-400'  },
+            { icon: '🚨', label: 'One-tap SOS with GPS location broadcast',   color: 'text-red-400'   },
+          ].map(({ icon, label, color }) => (
+            <div key={label} className="flex items-center gap-3 text-sm">
+              <span className={`w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-base shrink-0`}>{icon}</span>
+              <span className="text-zinc-300">{label}</span>
             </div>
           ))}
+
+          {/* Live system status */}
+          <div className="mt-6 flex items-center gap-2 px-3 py-2 bg-green-950/30 border border-green-800/30 rounded-xl w-fit">
+            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+            <span className="text-xs text-green-400 font-semibold">All systems operational</span>
+          </div>
         </div>
       </div>
 

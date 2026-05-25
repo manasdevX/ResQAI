@@ -1,8 +1,12 @@
+import mongoose from 'mongoose';
 import Incident from '../models/Incident.js';
 import User from '../models/User.js';
 import { analyzeIncident } from '../utils/aiTriage.js';
 import { io } from '../server.js';
 import { notify } from '../utils/notify.js';
+
+const badId = (res) => res.status(400).json({ success: false, message: 'Invalid ID format' });
+
 
 // Incident type → skill keywords for targeted dispatch
 const INCIDENT_SKILL_MAP = {
@@ -220,6 +224,19 @@ export const createIncident = async (req, res) => {
 export const getAllIncidents = async (req, res) => {
   try {
     const filter = {};
+
+    // ── Role-based data isolation ──────────────────────────────────────────────
+    // Citizens can ONLY see their own incidents
+    if (req.user.role === 'citizen') {
+      filter.reportedBy = req.user._id;
+    }
+
+    // Responders can filter to only their assignments (?assignedTo=me)
+    if (req.query.assignedTo === 'me' && ['responder', 'admin'].includes(req.user.role)) {
+      filter.assignedResponders = req.user._id;
+    }
+
+    // Standard query filters
     if (req.query.status)   filter.status   = req.query.status;
     if (req.query.type)     filter.type     = req.query.type;
     if (req.query.severity) filter.severity = req.query.severity;
@@ -253,6 +270,8 @@ export const getAllIncidents = async (req, res) => {
   }
 };
 
+
+
 /**
  * @desc  Upload additional media to an existing incident
  * @route POST /api/incidents/:id/media
@@ -260,6 +279,7 @@ export const getAllIncidents = async (req, res) => {
  */
 export const uploadIncidentMedia = async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) return badId(res);
     const incident = await Incident.findById(req.params.id);
     if (!incident) {
       return res.status(404).json({ success: false, message: 'Incident not found' });
@@ -291,6 +311,7 @@ export const uploadIncidentMedia = async (req, res) => {
 export const updateIncidentStatus = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) return badId(res);
     const { status, note } = req.body;
 
     const VALID_STATUSES = ['reported', 'acknowledged', 'responding', 'resolved', 'closed'];
@@ -328,7 +349,7 @@ export const updateIncidentStatus = async (req, res) => {
           type:  'incident_status',
           title: `Incident ${status.charAt(0).toUpperCase() + status.slice(1)}`,
           body:  `"${incident.title}" — ${STATUS_NOTIFY[status]}`,
-          link:  '/my-reports',
+          link:  `/incidents/${incident._id}`,
         });
       }
     }
@@ -348,6 +369,7 @@ export const updateIncidentStatus = async (req, res) => {
 export const updateIncidentSeverity = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) return badId(res);
     const { severity } = req.body;
 
     const VALID_SEVERITIES = ['low', 'medium', 'high', 'critical'];
@@ -493,6 +515,7 @@ export const createSOSIncident = async (req, res) => {
 export const acceptIncidentTask = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) return badId(res);
     const userId = req.user._id;
 
     // Atomic add: the $ne filter ensures we only modify the document when the
@@ -556,7 +579,9 @@ export const acceptIncidentTask = async (req, res) => {
 export const assignResponder = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) return badId(res);
     const { responderId } = req.body;
+    if (responderId && !mongoose.isValidObjectId(responderId)) return badId(res);
 
     if (!responderId) return res.status(400).json({ success: false, message: 'responderId is required' });
 
@@ -606,6 +631,7 @@ export const assignResponder = async (req, res) => {
 export const unassignResponder = async (req, res) => {
   try {
     const { id, responderId } = req.params;
+    if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(responderId)) return badId(res);
 
     const incident = await Incident.findById(id);
     if (!incident) return res.status(404).json({ success: false, message: 'Incident not found' });
@@ -630,6 +656,7 @@ export const unassignResponder = async (req, res) => {
  */
 export const getIncidentById = async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) return badId(res);
     const incident = await Incident.findById(req.params.id)
       .populate('reportedBy', 'name email avatar role phone')
       .populate('assignedResponders', 'name email avatar role isAvailable')

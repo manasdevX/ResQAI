@@ -29,7 +29,7 @@ const OccupancyBar = ({ current, total, status }) => {
   );
 };
 
-const ShelterCard = ({ shelter, isHighlit, onClick, isCheckedIn, onCheckIn, onCheckOut, checkInLoading }) => {
+const ShelterCard = ({ shelter, isHighlit, onClick, isCheckedIn, onCheckIn, onCheckOut, checkInLoading, confirmCheckOut }) => {
   const typeInfo = SHELTER_TYPE_META[shelter.type] || SHELTER_TYPE_META.other;
   return (
     <div
@@ -98,26 +98,29 @@ const ShelterCard = ({ shelter, isHighlit, onClick, isCheckedIn, onCheckIn, onCh
       )}
     </button>
 
-      {/* Check-in / Check-out button */}
       {shelter.status !== 'closed' && (
         <button
           onClick={e => { e.stopPropagation(); isCheckedIn ? onCheckOut() : onCheckIn(); }}
           disabled={checkInLoading || (!isCheckedIn && shelter.status === 'full')}
-          className={`mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold border transition disabled:opacity-50 disabled:cursor-not-allowed ${
-            isCheckedIn
+          className={`mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+            confirmCheckOut
+              ? 'bg-orange-500/20 border-orange-500/50 text-orange-300 animate-pulse'
+              : isCheckedIn
               ? 'bg-orange-950/30 border-orange-800/40 text-orange-400 hover:bg-orange-950/50'
               : shelter.status === 'full'
-                ? 'bg-zinc-800/50 border-zinc-700 text-zinc-600 cursor-not-allowed'
-                : 'bg-green-950/30 border-green-800/40 text-green-400 hover:bg-green-950/50'
+              ? 'bg-zinc-800/50 border-zinc-700 text-zinc-600 cursor-not-allowed'
+              : 'bg-green-950/30 border-green-800/40 text-green-400 hover:bg-green-950/50'
           }`}
         >
           {checkInLoading
             ? <Loader2 className="w-3 h-3 animate-spin" />
+            : confirmCheckOut
+            ? <><LogOutIcon className="w-3 h-3" /> Tap again to confirm check-out</>
             : isCheckedIn
-              ? <><LogOutIcon className="w-3 h-3" /> Check Out</>
-              : shelter.status === 'full'
-                ? 'Shelter Full'
-                : <><LogIn className="w-3 h-3" /> Check In</>
+            ? <><LogOutIcon className="w-3 h-3" /> Check Out</>
+            : shelter.status === 'full'
+            ? 'Shelter Full'
+            : <><LogIn className="w-3 h-3" /> Check In</>
           }
         </button>
       )}
@@ -139,27 +142,31 @@ const PlaceCard = ({ place, isHighlit, onClick }) => (
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-sm font-semibold text-zinc-100 leading-tight">{place.name}</h3>
-          <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border text-green-400 bg-green-500/10 border-green-500/30">
-            Google
+          <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border text-blue-400 bg-blue-500/10 border-blue-500/30">
+            OSM
           </span>
         </div>
         <p className="text-xs text-zinc-500 mt-0.5 flex items-center gap-1">
-          <MapPin className="w-3 h-3 shrink-0" /> {place.vicinity || place.formatted_address}
+          <MapPin className="w-3 h-3 shrink-0" /> {place.vicinity || place.formatted_address || 'Location data from OpenStreetMap'}
         </p>
-        {place.rating && (
-          <p className="text-xs text-yellow-400 mt-1">⭐ {place.rating} ({place.user_ratings_total || 0} reviews)</p>
+        {place.distanceKm !== undefined && (
+          <p className="text-xs text-blue-400 mt-1">📍 {place.distanceKm} km away</p>
         )}
         <div className="flex gap-1 mt-2 flex-wrap">
           {place.types?.slice(0, 3).map(t => (
             <span key={t} className="text-[10px] text-zinc-500 bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded-md">
-              {t.replace('_', ' ')}
+              {t.replace(/_/g, ' ')}
             </span>
           ))}
         </div>
-        {place.opening_hours?.open_now !== undefined && (
-          <p className={`text-xs mt-1.5 font-semibold ${place.opening_hours.open_now ? 'text-green-400' : 'text-red-400'}`}>
-            {place.opening_hours.open_now ? '✓ Open now' : '✗ Closed'}
-          </p>
+        {place.phone && (
+          <a
+            href={`tel:${place.phone}`}
+            onClick={e => e.stopPropagation()}
+            className="mt-2 flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition"
+          >
+            📞 {place.phone}
+          </a>
         )}
       </div>
     </div>
@@ -174,8 +181,9 @@ const Shelters = () => {
   // DB shelters state
   const [shelters,             setShelters]             = useState([]);
   const [myCheckedInShelterId, setMyCheckedInShelterId] = useState(null);
-  const [checkInLoading,       setCheckInLoading]       = useState(null); // shelterId or null
-  const [checkInMsg,           setCheckInMsg]           = useState(null); // { type, text }
+  const [checkInLoading,       setCheckInLoading]       = useState(null);
+  const [checkInMsg,           setCheckInMsg]           = useState(null);
+  const [confirmCheckOut,      setConfirmCheckOut]      = useState(null); // shelterId awaiting confirm
   const [loading,              setLoading]              = useState(true);
   const [error,                setError]                = useState(null);
   const [highlighted,          setHighlighted]          = useState(null);
@@ -191,12 +199,12 @@ const Shelters = () => {
   const [showFilters,          setShowFilters]          = useState(false);
   const [refreshTrigger,       setRefreshTrigger]       = useState(0);
 
-  // Google Places state
-  const [tab,            setTab]            = useState('registered'); // 'registered' | 'nearby'
-  const [places,         setPlaces]         = useState([]);
-  const [placesLoading,  setPlacesLoading]  = useState(false);
-  const [placesError,    setPlacesError]    = useState(null);
-  const [placeType,      setPlaceType]      = useState('hospital');
+  // OSM Places state
+  const [tab,           setTab]           = useState('registered');
+  const [places,        setPlaces]        = useState([]);
+  const [placesLoading, setPlacesLoading] = useState(false);
+  const [placesError,   setPlacesError]   = useState(null);
+  const [placeType,     setPlaceType]     = useState('hospital');
 
   const cardRefs = useRef({});
 
@@ -314,16 +322,23 @@ const Shelters = () => {
       setShelters(prev => prev.map(s =>
         s._id === shelterId ? { ...s, currentOccupancy: data.shelter.currentOccupancy, status: data.shelter.status } : s
       ));
-      setCheckInMsg({ type: 'success', text: data.message });
+      setCheckInMsg({ type: 'success', text: data.message || 'Checked in successfully!' });
     } catch (err) {
       setCheckInMsg({ type: 'error', text: err.response?.data?.message || 'Failed to check in' });
     } finally {
       setCheckInLoading(null);
-      setTimeout(() => setCheckInMsg(null), 4000);
+      setTimeout(() => setCheckInMsg(null), 5000);
     }
   };
 
   const handleCheckOut = async (shelterId) => {
+    // Require confirmation first
+    if (confirmCheckOut !== shelterId) {
+      setConfirmCheckOut(shelterId);
+      setTimeout(() => setConfirmCheckOut(null), 5000); // auto-cancel after 5s
+      return;
+    }
+    setConfirmCheckOut(null);
     setCheckInLoading(shelterId);
     setCheckInMsg(null);
     try {
@@ -332,12 +347,12 @@ const Shelters = () => {
       setShelters(prev => prev.map(s =>
         s._id === shelterId ? { ...s, currentOccupancy: data.shelter.currentOccupancy, status: data.shelter.status } : s
       ));
-      setCheckInMsg({ type: 'success', text: data.message });
+      setCheckInMsg({ type: 'success', text: data.message || 'Checked out successfully.' });
     } catch (err) {
       setCheckInMsg({ type: 'error', text: err.response?.data?.message || 'Failed to check out' });
     } finally {
       setCheckInLoading(null);
-      setTimeout(() => setCheckInMsg(null), 4000);
+      setTimeout(() => setCheckInMsg(null), 5000);
     }
   };
 
@@ -480,9 +495,9 @@ const Shelters = () => {
           </button>
           <button
             onClick={() => { setTab('nearby'); if (userLocation) fetchPlaces(userLocation); else handleLocate(); }}
-            className={`flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition ${tab === 'nearby' ? 'text-green-400 border-b-2 border-green-500' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition ${tab === 'nearby' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-zinc-500 hover:text-zinc-300'}`}
           >
-            🗺️ Google Places {places.length > 0 && `(${places.length})`}
+            🗺️ OSM Places {places.length > 0 && `(${places.length})`}
           </button>
         </div>
 
@@ -530,6 +545,7 @@ const Shelters = () => {
                     onCheckIn={() => handleCheckIn(shelter._id)}
                     onCheckOut={() => handleCheckOut(shelter._id)}
                     checkInLoading={checkInLoading === shelter._id}
+                    confirmCheckOut={confirmCheckOut === shelter._id}
                   />
                 </div>
               ))
@@ -552,7 +568,7 @@ const Shelters = () => {
                 <div className="text-center py-12 text-zinc-500">
                   <MapPin className="w-8 h-8 mx-auto mb-3 opacity-30" />
                   <p className="text-sm font-medium">Location required</p>
-                  <p className="text-xs mt-1">Click "Find Near Me" to search Google Places</p>
+                  <p className="text-xs mt-1">Click "Find Near Me" to search nearby places on OpenStreetMap</p>
                 </div>
               ) : placesLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (

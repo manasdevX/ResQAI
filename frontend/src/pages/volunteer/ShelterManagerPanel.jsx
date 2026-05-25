@@ -107,9 +107,10 @@ const ShelterManagerPanel = () => {
 
   // ── Real-time occupancy / status updates ───────────────────────────────────
   useEffect(() => {
-    if (!socket || !shelter) return;
+    if (!socket || !shelter?._id) return;
+    const shelterId = shelter._id.toString();
     const handler = (payload) => {
-      if (payload.shelterId?.toString() !== shelter._id?.toString()) return;
+      if (payload.shelterId?.toString() !== shelterId) return;
       setShelter(prev => ({
         ...prev,
         currentOccupancy: payload.currentOccupancy ?? prev.currentOccupancy,
@@ -122,7 +123,8 @@ const ShelterManagerPanel = () => {
       socket.off('shelterUpdated',          handler);
       socket.off('shelterOccupancyUpdated', handler);
     };
-  }, [socket, shelter]);
+  }, [socket, shelter?._id]);
+
 
   const showSuccess = (msg) => {
     setSuccess(msg);

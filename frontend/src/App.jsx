@@ -98,11 +98,15 @@ function App() {
                 <Route path="/shelters"           element={<Shelters />} />
                 <Route path="/resources"          element={<CitizenResources />} />
                 <Route path="/my-reports"         element={<CitizenMyReports />} />
-                <Route path="/incidents/:id"      element={<IncidentDetail />} />
                 <Route path="/notifications"      element={<Notifications />} />
                 <Route path="/chat"               element={<Chat />} />
                 <Route path="/profile"            element={<Profile />} />
               </Route>
+            </Route>
+
+            {/* ── Shared incident detail — all authenticated roles ─────────────── */}
+            <Route element={<ProtectedRoute allowedRoles={['citizen', 'responder', 'shelter_manager', 'admin']} />}>
+              <Route path="/incidents/:id" element={<IncidentDetail />} />
             </Route>
 
             {/* ── 404 ─────────────────────────────────────────────────────────── */}

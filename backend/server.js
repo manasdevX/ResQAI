@@ -91,18 +91,33 @@ app.use('/api/invites',    inviteRoutes);
 app.use('/api/analytics',     analyticsRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-// Verify JWT on every socket connection
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
   if (!token) return next(new Error('Authentication required'));
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     socket.userId = decoded.userId;
+    socket.userRole = decoded.role || 'citizen';
     next();
   } catch {
     next(new Error('Invalid or expired token'));
   }
 });
+
+io.on('connection', (socket) => {
+  // Join personal room so io.to(`user:${id}`) works for targeted notifications
+  socket.join(`user:${socket.userId}`);
+
+  // Join role room for role-wide broadcasts
+  if (socket.userRole) {
+    socket.join(`role:${socket.userRole}`);
+  }
+
+  socket.on('disconnect', () => {
+    socket.leave(`user:${socket.userId}`);
+  });
+});
+
 
 setupChatSocket(io);
 

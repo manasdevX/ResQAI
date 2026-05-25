@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle } from '@react-google-maps/api';
+import { MapPin, AlertTriangle } from 'lucide-react';
 
 const containerStyle = { width: '100%', height: '100%' };
 const defaultCenter  = { lat: 20.5937, lng: 78.9629 };
@@ -9,29 +10,42 @@ import { SHELTER_TYPE_META, SHELTER_STATUS_HEX } from '../constants/shelter';
 
 const PULSE_RADII = [3000, 6000, 9000];
 
-// ── Map dark style ─────────────────────────────────────────────────────────────
-const darkMapStyles = [
-  { elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a2e' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
-  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
-  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#263c3f' }] },
-  { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#6b9a76' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#16213e' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#0f3460' }] },
-  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9ca5b3' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#0f3460' }] },
-  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#1a1a2e' }] },
-  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#f3d19c' }] },
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#16213e' }] },
-  { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e2954' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#515c6d' }] },
-  { featureType: 'water', elementType: 'labels.text.stroke', stylers: [{ color: '#17263c' }] },
-];
+// Safe Google Maps symbol accessor — returns null before API loads
+const gmSymbol = (name) => {
+  try { return window.google?.maps?.SymbolPath?.[name] ?? null; }
+  catch { return null; }
+};
 
-// ── Component ──────────────────────────────────────────────────────────────────
+// Shown when the Maps API key is missing / quota exceeded
+const MapLoadError = ({ incidents = [] }) => (
+  <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900 gap-4 p-6">
+    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
+      <AlertTriangle className="w-6 h-6 text-amber-400" />
+    </div>
+    <div className="text-center">
+      <p className="text-sm font-bold text-zinc-200">Map unavailable</p>
+      <p className="text-xs text-zinc-500 mt-1">Google Maps could not load. Check your API key in frontend/.env</p>
+    </div>
+    {incidents.length > 0 && (
+      <div className="w-full max-w-sm space-y-2 mt-2">
+        <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Recent Incidents ({incidents.length})</p>
+        {incidents.slice(0, 5).map(inc => (
+          <div key={inc._id} className="flex items-center gap-2 p-2.5 bg-zinc-800 border border-zinc-700 rounded-xl">
+            <span className="text-base">{TYPE_ICONS[inc.type] || '📍'}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-zinc-200 truncate">{inc.title}</p>
+              <p className="text-[10px] text-zinc-500">{inc.type} · {inc.severity}</p>
+            </div>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+              style={{ backgroundColor: (SEVERITY_HEX[inc.severity] || '#94a3b8') + '22', color: SEVERITY_HEX[inc.severity] || '#94a3b8' }}>
+              {inc.severity?.toUpperCase()}
+            </span>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+);
 
 const LiveMap = ({
   incidents       = [],
@@ -44,9 +58,10 @@ const LiveMap = ({
   const [selectedShelter,  setSelectedShelter]  = useState(null);
   const [pulsingId,   setPulsingId]   = useState(null);
   const [pulseOpacity, setPulseOpacity] = useState(0.6);
+  const [mapError,    setMapError]    = useState(false);
   const mapRef = useRef(null);
 
-  const { isLoaded } = useJsApiLoader({
+  const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
   });
@@ -81,12 +96,16 @@ const LiveMap = ({
     setSelectedShelter(shelter);
   }, [highlightShelterId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (loadError || mapError) {
+    return <MapLoadError incidents={incidents} />;
+  }
+
   if (!isLoaded) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-400">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm">Loading map...</span>
+          <MapPin className="w-8 h-8 text-zinc-700 animate-bounce" />
+          <span className="text-sm">Loading map…</span>
         </div>
       </div>
     );
@@ -115,6 +134,8 @@ const LiveMap = ({
         const isNew   = incident._id === pulsingId;
         const color   = SEVERITY_HEX[incident.severity] || '#94a3b8';
         const isSel   = selectedIncident?._id === incident._id;
+        const circSym = gmSymbol('CIRCLE');
+        if (!circSym) return null;
 
         return (
           <div key={incident._id}>
@@ -140,7 +161,7 @@ const LiveMap = ({
               onClick={() => { setSelectedIncident(incident); setSelectedShelter(null); }}
               zIndex={isNew ? 999 : isSel ? 100 : 1}
               icon={{
-                path:        window.google.maps.SymbolPath.CIRCLE,
+                path:        circSym,
                 scale:       isNew ? (incident.severity === 'critical' ? 18 : 14) : (incident.severity === 'critical' ? 14 : incident.severity === 'high' ? 11 : 9),
                 fillColor:   color,
                 fillOpacity: 0.95,
@@ -197,7 +218,8 @@ const LiveMap = ({
         const colors    = SHELTER_STATUS_HEX[shelter.status] || SHELTER_STATUS_HEX.active;
         const isHighlit = shelter._id === highlightShelterId;
         const isSel     = selectedShelter?._id === shelter._id;
-        const pct       = shelter.occupancyPercent ?? Math.round(((shelter.currentOccupancy || 0) / (shelter.totalCapacity || 1)) * 100);
+        const arrowSym  = gmSymbol('BACKWARD_CLOSED_ARROW');
+        if (!arrowSym) return null;
 
         return (
           <Marker
@@ -207,7 +229,7 @@ const LiveMap = ({
             onClick={() => { setSelectedShelter(shelter); setSelectedIncident(null); }}
             zIndex={isHighlit ? 500 : isSel ? 200 : 50}
             icon={{
-              path:        window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+              path:        arrowSym,
               scale:       isHighlit ? 10 : isSel ? 8 : 6,
               fillColor:   colors.fill,
               fillOpacity: 0.92,

@@ -255,10 +255,17 @@ const IncidentReportForm = ({ onSuccess }) => {
     setStep2Error('');
     setSubmitError('');
 
-    if (!lat || !lng) {
+    if (lat === null || lng === null || lat === undefined || lng === undefined) {
       setStep2Error('Please set the incident location on the map or use GPS.');
       return;
     }
+
+    // Reject the "null island" default — exact [0,0] means GPS failed silently
+    if (lat === 0 && lng === 0) {
+      setStep2Error('Invalid location detected. Please enable GPS or click on the map to set the correct location.');
+      return;
+    }
+
 
     setSubmitting(true);
     setProgress(0);

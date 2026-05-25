@@ -48,11 +48,11 @@ router.get('/', protect, getAllIncidents);
 // Get nearby active incidents
 router.get('/nearby', protect, getNearbyIncidents);
 
+// Broadcast emergency alert — MUST be before /:id to avoid param collision
+router.post('/broadcast-alert', protect, authorize('admin', 'responder'), broadcastAlert);
+
 // Get a single incident by ID — must be before all /:id/sub-path routes
 router.get('/:id', protect, getIncidentById);
-
-// Broadcast emergency alert (Admin/Responder only)
-router.post('/broadcast-alert', protect, authorize('admin', 'responder'), broadcastAlert);
 
 // Update status of a specific incident (Admin/Responder only)
 router.patch('/:id/status', protect, authorize('admin', 'responder'), updateIncidentStatus);

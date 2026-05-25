@@ -179,9 +179,11 @@ export const createShelter = async (req, res) => {
  */
 export const updateOccupancy = async (req, res) => {
   try {
-    const { delta } = req.body; // +1 check-in, -1 check-out, any integer
-    if (typeof delta !== 'number') {
-      return res.status(400).json({ success: false, message: '"delta" must be a number (e.g. 1 or -1)' });
+    // Accept either an absolute value (currentOccupancy) or a delta (+/-N)
+    const { delta, currentOccupancy: absoluteOcc } = req.body;
+
+    if (absoluteOcc === undefined && typeof delta !== 'number') {
+      return res.status(400).json({ success: false, message: 'Provide either "currentOccupancy" (absolute) or "delta" (±N)' });
     }
 
     const shelter = await Shelter.findById(req.params.id);
@@ -195,15 +197,24 @@ export const updateOccupancy = async (req, res) => {
       return res.status(403).json({ success: false, message: 'You can only manage your own shelter' });
     }
 
-    const newOccupancy = shelter.currentOccupancy + delta;
+    const newOccupancy = absoluteOcc !== undefined
+      ? Number(absoluteOcc)
+      : shelter.currentOccupancy + delta;
+
     if (newOccupancy < 0) {
       return res.status(400).json({ success: false, message: 'Occupancy cannot go below 0' });
     }
     if (newOccupancy > shelter.totalCapacity) {
-      return res.status(400).json({ success: false, message: 'Exceeds total capacity' });
+      return res.status(400).json({ success: false, message: `Exceeds total capacity (${shelter.totalCapacity})` });
     }
 
     shelter.currentOccupancy = newOccupancy;
+    // Auto-update status based on occupancy
+    if (newOccupancy >= shelter.totalCapacity && shelter.status === 'active') {
+      shelter.status = 'full';
+    } else if (newOccupancy < shelter.totalCapacity && shelter.status === 'full') {
+      shelter.status = 'active';
+    }
     const updated = await shelter.save();
 
     io.emit('shelterUpdated', { shelterId: updated._id, currentOccupancy: updated.currentOccupancy, status: updated.status });
@@ -214,6 +225,7 @@ export const updateOccupancy = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to update occupancy' });
   }
 };
+
 
 /**
  * @desc  Update shelter status
@@ -542,3 +554,47 @@ export const getMyShelter = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to fetch your shelter' });
   }
 };
+
+/**
+ * @desc  Assign (or unassign) a shelter_manager to a shelter
+ * @route PATCH /api/shelters/:id/assign-manager
+ * @access Private (admin only)
+ */
+export const assignShelterManager = async (req, res) => {
+  try {
+    const { managerId } = req.body; // null to unassign
+
+    const shelter = await Shelter.findById(req.params.id);
+    if (!shelter) return res.status(404).json({ success: false, message: 'Shelter not found' });
+
+    if (managerId) {
+      // Validate the user exists and has the right role
+      const manager = await import('../models/User.js').then(m => m.default.findById(managerId).select('name email role'));
+      if (!manager) return res.status(404).json({ success: false, message: 'User not found' });
+      if (manager.role !== 'shelter_manager') {
+        return res.status(400).json({ success: false, message: 'User must have the shelter_manager role' });
+      }
+
+      // Remove this manager from any other shelter they were previously managing
+      await Shelter.updateMany(
+        { managedBy: managerId, _id: { $ne: shelter._id } },
+        { $unset: { managedBy: '' } }
+      );
+
+      shelter.managedBy = managerId;
+    } else {
+      shelter.managedBy = undefined;
+    }
+
+    await shelter.save();
+
+    const updated = await Shelter.findById(shelter._id).populate('managedBy', 'name email phone');
+    io.emit('shelterUpdated', { shelterId: updated._id, managedBy: updated.managedBy });
+
+    return res.json({ success: true, message: managerId ? 'Manager assigned' : 'Manager unassigned', shelter: updated });
+  } catch (error) {
+    console.error('[assignShelterManager]', error);
+    return res.status(500).json({ success: false, message: 'Failed to assign manager' });
+  }
+};
+

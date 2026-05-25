@@ -163,26 +163,24 @@ const VolunteerAssignments = () => {
   const [updatingId,   setUpdatingId]   = useState(null);
   const [expandedId,   setExpandedId]   = useState(null);
   const [showNoteId,   setShowNoteId]   = useState(null);
-  const [resolveTarget, setResolveTarget] = useState(null); // incident to confirm resolve
+  const [resolveTarget, setResolveTarget] = useState(null);
   const [resolving,    setResolving]    = useState(false);
-  const [justResolved, setJustResolved] = useState(null);  // id of freshly resolved incident
+  const [justResolved, setJustResolved] = useState(null);
+  const [showAll,      setShowAll]      = useState(false); // #5 — active/all toggle
 
-  /* fetch */
+  /* fetch — uses server-side assignedTo=me filter (#2) */
   const fetchAssignments = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.get('/incidents?limit=200');
-      const mine = (data.incidents || []).filter(inc =>
-        inc.assignedResponders?.some(r => (r?._id?.toString() || r?.toString()) === user?._id?.toString())
-      );
-      setIncidents(mine);
+      const { data } = await api.get('/incidents?assignedTo=me&limit=200');
+      setIncidents(data.incidents || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load assignments');
     } finally {
       setLoading(false);
     }
-  }, [api, user]);
+  }, [api]);
 
   useEffect(() => { fetchAssignments(); }, [fetchAssignments]);
 
@@ -196,9 +194,19 @@ const VolunteerAssignments = () => {
           : inc
       ));
     };
+    const onNew = (incident) => {
+      // New incident assigned to this responder via direct assignment
+      if (incident.assignedResponders?.some(r => (r?._id?.toString() || r?.toString()) === user?._id?.toString())) {
+        setIncidents(prev => [incident, ...prev]);
+      }
+    };
     socket.on('incidentUpdated', onUpdated);
-    return () => socket.off('incidentUpdated', onUpdated);
-  }, [socket]);
+    socket.on('newIncidentAssigned', onNew);
+    return () => {
+      socket.off('incidentUpdated', onUpdated);
+      socket.off('newIncidentAssigned', onNew);
+    };
+  }, [socket, user]);
 
   /* mark responding */
   const handleMarkResponding = async (incidentId) => {
@@ -235,7 +243,8 @@ const VolunteerAssignments = () => {
   };
 
   const activeCount   = incidents.filter(i => !['resolved', 'closed'].includes(i.status)).length;
-  const resolvedCount = incidents.filter(i => i.status === 'resolved').length;
+  const resolvedCount = incidents.filter(i => ['resolved', 'closed'].includes(i.status)).length;
+  const displayed     = showAll ? incidents : incidents.filter(i => !['resolved', 'closed'].includes(i.status));
 
   return (
     <>
@@ -255,7 +264,7 @@ const VolunteerAssignments = () => {
           <div>
             <h1 className="text-lg font-black text-zinc-100">My Assignments</h1>
             <p className="text-xs text-zinc-500 mt-0.5">
-              {activeCount} active · {resolvedCount} resolved
+              {activeCount} active &middot; {resolvedCount} resolved
             </p>
           </div>
           <button
@@ -265,6 +274,26 @@ const VolunteerAssignments = () => {
           >
             <RefreshCw className={`w-4 h-4 text-zinc-400 ${loading ? 'animate-spin' : ''}`} />
           </button>
+        </div>
+
+        {/* Active / All toggle */}
+        <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
+          {[
+            { label: `Active  (${activeCount})`,  value: false },
+            { label: `All  (${incidents.length})`, value: true  },
+          ].map(({ label, value }) => (
+            <button
+              key={String(value)}
+              onClick={() => setShowAll(value)}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${
+                showAll === value
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {error && (
@@ -283,17 +312,21 @@ const VolunteerAssignments = () => {
               </div>
             ))}
           </div>
-        ) : incidents.length === 0 ? (
+        ) : displayed.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-zinc-500">
             <ClipboardList className="w-12 h-12 mb-4 opacity-20" />
-            <p className="text-base font-semibold text-zinc-400">No assignments yet</p>
+            <p className="text-base font-semibold text-zinc-400">
+              {showAll ? 'No assignments yet' : 'No active assignments'}
+            </p>
             <p className="text-sm mt-1 text-center max-w-xs">
-              Accept incidents from Nearby Incidents to see them here.
+              {showAll
+                ? 'Accept incidents from Nearby Incidents to see them here.'
+                : 'All caught up! Switch to "All" to see resolved incidents.'}
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {incidents.map(inc => {
+            {displayed.map(inc => {
               const statusStyle  = INCIDENT_STATUS[inc.status] || INCIDENT_STATUS.reported;
               const isActive     = !['resolved', 'closed'].includes(inc.status);
               const isExpanded   = expandedId === inc._id;
