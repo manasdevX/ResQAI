@@ -4,8 +4,6 @@
 
 **Real-time disaster response — from citizen SOS to command centre resolution.**
 
-ResQAI is an open-source, full-stack emergency management platform that connects citizens in crisis, field responders, shelter operators, and administrators through a single real-time interface backed by AI-powered triage.
-
 [![Node.js](https://img.shields.io/badge/Node.js-v18%2B-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248?style=flat-square&logo=mongodb&logoColor=white)](https://mongoosejs.com)
@@ -17,18 +15,13 @@ ResQAI is an open-source, full-stack emergency management platform that connects
 
 ---
 
-## What is ResQAI?
+## What is this?
 
-When a disaster strikes, coordination breaks down fast. Citizens don't know who to call. Responders don't know where to go. Shelter operators don't know how full they are. Admins can't see anything in real time.
+When a disaster happens — flood, fire, earthquake — three groups of people need to act fast and in sync, but they almost never do. Citizens don't know who to call. Responders don't know where to go first. Admins are refreshing spreadsheets trying to understand what's happening.
 
-ResQAI solves this by giving every stakeholder a role-specific interface that shares a single live data layer:
+ResQAI is an attempt to fix that. It's a full-stack emergency management platform with a shared real-time data layer: citizens report, responders get dispatched, shelter managers track occupancy, and admins watch everything on a live map — all without anyone hitting refresh.
 
-- A **citizen** triggers an SOS, reports an incident with photos, checks into a shelter, and requests food or water — all from their phone.
-- A **responder** receives a skill-matched dispatch notification, accepts the task, fulfils resource requests in the field, and chats with the team.
-- A **shelter manager** tracks occupancy live, updates status, and manages their assigned facility.
-- An **admin** watches a live map of every active incident, broadcasts evacuation orders, reassigns responders, reads AI triage summaries, and monitors analytics — without refreshing a page.
-
-Everything is connected through WebSockets. Every status change, SOS alert, check-in, and message propagates to every relevant party within milliseconds.
+The project is a MERN stack app (MongoDB, Express, React, Node.js) with Socket.IO for real-time events, Google Gemini for AI triage, Cloudinary for media, and Leaflet for geospatial mapping.
 
 ---
 
@@ -55,7 +48,6 @@ Everything is connected through WebSockets. Every status change, SOS alert, chec
 - [Environment Variables](#environment-variables)
 - [API Overview](#api-overview)
 - [Security](#security)
-- [Contributing](#contributing)
 
 ---
 
@@ -69,69 +61,67 @@ Everything is connected through WebSockets. Every status change, SOS alert, chec
 │  │  Citizen  │  │  Responder   │  │ Shelter  │  │   Admin   │  │
 │  │   /home   │  │  /volunteer  │  │ Manager  │  │  /admin   │  │
 │  └────┬─────┘  └──────┬───────┘  └────┬─────┘  └─────┬─────┘  │
-│       │               │               │               │         │
 │       └───────────────┴───────────────┴───────────────┘         │
 │                               │                                 │
 │              ┌────────────────┼──────────────────┐              │
 │              │   AuthContext  │  SocketContext    │              │
-│              │   (Axios+JWT)  │  (Socket.io-cli)  │              │
+│              │   (Axios+JWT)  │  (socket.io-cli)  │              │
 │              └────────────────┼──────────────────┘              │
 └───────────────────────────────┼─────────────────────────────────┘
                                 │ HTTP REST + WebSocket
 ┌───────────────────────────────┼─────────────────────────────────┐
 │                  SERVER (Node.js + Express 5)                   │
-│                               │                                 │
+│                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │  REST API Layer                                          │   │
-│  │  /api/auth  /api/incidents  /api/shelters  /api/chat     │   │
-│  │  /api/users  /api/resources  /api/analytics  /api/...   │   │
-│  └───────────────────────────────┬──────────────────────────┘   │
-│                                  │                              │
-│  ┌───────────────┐   ┌───────────┴───────────┐                 │
-│  │  Gemini AI    │   │    Socket.IO Server    │                 │
-│  │  (triage)     │   │  (events, rooms, auth) │                 │
-│  └───────────────┘   └───────────┬────────────┘                │
-│                                  │                              │
-│  ┌───────────────┐   ┌───────────┴────────────┐                │
+│  │  REST API — /api/auth  /api/incidents  /api/shelters     │   │
+│  │             /api/chat  /api/users  /api/analytics  ...   │   │
+│  └───────────────────────────┬──────────────────────────────┘   │
+│                              │                                  │
+│  ┌───────────────┐   ┌───────┴────────────────┐                │
+│  │  Gemini AI    │   │    Socket.IO Server     │                │
+│  │  (triage)     │   │  (rooms, events, auth)  │                │
+│  └───────────────┘   └───────┬────────────────┘                │
+│                              │                                  │
+│  ┌───────────────┐   ┌───────┴────────────────┐                │
 │  │  Cloudinary   │   │       MongoDB           │                │
 │  │  (media)      │   │  (geospatial + docs)    │                │
 │  └───────────────┘   └────────────────────────┘                │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Key design decisions:**
+A few things worth knowing about how this is structured:
 
-- **Role rooms** — every connected socket automatically joins `user:<id>` (personal) and `role:<role>` (broadcast) rooms. Targeted events never reach the wrong audience.
-- **Geospatial-first** — incidents, shelters, and resource requests all store `GeoJSON Point` locations with `2dsphere` indexes, enabling `$near` queries for distance-aware filtering.
-- **AI as a non-blocking enrichment** — Gemini triage runs asynchronously after an incident is saved. A timeout and fallback guarantee the incident is always created, even when the AI service is unavailable.
+- Every connected socket joins two rooms automatically — `user:<id>` for personal events and `role:<role>` for broadcast events. This keeps targeted messages like SOS acknowledgements from leaking to the wrong person.
+- Incidents, shelters, and resource requests all store `GeoJSON Point` coordinates with `2dsphere` indexes. Distance-based queries use `$near` — no external mapping API needed for that.
+- Gemini triage is intentionally non-blocking. It runs after the incident is saved, with a 15-second timeout and a safe fallback. The incident is always created regardless of whether the AI responds.
 
 ---
 
 ## Core Flow
 
-Understanding how the system flows end-to-end:
+The main thing the system does — from incident report to resolution:
 
 ```
-Citizen reports incident
+Citizen reports an incident
         │
         ▼
-POST /api/report  ──► Validate + Duplicate check (500m / 30min)
+POST /api/report  ─► Validate + duplicate check (500m / 30 min)
         │
-        ├──► Save Incident to MongoDB
+        ├──► Save to MongoDB
         │
-        ├──► Gemini AI Triage (async, 15s timeout)
-        │         └── sets severity, risk score, summary, recommended actions
+        ├──► Gemini triage (async, 15s timeout)
+        │         └── severity, risk score, summary, recommended actions
         │
-        ├──► io.emit('newIncident')  ──► All admin dashboards update live
+        ├──► io.emit('newIncident')  ──► Admin dashboards update live
         │
-        └──► Smart Dispatch (setImmediate)
+        └──► Smart dispatch (setImmediate, non-blocking)
                   │
-                  ├── Query skill-matched responders (e.g. fire → firefighters)
-                  ├── Fallback to all available responders if no skill match
-                  └── io.to(`user:${id}`).emit('newIncidentAssigned') per responder
+                  ├── Find skill-matched available responders
+                  ├── Fall back to all available if no match
+                  └── io.to(`user:${id}`).emit('newIncidentAssigned')
                               │
                               ▼
-                  Responder sees dispatch alert on dashboard
+                  Responder sees dispatch on their dashboard
                               │
                               ▼
                   POST /api/incidents/:id/accept
@@ -143,10 +133,10 @@ POST /api/report  ──► Validate + Duplicate check (500m / 30min)
 
                   ── 15 minutes pass with no acceptance ──►
 
-                  Auto-escalation timer fires
+                  Auto-escalation fires
                               │
-                              └── io.to(`role:admin`).emit('incidentEscalated')
-                                        └── Admin dashboard shows escalation banner
+                              └── io.to('role:admin').emit('incidentEscalated')
+                                        └── Escalation banner on admin dashboard
 ```
 
 ---
@@ -155,219 +145,161 @@ POST /api/report  ──► Validate + Duplicate check (500m / 30min)
 
 ### Authentication & Onboarding
 
-ResQAI uses a two-step email verification flow for all new accounts.
+Signup uses a two-step email verification flow. The user submits their details, gets a 6-digit OTP by email (hashed with bcrypt before storing), and enters it on a verification screen. The OTP expires in 10 minutes, locks after 5 wrong attempts, and can be resent after 60 seconds. On success a JWT is issued.
 
-**Signup flow:**
-1. User submits name, email, password, and role (`citizen` or `responder`). If an invite token is present in the URL, the role is overridden by the invite.
-2. A 6-digit OTP is hashed with bcrypt and stored. The raw OTP is emailed via Nodemailer.
-3. The user enters the OTP on a verification screen. After 5 wrong attempts, the code is locked. A new code can be requested after 60 seconds.
-4. On success, the account is marked verified and a JWT is issued.
+If someone has an invite link (generated by an admin), the role is taken from the invite rather than what the user picked — that's how responder and shelter manager accounts are created.
 
-**Invite-based onboarding:**
-- Admins generate time-limited invite links (48-hour expiry) for `admin` and `shelter_manager` roles from the Invites panel.
-- The link encodes a one-use token. When a new user signs up via that URL, the token is validated and the correct role is automatically assigned.
-- Used tokens are stamped with `usedAt` and `usedBy` and cannot be reused.
+Google OAuth is also supported. If the email already exists the account gets linked; if not, a new account is created with the email pre-verified.
 
-**Additional auth:**
-- **Google OAuth** — One-tap sign-in. If the email already exists, the account is linked; if not, a new account is created with the email pre-verified.
-- **Forgot / Reset Password** — A raw 32-byte token is emailed. Only its SHA-256 hash is stored in the database. The link expires in 1 hour.
-- **Session restore** — On app load, the stored JWT is validated against `GET /api/auth/me`. Invalid or expired tokens trigger a clean logout.
+Password resets use a 32-byte random token sent in the email link. Only its SHA-256 hash is stored in the database — the plain token is never persisted anywhere.
 
 ---
 
 ### Incident Reporting & AI Triage
 
-Citizens and responders can report any of the following incident types: `fire`, `flood`, `earthquake`, `cyclone`, `landslide`, `accident`, `medical_emergency`, `building_collapse`, `chemical_spill`, `riot`, `other`.
+Incidents can be reported through two endpoints. `/api/report` accepts `multipart/form-data` with up to 5 files (images, video, audio, documents — 10 MB each, uploaded to Cloudinary). `/api/incidents` accepts JSON if no media is needed.
 
-**Report form (`POST /api/report`):**
-- Accepts `multipart/form-data` — up to 5 files (images, video, audio, documents), 10 MB each, uploaded to Cloudinary.
-- Also accepts `POST /api/incidents` as a JSON-only variant.
-- Location is sent as a GeoJSON `Point` with optional address fields.
+Supported incident types: `fire`, `flood`, `earthquake`, `cyclone`, `landslide`, `accident`, `medical_emergency`, `building_collapse`, `chemical_spill`, `riot`, `other`.
 
-**AI Triage:**
+Every new incident is sent to Gemini 2.0 Flash with a structured prompt asking for:
 
-Every new incident is passed to Gemini 2.0 Flash with a structured prompt. The model returns:
+| Field | What it is |
+|-------|-----------|
+| `summary` | A 1–2 sentence plain-English summary |
+| `urgency` | `low` / `medium` / `high` / `critical` |
+| `recommendedActions` | Ordered list of response steps |
+| `estimatedAffected` | Best-guess number of people affected |
+| `riskScore` | 0–100 integer |
 
-| Field | Description |
-|-------|-------------|
-| `summary` | 1–2 sentence human-readable summary |
-| `urgency` | `low` \| `medium` \| `high` \| `critical` |
-| `recommendedActions` | Array of step-by-step response actions |
-| `estimatedAffected` | Estimated number of people affected |
-| `riskScore` | Integer 0–100 |
+This gets stored in the `aiTriage` sub-document on the incident and shows up on admin and responder dashboards inline.
 
-The AI output is stored in the `aiTriage` sub-document on the incident and displayed on admin and responder dashboards. If the AI call fails or times out (15 s), a safe fallback is used and the incident is still saved.
+Status lifecycle: `reported` → `acknowledged` → `responding` → `resolved` → `closed`. Every transition is appended to a `statusHistory` array with who changed it and when. The person who reported the incident gets a socket notification when the status moves to `acknowledged`, `responding`, `resolved`, or `closed`.
 
-**Lifecycle statuses:** `reported` → `acknowledged` → `responding` → `resolved` → `closed`  
-Every status transition is appended to a `statusHistory` array with the user who made the change and a timestamp. The original reporter receives a socket notification for key transitions.
-
-**Duplicate detection:**  
-A `$near` query checks if the same user already has an active incident within 500 m, reported in the last 30 minutes. If so, the request is rejected with the ID of the existing incident.
+On creation, the system also checks if the same user already has an open incident within 500m in the last 30 minutes. If yes, the request is rejected and the existing incident ID is returned — avoids duplicate floods during large events.
 
 ---
 
 ### SOS Emergency System
 
-The SOS button is available to every authenticated citizen. It follows a deliberate 4-phase UI flow to prevent accidental triggers:
+Every citizen has a one-tap SOS button. To prevent accidental triggers it goes through four states before anything is sent:
 
 ```
 idle  ──tap──►  confirm  ──"YES, SEND SOS"──►  sending (GPS fetch)  ──►  done / error
 ```
 
-On confirmation:
-1. The browser requests high-accuracy GPS coordinates.
-2. `POST /api/incidents/sos` creates a `critical`-severity incident with `isSOS: true`.
-3. `io.emit('sosAlert')` broadcasts to all connected clients — every admin and volunteer dashboard shows an immediate alert banner.
-4. `io.emit('newIncident')` propagates the incident to the live map.
+On confirmation, the browser requests GPS coordinates, then `POST /api/incidents/sos` creates a critical-severity incident with `isSOS: true`. Two socket events fire: `sosAlert` goes to every connected client (admins and responders see an alert banner), and `newIncident` puts it on the live map.
 
-When a responder accepts the SOS task:
-- `io.to(`user:${reporterId}`).emit('sosAcknowledged')` sends a personal notification back to the citizen with the responder's name, showing them help is on the way.
+When a responder accepts the SOS task, the person who triggered it gets a `sosAcknowledged` event with the responder's name — so they know someone is actually coming.
 
 ---
 
 ### Smart Dispatch & Escalation
 
-**Smart dispatch** runs immediately after every new incident is saved, in a `setImmediate` callback (non-blocking).
+After every new incident is saved, a non-blocking `setImmediate` callback tries to route it to the right people.
 
-The system maintains a skill keyword map for each incident type:
+There's a keyword map per incident type — for example:
 
 ```
 fire              → ['firefighting', 'fire', 'rescue']
-flood             → ['water rescue', 'swimming', 'flood', 'search and rescue']
 medical_emergency → ['medical', 'first aid', 'cpr', 'paramedic', 'nurse', 'doctor']
+flood             → ['water rescue', 'swimming', 'flood', 'search and rescue']
 chemical_spill    → ['hazmat', 'chemical', 'decontamination']
-...
 ```
 
-All available, active responders are fetched. Those whose skill profiles overlap with the incident's keyword list are targeted first. If no skill-matched responders exist, all available responders receive the dispatch.
+Responders whose skill profiles overlap those keywords get targeted first. If nobody qualifies, the dispatch goes to all available responders. Each targeted responder receives a `newIncidentAssigned` socket event with the incident title, severity, type, and AI summary.
 
-Each targeted responder gets a personal socket event `newIncidentAssigned` with the incident summary, severity, type, SOS flag, and AI summary — directly on their dashboard without any polling.
-
-**Auto-escalation** runs on a `setTimeout` 15 minutes after incident creation. If the incident still has zero `assignedResponders` and is not yet resolved, a `incidentEscalated` event is emitted to every socket in the `role:admin` room. The admin dashboard shows a dismissible escalation banner.
+The escalation timer runs on a `setTimeout` set 15 minutes after creation. If the incident still has no `assignedResponders` and isn't resolved, a `incidentEscalated` event fires to every socket in `role:admin`. The admin dashboard shows a dismissible orange banner for each pending escalation.
 
 ---
 
 ### Shelter Management
 
-**Registered shelters** are stored in MongoDB with full GeoJSON coordinates and can be queried by distance using `$near`.
+Shelters live in MongoDB with `GeoJSON Point` coordinates and `2dsphere` indexes. The `/nearby` endpoint uses `$near` to return shelters sorted by distance, with the calculated distance attached to each result.
 
-Shelter types: `hospital`, `relief_camp`, `school`, `community_hall`, `government_building`, `other`  
-Shelter statuses: `active`, `full`, `preparing`, `closed`  
-Tracked amenities: food, water, medical, electricity, wifi, bedding, toilets, childCare, wheelchairAccessible, security
+Supported types: `hospital`, `relief_camp`, `school`, `community_hall`, `government_building`, `other`.  
+Tracked amenities: food, water, medical, electricity, wifi, bedding, toilets, child care, wheelchair access, security.
 
-**Citizen check-in flow:**
-- A citizen can check in to one shelter at a time. A pre-check verifies they are not already registered elsewhere.
-- The actual check-in uses a MongoDB atomic `findOneAndUpdate` with a `$expr: { $lt: ['$currentOccupancy', '$totalCapacity'] }` filter — if two citizens try to fill the last spot simultaneously, only one succeeds.
-- On success, `shelterOccupancyUpdated` is emitted via socket so every connected client's shelter list updates without a reload.
-- If occupancy reaches capacity after a check-in, status automatically flips to `full`.
+Check-in is atomic. The update query includes `$expr: { $lt: ['$currentOccupancy', '$totalCapacity'] }` — so if two people race to fill the last spot, only one gets in. After every check-in or check-out, a `shelterOccupancyUpdated` socket event updates every connected client's shelter list in place. If occupancy hits capacity, status flips to `full` automatically.
 
-**OSM Nearby Places tab:**
-- Uses the free [OpenStreetMap Overpass API](https://overpass-api.de) — no API key required.
-- Fetches real hospitals, clinics, pharmacies, police stations, fire stations, and shelters within the user's chosen radius.
-- Results include name, address, phone, website, opening hours, and Haversine distance, sorted nearest first.
+The **OSM Nearby Places** tab fetches real-world data from the OpenStreetMap Overpass API — no API key, no cost. It returns hospitals, clinics, pharmacies, police stations, and fire stations within the user's radius, sorted by Haversine distance. Useful when registered shelters are sparse.
 
-**Shelter manager role:**
-- A `shelter_manager` account can only view and edit the shelter explicitly assigned to them by an admin.
-- Occupancy and status updates go through an ownership check before being applied.
+Shelter managers can only see and modify the shelter assigned to them by an admin. Every mutation goes through an ownership check.
 
 ---
 
 ### Resource Requests
 
-Citizens can request essential supplies: `food`, `water`, `medical`, `clothing`, `shelter`, `other`.
+Citizens can request `food`, `water`, `medical`, `clothing`, `shelter`, or `other` supplies from their home page. The request stores GPS coordinates and an urgency level.
 
-**Flow:**
-1. Citizen submits a request with type, description, urgency, and GPS location via the Resource Request modal.
-2. `newResourceRequest` is broadcast via socket — responders see it appear on their Resources page in real time.
-3. A responder acknowledges the request (`acknowledged` status), claiming it so others know it is being handled.
-4. The responder fulfils it on delivery, moving it to `fulfilled`.
-
-Responders can also query resource requests by proximity (`GET /api/resources/nearby`) to see what needs handling in their area.
+When a request is created, `newResourceRequest` is broadcast so responders see it appear on their Resources page immediately. A responder acknowledges it to claim it, then marks it fulfilled on delivery. The whole workflow is: `pending` → `acknowledged` → `fulfilled`.
 
 ---
 
 ### Real-Time Chat
 
-Every role has access to direct messaging. Chat is built on Socket.IO with REST fallbacks.
+All four roles can message each other directly. The chat is built on Socket.IO with REST endpoints for history.
 
-**Features:**
-- **Direct messages** between any two users — citizens, responders, shelter managers, and admins can all message each other.
-- **Online presence** — a `chat:onlineUsers` event is broadcast whenever someone connects or disconnects, showing live green/grey status indicators on all user avatars.
-- **Typing indicators** — `chat:typing` events are debounced client-side (2-second idle timeout) and shown to the recipient in real time.
-- **Reply threads** — any message can be replied to; the reply preview is stored as a `replyTo` reference.
-- **Unread counts** — per-conversation unread badge counts are fetched on load and decremented as messages are read.
-- **Soft delete** — deleted messages are marked `isDeleted: true` and their content replaced with `[Message deleted]`. The sender or any admin can delete.
-- **Optimistic UI** — sent messages appear instantly with a temporary ID. When the server echo arrives, the temp message is replaced in-place.
-- **Incident threads** — incidents have their own message rooms (`incident:<id>`). Responders assigned to an incident can post updates in the thread, visible to everyone viewing that incident's detail page.
+- **Presence** — `chat:onlineUsers` fires whenever someone connects or disconnects. Green/grey dots on avatars update for everyone in real time.
+- **Typing indicators** — `chat:typing` is debounced client-side at 2 seconds, so the "is typing…" indicator disappears naturally when someone pauses.
+- **Unread counts** — per-conversation unread badges are fetched on load and cleared when you open that conversation.
+- **Replies** — any message can be replied to. The `replyTo` reference is stored and the original message content is shown as a preview above the reply.
+- **Soft delete** — deleted messages flip to `isDeleted: true` and show "[Message deleted]" in place. Senders can delete their own; admins can delete anyone's.
+- **Optimistic UI** — sent messages appear instantly with a temp ID and get replaced with the real document when the server echo arrives.
+- **Incident threads** — each incident has a thread room (`incident:<id>`). Responders on that incident can post updates visible to anyone viewing the detail page.
 
-All messages are persisted in MongoDB and available as a scrollable history (50 messages per page, paginated).
+All messages are persisted. History loads 50 messages per page.
 
 ---
 
 ### Emergency Broadcast
 
-Admins can push a system-wide alert from the **Alerts** panel.
+From the Admin Alerts panel, any admin can push a system-wide message: `evacuation`, `medical`, `shelter`, or `general`.
 
-Alert types: `evacuation`, `medical`, `shelter`, `general`
-
-`POST /api/incidents/broadcast-alert` emits an `alertBroadcast` event to **all connected sockets** (`io.emit`). Every dashboard — citizen, responder, and admin — shows an animated banner at the top of the screen with the alert type, message, and the admin who sent it. The banner auto-dismisses after 12 seconds or can be closed manually.
+`POST /api/incidents/broadcast-alert` calls `io.emit('alertBroadcast')` — every connected socket gets it. Citizens, responders, and other admins all see an animated banner with the alert type, message text, and the sender's name. It auto-dismisses after 12 seconds or can be closed manually.
 
 ---
 
 ### Notifications
 
-Notifications are generated for specific events and delivered in two ways simultaneously:
+Two things happen simultaneously whenever a notification-worthy event occurs:
 
-1. **Database** — a `Notification` document is created with `recipient`, `type`, `title`, `body`, and `link`.
-2. **Socket** — the same payload is emitted to `user:<id>` so the recipient sees it immediately if they are online.
+1. A `Notification` document is written to MongoDB with `recipient`, `type`, `title`, `body`, and an optional `link`.
+2. The same payload is emitted to `user:<id>` via socket so the recipient sees it instantly if they're online.
 
-Events that trigger notifications:
-- A responder is manually assigned to an incident by an admin
-- An incident's status changes to `acknowledged`, `responding`, `resolved`, or `closed` (notifies the original reporter)
+Events that generate notifications: manual responder assignment by an admin, and status changes on incidents the user reported.
 
-The notification bell in the navigation header shows an unread badge count. Clicking it navigates to the Notifications page where all notifications are listed with mark-one-read and mark-all-read actions.
+The bell icon in the nav shows an unread count. The Notifications page lists everything with mark-one-read and mark-all-read.
 
 ---
 
 ### Analytics
 
-The Analytics dashboard (admin only) is built on a single MongoDB aggregation request using `$facet` for efficiency — one round-trip returns all data.
+The analytics dashboard makes a single request to the server, which runs one aggregation using MongoDB's `$facet` — multiple pipelines in one round-trip.
 
-**Metrics available:**
+What you get:
 
-| Metric | Source |
-|--------|--------|
-| Total, active, resolved, and critical incidents | `$facet` on `Incident` collection |
-| SOS count | `isSOS` flag count |
+| Metric | How it's computed |
+|--------|------------------|
+| Total, active, resolved, critical incident counts | `$facet` on the Incident collection |
+| SOS count | Count where `isSOS: true` |
 | Resolution rate | `resolved / total × 100` |
-| Average resolution time | `statusHistory` — time from `createdAt` to first `resolved` entry |
-| Incidents by severity | `$group` on `severity` |
-| Incidents by type | `$group` on `type`, sorted by count |
-| Incidents by status | `$group` on `status` |
-| 14-day daily incident trend | `$dateToString` grouping, gap-filled with zeros |
-| Total shelters, active shelters | `$group` on `Shelter` |
-| Total capacity and current occupancy | `$sum` of respective fields |
-| Shelter utilization rate | `totalOccupancy / totalCapacity × 100` |
-| Responders registered and on duty | `$group` on `User` where role is `responder` or `shelter_manager` |
+| Avg resolution time | Time from `createdAt` to first `resolved` entry in `statusHistory` |
+| Incidents by severity, type, status | `$group` aggregations |
+| 14-day daily trend | `$dateToString` group, zero-filled for missing days |
+| Shelter utilisation | `totalOccupancy / totalCapacity × 100` across all shelters |
+| Responders on duty | Count where `role = responder` and `isAvailable = true` |
 
-Charts are rendered with pure CSS/SVG — no charting library dependency.
+Charts are pure CSS/SVG — no charting library.
 
 ---
 
 ### User & Role Management
 
-**Admin → User Manager:**
-- Search users by name or email, filter by role.
-- Change a user's role between `citizen`, `responder`, and `shelter_manager`. Admin role is protected and cannot be changed by another admin.
-- Activate or deactivate accounts. Deactivated accounts cannot log in.
+Admins can search users by name or email, filter by role, change roles, and activate or deactivate accounts. Deactivated accounts are blocked at the auth middleware.
 
-**Volunteer availability toggle:**
-- Responders can toggle their duty status (ON DUTY / OFF DUTY) from their dashboard or profile.
-- When toggled, all admin sockets immediately receive a `responderAvailabilityChanged` event and update their displayed "responders on duty" count without a page refresh.
+Responders toggle their duty status (on/off duty) from their dashboard or profile. When they do, all admin sockets receive `responderAvailabilityChanged` and the "responders on duty" counter updates live.
 
-**Skills management:**
-- Responders maintain a personal skills list (e.g., "first aid", "search and rescue", "driving") that drives smart dispatch.
-- Skills can be added and removed from the volunteer dashboard and profile page.
+Skills are managed from the volunteer dashboard or profile page. Adding or removing a skill immediately affects which incidents get dispatched to that person.
 
 ---
 
@@ -386,11 +318,13 @@ Charts are rendered with pure CSS/SVG — no charting library dependency.
 | Create / delete shelters | — | — | — | ✅ |
 | Request resources | ✅ | — | — | — |
 | Acknowledge / fulfil resources | — | ✅ | ✅ | ✅ |
-| Chat (DM) | ✅ | ✅ | ✅ | ✅ |
+| Direct message anyone | ✅ | ✅ | ✅ | ✅ |
 | Broadcast emergency alert | — | — | — | ✅ |
 | Create invite links | — | — | — | ✅ |
 | View analytics | — | — | — | ✅ |
-| Manage users (role, active) | — | — | — | ✅ |
+| Change user roles / active status | — | — | — | ✅ |
+
+> Admins are created via the seed script. All other privileged roles (`responder`, `shelter_manager`) require an invite link generated from the Admin panel.
 
 ---
 
@@ -398,40 +332,35 @@ Charts are rendered with pure CSS/SVG — no charting library dependency.
 
 ### Backend
 
-| Package | Version | Role |
-|---------|---------|------|
-| Node.js | 18+ | Runtime |
-| Express | 5 | HTTP framework |
-| Mongoose | 9 | ODM + geospatial queries |
-| Socket.IO | 4 | WebSocket server |
-| jsonwebtoken | 9 | JWT sign / verify |
-| bcryptjs | 3 | Password and OTP hashing |
-| Nodemailer | 8 | SMTP email (OTP, reset) |
-| Cloudinary SDK | 2 | Media storage |
-| Multer | 2 | Multipart file parsing |
-| @google/generative-ai | 0.24 | Gemini 2.0 Flash triage |
-| Helmet | 8 | Security headers |
-| express-rate-limit | 8 | Abuse protection |
-| express-mongo-sanitize | 2 | NoSQL injection prevention |
+| Package | Role |
+|---------|------|
+| Node.js 18+ / Express 5 | HTTP server and REST API |
+| Mongoose 9 | ODM, schema validation, `2dsphere` geospatial indexes |
+| Socket.IO 4 | Bidirectional real-time events |
+| jsonwebtoken | JWT sign and verify |
+| bcryptjs | Password and OTP hashing (12 salt rounds) |
+| Nodemailer | Transactional email — OTP and password reset |
+| Cloudinary SDK + Multer | Media upload, storage, and retrieval |
+| @google/generative-ai | Gemini 2.0 Flash for incident triage |
+| Helmet | Security headers |
+| express-rate-limit | Brute-force protection |
+| express-mongo-sanitize | NoSQL injection prevention |
 
 ### Frontend
 
-| Package | Version | Role |
-|---------|---------|------|
-| React | 19 | UI framework |
-| Vite | 8 | Build tool and dev server |
-| React Router | 7 | Client-side routing |
-| TailwindCSS | 3 | Utility-first styling |
-| Shadcn UI | — | Accessible component primitives |
-| Leaflet + react-leaflet | 1.9 / 5 | Interactive map |
-| socket.io-client | 4 | WebSocket client |
-| Axios | 1 | HTTP client |
-| Framer Motion | 12 | Animations |
-| Lucide React | — | Icon set |
-| Geist Variable | — | Typeface |
-| Zod | 4 | Schema validation |
-| react-hook-form | 7 | Form state management |
-| @react-oauth/google | 0.13 | Google sign-in button |
+| Package | Role |
+|---------|------|
+| React 19 + Vite 8 | UI framework and dev/build tooling |
+| React Router v7 | Client-side routing, protected layouts |
+| TailwindCSS 3 + Shadcn UI | Styling and accessible component primitives |
+| Leaflet + react-leaflet | Interactive geospatial map |
+| socket.io-client 4 | WebSocket subscription |
+| Axios | HTTP client with JWT interceptor and 401 redirect |
+| Framer Motion | Page and component animations |
+| Lucide React | Icons |
+| Geist Variable | Typeface |
+| Zod + react-hook-form | Form validation |
+| @react-oauth/google | Google sign-in button |
 
 ---
 
@@ -441,72 +370,72 @@ Charts are rendered with pure CSS/SVG — no charting library dependency.
 ResQAI/
 ├── backend/
 │   ├── controllers/
-│   │   ├── authController.js         # Signup/OTP/login/Google/reset
-│   │   ├── incidentController.js     # CRUD, SOS, dispatch, escalation, media
-│   │   ├── shelterController.js      # CRUD, check-in/out, OSM, manager assign
-│   │   ├── chatController.js         # DM, threads, unread, soft delete, socket
-│   │   ├── resourceController.js     # Request, acknowledge, fulfil
-│   │   ├── userController.js         # Profile, skills, availability, admin ops
-│   │   ├── analyticsController.js    # $facet aggregation pipeline
-│   │   ├── inviteController.js       # Create, validate, list, revoke
-│   │   └── notificationController.js # Fetch, mark read
+│   │   ├── authController.js           # Signup, OTP, login, Google, reset
+│   │   ├── incidentController.js       # CRUD, SOS, dispatch, escalation, media
+│   │   ├── shelterController.js        # CRUD, check-in/out, OSM, manager assign
+│   │   ├── chatController.js           # DM, threads, unread, delete, socket events
+│   │   ├── resourceController.js       # Request, acknowledge, fulfil
+│   │   ├── userController.js           # Profile, skills, availability, admin ops
+│   │   ├── analyticsController.js      # $facet aggregation pipeline
+│   │   ├── inviteController.js         # Create, validate, list, revoke
+│   │   └── notificationController.js  # Fetch, mark read
 │   ├── models/
-│   │   ├── User.js                   # 4 roles, bcrypt hook, 2dsphere index
-│   │   ├── Incident.js               # Full enum set, aiTriage, statusHistory
-│   │   ├── Shelter.js                # Amenities map, occupant refs, 2dsphere
-│   │   ├── Message.js                # DM + incident threads, readBy, soft delete
-│   │   ├── ResourceRequest.js        # GeoJSON location, status workflow
-│   │   ├── Notification.js           # Recipient, type, read flag
-│   │   └── Invite.js                 # Token, role, expiry, usedAt
-│   ├── routes/                       # One router per resource
+│   │   ├── User.js                     # 4 roles, bcrypt pre-save, 2dsphere index
+│   │   ├── Incident.js                 # Types, statuses, aiTriage, statusHistory
+│   │   ├── Shelter.js                  # Amenities map, occupant refs, 2dsphere
+│   │   ├── Message.js                  # DM + incident threads, soft delete
+│   │   ├── ResourceRequest.js          # GeoJSON location, status workflow
+│   │   ├── Notification.js             # Recipient, type, read flag
+│   │   └── Invite.js                   # Token, role, expiry, usedAt
+│   ├── routes/                         # One router file per resource
 │   ├── middleware/
-│   │   ├── authMiddleware.js         # JWT protect guard
-│   │   └── upload.js                 # Cloudinary + Multer config
+│   │   ├── authMiddleware.js           # JWT protect + role guards
+│   │   └── upload.js                   # Cloudinary + Multer config
 │   ├── utils/
-│   │   ├── aiTriage.js               # Gemini prompt + fallback
-│   │   ├── emailService.js           # OTP and reset email templates
-│   │   ├── notify.js                 # DB + socket notification helper
-│   │   └── generateToken.js          # JWT sign
+│   │   ├── aiTriage.js                 # Gemini prompt, timeout, fallback
+│   │   ├── emailService.js             # OTP and reset email HTML templates
+│   │   ├── notify.js                   # Creates DB notification + emits socket
+│   │   └── generateToken.js            # JWT sign helper
 │   ├── seeds/
-│   │   ├── createAdmin.js            # Bootstrap first admin
-│   │   └── seedShelters.js           # Sample shelter data
+│   │   ├── createAdmin.js              # Bootstrap first admin account
+│   │   └── seedShelters.js             # Sample shelter data
 │   ├── .env.example
-│   └── server.js                     # Express + Socket.IO + MongoDB entry
+│   └── server.js                       # Entry point — Express + Socket.IO + MongoDB
 │
 └── frontend/
     └── src/
         ├── pages/
-        │   ├── admin/                # Dashboard, IncidentManager, ShelterManager,
-        │   │                         # Analytics, Alerts, Invites, UserManager
-        │   ├── volunteer/            # Dashboard, Incidents, Assignments,
-        │   │                         # Resources, ShelterManagerPanel
-        │   ├── citizen/              # Home, Shelters, MyReports,
-        │   │                         # IncidentDetail, Resources
-        │   └── (shared)              # Login, Signup, Chat, Notifications,
-        │                             # Profile, Report, ForgotPassword, ResetPassword
+        │   ├── admin/                  # Dashboard, IncidentManager, ShelterManager,
+        │   │                           # Analytics, Alerts, Invites, UserManager
+        │   ├── volunteer/              # Dashboard, Incidents, Assignments,
+        │   │                           # Resources, ShelterManagerPanel
+        │   ├── citizen/                # Home, Shelters, MyReports,
+        │   │                           # IncidentDetail, Resources
+        │   └── (shared)                # Login, Signup, Chat, Notifications,
+        │                               # Profile, Report, ForgotPassword, ResetPassword
         ├── components/
-        │   ├── SOSButton.jsx         # 4-phase confirm guard + GPS + API
-        │   ├── LiveMap.jsx           # Leaflet map, incident + shelter markers
-        │   ├── IncidentReportForm.jsx# Full form with Cloudinary upload
-        │   ├── IncidentManagementPanel.jsx  # Admin single-incident controls
-        │   ├── IncidentToast.jsx     # Real-time new incident popup
-        │   ├── NotificationBell.jsx  # Unread badge + dropdown
-        │   ├── ResourceRequestModal.jsx     # Citizen resource request form
-        │   ├── WeatherWidget.jsx     # Compact / full weather card
-        │   ├── ProtectedRoute.jsx    # Role-based route guard
-        │   ├── ErrorBoundary.jsx     # Graceful error fallback
-        │   └── OfflineBanner.jsx     # Network status indicator
+        │   ├── SOSButton.jsx           # 4-phase confirm guard, GPS, API call
+        │   ├── LiveMap.jsx             # Leaflet map with incident + shelter markers
+        │   ├── IncidentReportForm.jsx  # Full form with Cloudinary media upload
+        │   ├── IncidentManagementPanel.jsx  # Admin controls for a single incident
+        │   ├── IncidentToast.jsx       # Real-time new-incident popup
+        │   ├── NotificationBell.jsx    # Unread badge + dropdown list
+        │   ├── ResourceRequestModal.jsx # Citizen resource request form
+        │   ├── WeatherWidget.jsx       # Compact / full weather card
+        │   ├── ProtectedRoute.jsx      # Role-based route guard
+        │   ├── ErrorBoundary.jsx       # Graceful crash fallback
+        │   └── OfflineBanner.jsx       # Network status indicator
         ├── context/
-        │   ├── AuthContext.jsx       # User, token, all auth actions, Axios instance
-        │   ├── SocketContext.jsx     # JWT-authenticated socket lifecycle
-        │   └── NotificationContext.jsx  # Unread count, real-time push
+        │   ├── AuthContext.jsx         # User state, token, all auth actions, Axios instance
+        │   ├── SocketContext.jsx       # JWT-authenticated socket lifecycle
+        │   └── NotificationContext.jsx # Unread count, real-time push
         ├── layouts/
-        │   ├── AdminLayout.jsx       # Sidebar nav for admin
-        │   ├── VolunteerLayout.jsx   # Sidebar nav for responder/shelter_manager
-        │   └── CitizenLayout.jsx     # Bottom nav for citizen
+        │   ├── AdminLayout.jsx         # Sidebar nav for admin
+        │   ├── VolunteerLayout.jsx     # Sidebar nav for responder / shelter manager
+        │   └── CitizenLayout.jsx       # Bottom nav for citizen
         └── constants/
-            ├── incident.js           # Type icons, severity badges, status styles
-            └── shelter.js            # Type metadata, amenity list, status badges
+            ├── incident.js             # Type icons, severity badges, status colours
+            └── shelter.js              # Type metadata, amenity list, status badges
 ```
 
 ---
@@ -515,13 +444,11 @@ ResQAI/
 
 ### Prerequisites
 
-- **Node.js** v18 or above
-- **MongoDB** — a local instance or a free [MongoDB Atlas](https://www.mongodb.com/atlas) cluster
-- **Cloudinary** account — for incident photo and video uploads
-- **Google Cloud** project — Generative AI API enabled, for Gemini triage
-- **Gmail** (or any SMTP provider) — with an [App Password](https://support.google.com/accounts/answer/185833) for sending OTP and reset emails
-
----
+- **Node.js** v18+
+- **MongoDB** — local or [Atlas](https://www.mongodb.com/atlas)
+- **Cloudinary** — for incident media uploads
+- **Google AI Studio** — Gemini API key for triage
+- **SMTP** — Gmail with an [App Password](https://support.google.com/accounts/answer/185833) works fine
 
 ### 1. Clone
 
@@ -535,11 +462,9 @@ cd ResQAI
 ```bash
 cd backend
 npm install
-cp .env.example .env   # then fill in your values
+cp .env.example .env   # fill in your values
 npm run dev
 ```
-
-Expected output:
 
 ```
   ResQAI Server
@@ -552,20 +477,20 @@ Expected output:
 ```bash
 cd ../frontend
 npm install
-cp .env.example .env   # then fill in your values
+cp .env.example .env
 npm run dev
 ```
 
 Open `http://localhost:5173`.
 
-### 4. Bootstrap the first admin
+### 4. Create the first admin
 
 ```bash
-# from the backend/ directory
+# run from backend/
 node seeds/createAdmin.js
 ```
 
-Log in with the credentials printed by the script. From the Admin panel, use **Invites** to onboard additional staff.
+The script prints the credentials. Log in with them, then use the **Invites** panel to onboard responders and shelter managers.
 
 ---
 
@@ -576,13 +501,13 @@ Log in with the credentials printed by the script. From the Admin panel, use **I
 | Variable | Required | Description |
 |----------|:--------:|-------------|
 | `MONGO_URI` | ✅ | MongoDB connection string |
-| `JWT_SECRET` | ✅ | Signing secret — minimum 32 characters |
+| `JWT_SECRET` | ✅ | Signing key — use at least 32 random characters |
 | `PORT` | — | HTTP port (default `5000`) |
 | `FRONTEND_URL` | — | CORS origin + email link base (default `http://localhost:5173`) |
 | `GOOGLE_CLIENT_ID` | — | Google OAuth client ID |
 | `EMAIL_HOST` | — | SMTP host (e.g. `smtp.gmail.com`) |
-| `EMAIL_PORT` | — | SMTP port (e.g. `587`) |
-| `EMAIL_SECURE` | — | `true` for port 465, `false` for STARTTLS |
+| `EMAIL_PORT` | — | SMTP port (`587` for STARTTLS) |
+| `EMAIL_SECURE` | — | `true` for port 465, `false` otherwise |
 | `EMAIL_USER` | — | Sender address |
 | `EMAIL_PASS` | — | App password |
 | `CLOUDINARY_CLOUD_NAME` | — | Cloudinary cloud name |
@@ -590,7 +515,7 @@ Log in with the credentials printed by the script. From the Admin panel, use **I
 | `CLOUDINARY_API_SECRET` | — | Cloudinary API secret |
 | `GEMINI_API_KEY` | — | Google Generative AI key |
 
-> The server refuses to start if `MONGO_URI` or `JWT_SECRET` are missing. All other variables degrade gracefully — features simply become unavailable rather than crashing.
+The server exits immediately if `MONGO_URI` or `JWT_SECRET` are absent. Everything else degrades gracefully — missing credentials just disable that feature.
 
 ### `frontend/.env`
 
@@ -604,70 +529,89 @@ Log in with the credentials printed by the script. From the Admin panel, use **I
 
 ## API Overview
 
-All routes are prefixed with `/api`. Protected routes require `Authorization: Bearer <token>`.
+All routes are prefixed `/api`. Protected routes require `Authorization: Bearer <token>`.
 
-| Resource | Prefix | Notable endpoints |
-|----------|--------|-------------------|
-| Auth | `/api/auth` | `POST /signup`, `POST /verify-otp`, `POST /login`, `POST /google`, `POST /forgot-password`, `POST /reset-password`, `GET /me` |
-| Incidents | `/api/incidents` | `GET /`, `GET /nearby`, `GET /:id`, `POST /sos`, `POST /broadcast-alert`, `PATCH /:id/status`, `PATCH /:id/severity`, `POST /:id/accept`, `POST /:id/assign`, `DELETE /:id/assign/:responderId` |
-| Report | `/api/report` | `POST /` — multipart with up to 5 media files |
-| Shelters | `/api/shelters` | `GET /`, `GET /nearby`, `GET /places`, `GET /mine`, `POST /`, `PUT /:id`, `DELETE /:id`, `PATCH /:id/status`, `PATCH /:id/occupancy`, `POST /:id/checkin`, `POST /:id/checkout`, `PATCH /:id/assign-manager` |
-| Chat | `/api/chat` | `GET /users`, `GET /dm/:userId`, `POST /dm/:userId`, `PATCH /dm/:userId/read`, `GET /unread`, `GET /incident/:id`, `POST /incident/:id`, `DELETE /message/:id` |
-| Resources | `/api/resources` | `GET /` (admin), `GET /nearby`, `GET /mine`, `POST /`, `PATCH /:id/acknowledge`, `PATCH /:id/fulfill` |
-| Users | `/api/users` | `GET /profile`, `PATCH /profile`, `PATCH /avatar`, `PATCH /password`, `PATCH /availability`, `PATCH /skills`, `PATCH /safe`, `GET /responders`, `GET /all` (admin), `PATCH /:id/role` (admin), `PATCH /:id/active` (admin) |
-| Invites | `/api/invites` | `POST /`, `GET /`, `GET /validate`, `DELETE /:id` |
-| Analytics | `/api/analytics` | `GET /summary` |
-| Notifications | `/api/notifications` | `GET /`, `PATCH /:id/read`, `PATCH /read-all` |
+| Resource | Prefix | Notes |
+|----------|--------|-------|
+| Auth | `/api/auth` | Most endpoints public |
+| Incidents | `/api/incidents` | Role-filtered on `GET /` |
+| Report (multipart) | `/api/report` | Up to 5 files |
+| Shelters | `/api/shelters` | |
+| Chat | `/api/chat` | |
+| Resources | `/api/resources` | |
+| Users | `/api/users` | Admin ops on `/:id/*` |
+| Invites | `/api/invites` | Admin only |
+| Analytics | `/api/analytics` | Admin only |
+| Notifications | `/api/notifications` | |
 
-### Socket.IO events
+Key endpoints worth knowing:
+
+```
+# Auth
+POST   /api/auth/signup
+POST   /api/auth/verify-otp
+POST   /api/auth/resend-otp
+POST   /api/auth/login
+POST   /api/auth/google
+POST   /api/auth/forgot-password
+POST   /api/auth/reset-password
+GET    /api/auth/me
+
+# Incidents
+GET    /api/incidents
+GET    /api/incidents/nearby          ?lat=&lng=&maxDistance=
+POST   /api/incidents/sos
+POST   /api/incidents/broadcast-alert
+PATCH  /api/incidents/:id/status
+PATCH  /api/incidents/:id/severity
+POST   /api/incidents/:id/accept
+POST   /api/incidents/:id/assign
+DELETE /api/incidents/:id/assign/:responderId
+
+# Shelters
+GET    /api/shelters/nearby           ?lat=&lng=&maxDistance=
+GET    /api/shelters/places           ?lat=&lng=&type=&radius=   (OSM)
+POST   /api/shelters/:id/checkin
+POST   /api/shelters/:id/checkout
+PATCH  /api/shelters/:id/assign-manager
+```
+
+### Socket events
 
 | Event | Direction | Description |
 |-------|-----------|-------------|
-| `newIncident` | Server → All | A new incident was reported |
+| `newIncident` | Server → All | New incident reported |
 | `incidentUpdated` | Server → All | Status, severity, or assignees changed |
 | `sosAlert` | Server → All | SOS triggered |
-| `sosAcknowledged` | Server → Citizen | A responder accepted the citizen's SOS |
+| `sosAcknowledged` | Server → Citizen | A responder accepted their SOS |
 | `newIncidentAssigned` | Server → Responder | Dispatch to a specific responder |
-| `incidentEscalated` | Server → Admins | 15-min escalation, no one accepted |
+| `incidentEscalated` | Server → Admins | 15-min escalation with no acceptance |
 | `alertBroadcast` | Server → All | Emergency broadcast from admin |
 | `shelterUpdated` | Server → All | Shelter details changed |
-| `shelterOccupancyUpdated` | Server → All | Check-in or check-out occurred |
-| `newResourceRequest` | Server → All | New resource request submitted |
-| `resourceRequestAcknowledged` | Server → All | Responder claimed a resource request |
-| `resourceRequestFulfilled` | Server → All | Resource request fulfilled |
-| `responderAvailabilityChanged` | Server → Admins | Responder toggled duty status |
+| `shelterOccupancyUpdated` | Server → All | Check-in or check-out |
+| `newResourceRequest` | Server → All | New resource request |
+| `resourceRequestAcknowledged` | Server → All | Request claimed by a responder |
+| `resourceRequestFulfilled` | Server → All | Request completed |
+| `responderAvailabilityChanged` | Server → Admins | Duty status toggled |
 | `notification` | Server → User | Personal in-app notification |
-| `chat:newDM` | Server → User | New direct message |
+| `chat:newDM` | Server → User | Incoming direct message |
 | `chat:typing` | Server → User | Typing indicator |
-| `chat:onlineUsers` | Server → All | Updated online presence list |
-| `chat:incidentMessage` | Server → Room | Message in an incident thread |
+| `chat:onlineUsers` | Server → All | Updated presence list |
+| `chat:incidentMessage` | Server → Room | Incident thread message |
 
 ---
 
 ## Security
 
-| Layer | Mechanism |
-|-------|-----------|
-| HTTP headers | `helmet` — sets `X-Frame-Options`, `Strict-Transport-Security`, `X-Content-Type-Options`, `Content-Security-Policy`, and more |
-| NoSQL injection | `express-mongo-sanitize` strips `$` operators and `.` from all request bodies and query strings |
-| Rate limiting | 200 req / 15 min globally; 15 req / 15 min on all auth endpoints (`/login`, `/signup`, `/verify-otp`, `/resend-otp`, `/forgot-password`, `/reset-password`, `/google`) |
-| Password hashing | bcrypt with salt rounds of 12; never stored in plain text |
-| OTP security | bcrypt-hashed OTP storage; 10-minute expiry; 5-attempt lockout; 60-second resend cooldown |
-| Password reset | Raw token in email link; SHA-256 hash stored in DB; plain token is never persisted |
-| JWT | Signed `HS256` tokens validated on every protected request; Socket.IO connections verified via JWT middleware before any event is processed |
-| Role isolation | Citizens receive only their own incidents from the API; shelter managers are ownership-checked before any mutation |
-| CORS | Explicitly configured to the `FRONTEND_URL` origin; credentials allowed |
-| Media validation | Multer `fileFilter` restricts uploads to `image/*`, `video/*`, `audio/*`, and `application/pdf`; 10 MB per file; 5 files maximum |
-
----
-
-## Contributing
-
-Contributions are welcome. Please follow these steps:
-
-1. Fork the repository
-2. Create a branch: `git checkout -b feat/your-feature`
-3. Commit following [Conventional Commits](https://www.conventionalcommits.org/): `git commit -m "feat: describe your change"`
-4. Push and open a Pull Request against `main`
-
-For significant changes, open an issue first to discuss the approach.
+| What | How |
+|------|-----|
+| HTTP headers | `helmet` — `X-Frame-Options`, `Strict-Transport-Security`, `X-Content-Type-Options`, CSP, and more |
+| NoSQL injection | `express-mongo-sanitize` strips `$` operators and `.` from all inputs |
+| Rate limiting | 200 req / 15 min globally; 15 req / 15 min on every auth endpoint |
+| Passwords | bcrypt with 12 salt rounds; password field is `select: false` on the schema |
+| OTP | bcrypt-hashed before storage; 10-min expiry; 5-attempt lockout; 60-sec resend cooldown |
+| Password reset tokens | 32-byte random token in the email link; SHA-256 hash stored in DB only |
+| JWT | `HS256`, validated on every protected request; Socket.IO connections also JWT-verified before any event is processed |
+| Role isolation | Citizens get only their own incidents from `GET /api/incidents`; shelter manager mutations go through an ownership check |
+| CORS | Scoped to `FRONTEND_URL`; credentials allowed |
+| File uploads | `fileFilter` restricts to `image/*`, `video/*`, `audio/*`, `application/pdf`; 10 MB per file; 5 files max |
