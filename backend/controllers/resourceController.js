@@ -1,4 +1,5 @@
 import ResourceRequest from '../models/ResourceRequest.js';
+import User from '../models/User.js';
 import { io } from '../server.js';
 
 // @desc   Create a resource request (citizen)
@@ -60,8 +61,11 @@ export const getNearbyResourceRequests = async (req, res) => {
           $maxDistance: Math.min(parseInt(maxDistance) || 20000, 200000), // cap at 200 km
         },
       },
-      status: 'pending',
-    }).populate('requestedBy', 'name phone avatar');
+      // Show both pending AND acknowledged so responders can see in-progress requests
+      status: { $in: ['pending', 'acknowledged'] },
+    })
+      .populate('requestedBy', 'name phone avatar')
+      .populate('acknowledgedBy', 'name avatar');
 
     return res.json({ success: true, count: requests.length, requests });
   } catch (error) {
@@ -125,11 +129,50 @@ export const getAllResourceRequests = async (req, res) => {
   }
 };
 
+// @desc   Acknowledge a resource request (volunteer — confirms receipt, marks in-progress)
+// @route  PATCH /api/resources/:id/acknowledge
+// @access Private
+export const acknowledgeResourceRequest = async (req, res) => {
+  try {
+    const request = await ResourceRequest.findOneAndUpdate(
+      { _id: req.params.id, status: 'pending' },
+      {
+        status:         'acknowledged',
+        acknowledgedBy: req.user._id,
+        acknowledgedAt: new Date(),
+      },
+      { new: true }
+    ).populate('requestedBy', 'name phone avatar')
+     .populate('acknowledgedBy', 'name avatar');
+
+    if (!request) {
+      const exists = await ResourceRequest.findById(req.params.id).select('status');
+      if (!exists) return res.status(404).json({ success: false, message: 'Resource request not found' });
+      return res.status(400).json({
+        success: false,
+        message: exists.status === 'acknowledged' ? 'Request already acknowledged' : 'Request is already fulfilled',
+      });
+    }
+
+    io.emit('resourceRequestAcknowledged', {
+      requestId:      request._id,
+      acknowledgedBy: req.user.name,
+      request,
+    });
+
+    return res.json({ success: true, request });
+  } catch (error) {
+    console.error('[acknowledgeResourceRequest]', error);
+    return res.status(500).json({ success: false, message: 'Failed to acknowledge request' });
+  }
+};
+
 // @desc   Fulfill a resource request (volunteer)
 // @route  PATCH /api/resources/:id/fulfill
 // @access Private
 export const fulfillResourceRequest = async (req, res) => {
   try {
+    // Can fulfill from either pending or acknowledged state
     const request = await ResourceRequest.findOneAndUpdate(
       { _id: req.params.id, status: { $ne: 'fulfilled' } },
       { status: 'fulfilled', fulfilledBy: req.user._id, fulfilledAt: new Date() },

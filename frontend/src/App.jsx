@@ -40,10 +40,11 @@ import CitizenMyReports   from './pages/citizen/MyReports';
 import IncidentDetail     from './pages/citizen/IncidentDetail';
 
 // Shared pages
-import Profile  from './pages/Profile';
-import Report   from './pages/Report';
-import Shelters from './pages/Shelters';
-import Chat     from './pages/Chat';
+import Profile        from './pages/Profile';
+import Report        from './pages/Report';
+import Shelters      from './pages/Shelters';
+import Chat          from './pages/Chat';
+import Notifications from './pages/Notifications';
 
 function App() {
   return (
@@ -85,6 +86,7 @@ function App() {
                 <Route path="/volunteer/shelter"     element={<ShelterManagerPanel />} />
                 <Route path="/volunteer/chat"        element={<Chat />} />
                 <Route path="/volunteer/profile"     element={<Profile />} />
+                <Route path="/notifications"         element={<Notifications />} />
               </Route>
             </Route>
 
@@ -97,6 +99,7 @@ function App() {
                 <Route path="/resources"          element={<CitizenResources />} />
                 <Route path="/my-reports"         element={<CitizenMyReports />} />
                 <Route path="/incidents/:id"      element={<IncidentDetail />} />
+                <Route path="/notifications"      element={<Notifications />} />
                 <Route path="/chat"               element={<Chat />} />
                 <Route path="/profile"            element={<Profile />} />
               </Route>

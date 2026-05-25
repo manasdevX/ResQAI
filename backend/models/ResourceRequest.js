@@ -57,6 +57,17 @@ const ResourceRequestSchema = new Schema(
       type: Date,
       default: null,
     },
+
+    acknowledgedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+
+    acknowledgedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

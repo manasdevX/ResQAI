@@ -15,13 +15,36 @@ const VolunteerDashboard = () => {
   const [skillSaving,     setSkillSaving]     = useState(false);
   const [sosAlerts,       setSOSAlerts]       = useState([]);
   const [dispatchAlerts,  setDispatchAlerts]  = useState([]);
+  const [gpsLocation,     setGpsLocation]     = useState(null);
+  const [gpsStatus,       setGpsStatus]       = useState('detecting'); // detecting | granted | denied
+
+  // Get real GPS location on mount
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setGpsStatus('denied');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGpsLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGpsStatus('granted');
+      },
+      () => setGpsStatus('denied'),
+      { timeout: 10000, maximumAge: 120000 }
+    );
+  }, []);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
+        // Use real GPS if available; fallback to a wide global fetch so the stat is still meaningful
+        const lat = gpsLocation?.lat ?? 0;
+        const lng = gpsLocation?.lng ?? 0;
+        const dist = gpsLocation ? 20000 : 99999999; // 20 km vs global
+
         const [incRes, allRes] = await Promise.all([
           api.get('/incidents?limit=200'),
-          api.get('/resources/nearby?lat=0&lng=0&maxDistance=99999999').catch(() => ({ data: { requests: [] } })),
+          api.get(`/resources/nearby?lat=${lat}&lng=${lng}&maxDistance=${dist}`).catch(() => ({ data: { requests: [] } })),
         ]);
         const incidents = incRes.data.incidents || [];
         const activeCount = incidents.filter(i => !['resolved', 'closed'].includes(i.status)).length;
@@ -35,8 +58,10 @@ const VolunteerDashboard = () => {
         });
       } catch { /* silent */ }
     };
-    fetchStats();
-  }, [api, user]);
+    // Fetch once GPS resolves (or if denied, fetch immediately with fallback)
+    if (gpsStatus !== 'detecting') fetchStats();
+  }, [api, user, gpsStatus, gpsLocation]);
+
 
   useEffect(() => {
     if (!socket) return;
@@ -143,6 +168,11 @@ const VolunteerDashboard = () => {
         <p className="text-sm text-zinc-500 mt-0.5">
           {user?.isAvailable ? '🟢 You are ON DUTY — volunteers can see you' : '⚪ You are OFF DUTY — toggle to go active'}
         </p>
+        <p className="text-[11px] text-zinc-600 mt-1 flex items-center gap-1">
+          {gpsStatus === 'detecting' && <><span className="inline-block w-2 h-2 rounded-full bg-yellow-500 animate-pulse" /> Detecting your location…</>}
+          {gpsStatus === 'granted'   && <><span className="inline-block w-2 h-2 rounded-full bg-green-500" /> Showing stats for your area</>}
+          {gpsStatus === 'denied'    && <><span className="inline-block w-2 h-2 rounded-full bg-zinc-600" /> Location unavailable — showing global stats</>}
+        </p>
       </div>
 
       {/* Stats */}
@@ -150,7 +180,7 @@ const VolunteerDashboard = () => {
         {[
           { label: 'Active Incidents',  value: stats.active,  icon: AlertTriangle, color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/20' },
           { label: 'My Assignments',    value: stats.mine,    icon: ClipboardList, color: 'text-blue-400',   bg: 'bg-blue-500/10 border-blue-500/20' },
-          { label: 'Resource Requests', value: stats.resources, icon: Package,     color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
+          { label: gpsLocation ? 'Nearby Resources' : 'Resource Requests', value: stats.resources, icon: Package, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className={`flex flex-col items-center gap-1.5 p-4 rounded-2xl border ${bg}`}>
             <Icon className={`w-5 h-5 ${color}`} />
@@ -159,6 +189,7 @@ const VolunteerDashboard = () => {
           </div>
         ))}
       </div>
+
 
       {/* Quick links */}
       <div className="grid grid-cols-2 gap-3">

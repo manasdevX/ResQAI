@@ -1,18 +1,20 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Home, AlertOctagon, Building2, Package, FileText, MessageCircle, User, LogOut, Menu, X } from 'lucide-react';
+import { Home, AlertOctagon, Building2, Package, FileText, MessageCircle, User, LogOut, Menu, X, Bell } from 'lucide-react';
 import { useState } from 'react';
 import NotificationBell from '../components/NotificationBell';
 
 const NAV = [
-  { to: '/home',        icon: Home,          label: 'Home' },
-  { to: '/report',      icon: AlertOctagon,  label: 'Report Emergency' },
-  { to: '/shelters',    icon: Building2,     label: 'Find Shelter' },
-  { to: '/resources',   icon: Package,       label: 'Request Help' },
-  { to: '/my-reports',  icon: FileText,      label: 'My Reports' },
-  { to: '/chat',        icon: MessageCircle, label: 'Chat' },
-  { to: '/profile',     icon: User,          label: 'Profile' },
+  { to: '/home',           icon: Home,          label: 'Home' },
+  { to: '/report',         icon: AlertOctagon,  label: 'Report Emergency' },
+  { to: '/shelters',       icon: Building2,     label: 'Find Shelter' },
+  { to: '/resources',      icon: Package,       label: 'Request Help' },
+  { to: '/my-reports',     icon: FileText,      label: 'My Reports' },
+  { to: '/notifications',  icon: Bell,          label: 'Notifications' },
+  { to: '/chat',           icon: MessageCircle, label: 'Chat' },
+  { to: '/profile',        icon: User,          label: 'Profile' },
 ];
+
 
 const CitizenLayout = () => {
   const { user, logout } = useAuth();

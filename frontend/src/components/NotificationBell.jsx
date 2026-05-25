@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Bell, X, CheckCheck, Loader2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
 
 const TYPE_ICON = {
@@ -115,6 +116,17 @@ const NotificationBell = () => {
                 </button>
               ))
             )}
+          </div>
+
+          {/* View all footer */}
+          <div className="px-4 py-2.5 border-t border-zinc-800 bg-zinc-900/60">
+            <Link
+              to="/notifications"
+              onClick={() => setOpen(false)}
+              className="flex items-center justify-center gap-1.5 text-xs text-zinc-400 hover:text-blue-400 transition font-medium py-0.5"
+            >
+              View all notifications →
+            </Link>
           </div>
         </div>
       )}

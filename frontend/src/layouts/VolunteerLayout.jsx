@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, MapPin, ClipboardList, Package,
-  MessageCircle, User, LogOut, ChevronRight, Zap, Building2,
+  MessageCircle, User, LogOut, ChevronRight, Zap, Building2, Bell,
 } from 'lucide-react';
 import NotificationBell from '../components/NotificationBell';
 
@@ -11,9 +11,11 @@ const NAV_RESPONDER = [
   { to: '/volunteer/incidents',    icon: MapPin,          label: 'Nearby Incidents' },
   { to: '/volunteer/assignments',  icon: ClipboardList,   label: 'My Assignments'   },
   { to: '/volunteer/resources',    icon: Package,         label: 'Resource Requests'},
+  { to: '/notifications',          icon: Bell,            label: 'Notifications'    },
   { to: '/volunteer/chat',         icon: MessageCircle,   label: 'Chat'             },
   { to: '/volunteer/profile',      icon: User,            label: 'Profile'          },
 ];
+
 
 const NAV_SHELTER_MANAGER = [
   { to: '/volunteer',              icon: LayoutDashboard, label: 'Dashboard',        exact: true },
