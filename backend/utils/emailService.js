@@ -9,7 +9,6 @@ const createTransporter = () => {
     port:   parseInt(EMAIL_PORT || '587'),
     secure: EMAIL_SECURE === 'true',
     auth:   { user: EMAIL_USER, pass: EMAIL_PASS },
-    tls:    { rejectUnauthorized: false },
   });
 };
 

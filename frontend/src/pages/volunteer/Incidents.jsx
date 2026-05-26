@@ -71,9 +71,10 @@ const VolunteerIncidents = () => {
         inc._id === incidentId ? { ...inc, ...(status && { status }), ...(severity && { severity }), ...(assignedResponders && { assignedResponders }) } : inc
       ));
     };
+    const onNew = () => setRefreshKey(k => k + 1);
     socket.on('incidentUpdated', onUpdated);
-    socket.on('newIncident', () => setRefreshKey(k => k + 1));
-    return () => { socket.off('incidentUpdated', onUpdated); socket.off('newIncident'); };
+    socket.on('newIncident', onNew);
+    return () => { socket.off('incidentUpdated', onUpdated); socket.off('newIncident', onNew); };
   }, [socket]);
 
   const handleAccept = useCallback(async (incidentId) => {

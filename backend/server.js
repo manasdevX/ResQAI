@@ -138,7 +138,10 @@ httpServer.on('error', (err) => {
   }
 });
 
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_URI, {
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+})
   .then(() => {
     httpServer.listen(PORT, () => {
       console.log(`\n  ResQAI Server`);

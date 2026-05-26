@@ -35,7 +35,7 @@ const buildAuthResponse = (user) => ({
   isAvailable:     user.isAvailable,
   isSafe:          user.isSafe,
   isEmailVerified: user.isEmailVerified,
-  token:           generateToken(user._id),
+  token:           generateToken(user._id, user.role),
 });
 
 // ─── Controllers ──────────────────────────────────────────────────────────────

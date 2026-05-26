@@ -316,7 +316,7 @@ const Chat = () => {
   const activePeerTyping = activePeer && typingPeers[activePeer._id];
 
   return (
-    <div className="flex h-screen bg-zinc-950 text-zinc-100 overflow-hidden">
+    <div className="flex h-full bg-zinc-950 text-zinc-100 overflow-hidden">
 
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       <aside className="w-72 xl:w-80 bg-zinc-900 border-r border-zinc-800 flex flex-col shrink-0">

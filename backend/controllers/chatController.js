@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Message from '../models/Message.js';
 import User from '../models/User.js';
 
@@ -49,6 +50,9 @@ export const getChatUsers = async (req, res) => {
 export const getDMHistory = async (req, res) => {
   try {
     const { userId } = req.params;
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
     const page  = Math.max(1, parseInt(req.query.page) || 1);
     const limit = 50;
     const skip  = (page - 1) * limit;
@@ -303,6 +307,7 @@ export const setupChatSocket = (io) => {
     socket.on('chat:sendDM', async ({ recipientId, content, replyTo, tempId }) => {
       if (!socket.userId || !content?.trim() || !recipientId) return;
       if (recipientId === socket.userId) return; // prevent self-DM
+      if (content.trim().length > 10000) return socket.emit('chat:error', { message: 'Message too long (max 10,000 characters)' });
 
       try {
         const message = await Message.create({
@@ -352,6 +357,7 @@ export const setupChatSocket = (io) => {
     // ── Send incident thread message ──────────────────────────────────────────
     socket.on('chat:incidentMessage', async ({ incidentId, content, replyTo, tempId }) => {
       if (!socket.userId || !content?.trim() || !incidentId) return;
+      if (content.trim().length > 10000) return socket.emit('chat:error', { message: 'Message too long (max 10,000 characters)' });
 
       try {
         const message = await Message.create({

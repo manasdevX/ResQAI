@@ -74,6 +74,12 @@ export const createIncident = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid location: coordinates [lng, lat] are required' });
     }
 
+    const [lng, lat] = location.coordinates;
+    if (typeof lng !== 'number' || typeof lat !== 'number' ||
+        lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+      return res.status(400).json({ success: false, message: 'Invalid coordinates: longitude must be -180 to 180, latitude -90 to 90' });
+    }
+
     // ── Duplicate detection ────────────────────────────────────────────────────
     // Prevent spam: block if this user already reported an active incident
     // within 500 m of this location in the last 30 minutes.

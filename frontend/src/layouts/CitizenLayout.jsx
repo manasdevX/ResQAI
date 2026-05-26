@@ -39,7 +39,7 @@ const CitizenLayout = () => {
   const handleLogout = () => { logout(); navigate('/login'); };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+    <div className="h-screen bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden">
 
       {/* ── Top navbar ─────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 bg-zinc-900/95 backdrop-blur-md border-b border-zinc-800/80">
@@ -154,7 +154,7 @@ const CitizenLayout = () => {
       </header>
 
       {/* Page content */}
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
         <Outlet />
       </main>
 

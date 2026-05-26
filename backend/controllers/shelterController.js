@@ -1,7 +1,6 @@
 import Shelter from '../models/Shelter.js';
 import User from '../models/User.js';
 import { io } from '../server.js';
-import { notify } from '../utils/notify.js'; // eslint-disable-line no-unused-vars
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
