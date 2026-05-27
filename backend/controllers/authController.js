@@ -386,11 +386,18 @@ export const googleAuth = async (req, res) => {
   try {
     const { token, role } = req.body;
 
+    if (!token) {
+      return res.status(400).json({ message: 'Google access token is required' });
+    }
+
     const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (!response.ok) throw new Error('Failed to fetch Google user info');
+    if (!response.ok) {
+      console.error('Google userinfo failed:', response.status, await response.text().catch(() => ''));
+      return res.status(401).json({ message: 'Invalid Google token. Please sign in again.' });
+    }
 
     const { name, email, picture } = await response.json();
     const normalizedEmail = email.toLowerCase().trim();
@@ -420,7 +427,7 @@ export const googleAuth = async (req, res) => {
 
     return res.json(buildAuthResponse(user));
   } catch (error) {
-    console.error('Google Auth Error:', error);
-    return res.status(401).json({ message: 'Google authentication failed' });
+    console.error('Google Auth Error:', error.message || error);
+    return res.status(500).json({ message: 'Google authentication failed. Please try again.' });
   }
 };

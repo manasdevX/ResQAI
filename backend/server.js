@@ -36,6 +36,10 @@ if (process.env.JWT_SECRET.length < 32) {
 const app = express();
 const httpServer = createServer(app);
 
+// Render (and most cloud platforms) sit behind a reverse proxy.
+// Without this, express-rate-limit throws on X-Forwarded-For headers.
+app.set('trust proxy', 1);
+
 // Support multiple frontend origins: one env var can be a comma-separated list
 // so that both the Vercel production URL and localhost work without separate vars.
 const ALLOWED_ORIGINS = [

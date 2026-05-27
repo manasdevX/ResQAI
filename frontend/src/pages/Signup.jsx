@@ -171,13 +171,17 @@ const Signup = () => {
 
   // ── Google ───────────────────────────────────────────────────────────────────
   const handleGoogleSuccess = async (tokenResponse) => {
+    if (!tokenResponse?.access_token) {
+      setError('Google Sign-Up was blocked. Try disabling any popup blockers and retry.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
       const data = await googleLogin(tokenResponse.access_token, inviteData?.role || role);
       redirect(data.role);
     } catch (err) {
-      setError(err.response?.data?.message || 'Google Sign-Up failed');
+      setError(err.response?.data?.message || 'Google Sign-Up failed. Please try again.');
       setSubmitting(false);
     }
   };

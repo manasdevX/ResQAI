@@ -25,13 +25,17 @@ const Login = () => {
   const redirect = (role) => navigate(roleHome(role), { replace: true });
 
   const handleGoogleSuccess = async (tokenResponse) => {
+    if (!tokenResponse?.access_token) {
+      setError('Google Sign-In was blocked. Try disabling any popup blockers and retry.');
+      return;
+    }
     setIsSubmitting(true);
     setError('');
     try {
       const data = await googleLogin(tokenResponse.access_token);
       redirect(data.role);
     } catch (err) {
-      setError(err.response?.data?.message || 'Google Sign-In failed');
+      setError(err.response?.data?.message || 'Google Sign-In failed. Please try again.');
       setIsSubmitting(false);
     }
   };
