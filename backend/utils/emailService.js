@@ -5,10 +5,13 @@ const createTransporter = () => {
   if (!EMAIL_USER || !EMAIL_PASS) return null;
 
   return nodemailer.createTransport({
-    host:   EMAIL_HOST  || 'smtp.gmail.com',
-    port:   parseInt(EMAIL_PORT || '587'),
-    secure: EMAIL_SECURE === 'true',
-    auth:   { user: EMAIL_USER, pass: EMAIL_PASS },
+    host:             EMAIL_HOST || 'smtp.gmail.com',
+    port:             parseInt(EMAIL_PORT || '587'),
+    secure:           EMAIL_SECURE === 'true',
+    auth:             { user: EMAIL_USER, pass: EMAIL_PASS },
+    connectionTimeout: 10_000,  // 10s to establish TCP connection
+    greetingTimeout:   8_000,   // 8s to receive SMTP greeting
+    socketTimeout:     15_000,  // 15s of socket inactivity before giving up
   });
 };
 

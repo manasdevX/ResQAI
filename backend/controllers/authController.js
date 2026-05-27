@@ -5,6 +5,15 @@ import Invite from '../models/Invite.js';
 import generateToken from '../utils/generateToken.js';
 import { sendOTPEmail, sendPasswordResetEmail } from '../utils/emailService.js';
 
+// Wraps any promise with a timeout so email sending never hangs a request.
+const withTimeout = (promise, ms, label) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -106,7 +115,8 @@ export const signupUser = async (req, res) => {
       existingUser.emailOTPAttempts = 0;
       existingUser.emailOTPSentAt   = new Date();
       await existingUser.save();
-      await sendOTPEmail(normalizedEmail, existingUser.name, otp);
+        await withTimeout(sendOTPEmail(normalizedEmail, existingUser.name, otp), 20_000, 'OTP email')
+        .catch((e) => console.error('[Email] OTP resend failed:', e.message));
 
       return res.status(200).json({
         requiresVerification: true,
@@ -141,7 +151,9 @@ export const signupUser = async (req, res) => {
     user.emailOTPSentAt   = new Date();
     await user.save();
 
-    await sendOTPEmail(normalizedEmail, user.name, otp);
+    // Send OTP — don't let email failure block the response
+    await withTimeout(sendOTPEmail(normalizedEmail, user.name, otp), 20_000, 'OTP email')
+      .catch((e) => console.error('[Email] OTP send failed:', e.message));
 
     return res.status(201).json({
       requiresVerification: true,
@@ -246,7 +258,8 @@ export const resendEmailOTP = async (req, res) => {
     user.emailOTPSentAt   = new Date();
     await user.save();
 
-    await sendOTPEmail(user.email, user.name, otp);
+    await withTimeout(sendOTPEmail(user.email, user.name, otp), 20_000, 'OTP email')
+      .catch((e) => console.error('[Email] resend OTP failed:', e.message));
 
     return res.json({ message: 'New verification code sent to your email' });
   } catch (error) {
@@ -320,8 +333,10 @@ export const forgotPassword = async (req, res) => {
     user.resetPasswordExpires = new Date(Date.now() + 60 * 60_000); // 1 hour
     await user.save();
 
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${rawToken}`;
-    await sendPasswordResetEmail(user.email, user.name, resetUrl);
+    const frontendOrigin = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim();
+    const resetUrl = `${frontendOrigin}/reset-password?token=${rawToken}`;
+    await withTimeout(sendPasswordResetEmail(user.email, user.name, resetUrl), 20_000, 'password reset email')
+      .catch((e) => console.error('[Email] password reset send failed:', e.message));
 
     return res.status(200).json(genericResponse);
   } catch (error) {
