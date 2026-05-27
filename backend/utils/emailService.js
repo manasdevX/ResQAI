@@ -9,9 +9,10 @@ const createTransporter = () => {
     port:             parseInt(EMAIL_PORT || '587'),
     secure:           EMAIL_SECURE === 'true',
     auth:             { user: EMAIL_USER, pass: EMAIL_PASS },
-    connectionTimeout: 10_000,  // 10s to establish TCP connection
-    greetingTimeout:   8_000,   // 8s to receive SMTP greeting
-    socketTimeout:     15_000,  // 15s of socket inactivity before giving up
+    family:           4,        // Force IPv4 — Render free tier has no IPv6 egress
+    connectionTimeout: 10_000,
+    greetingTimeout:   8_000,
+    socketTimeout:     15_000,
   });
 };
 
