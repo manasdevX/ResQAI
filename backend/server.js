@@ -36,9 +36,14 @@ if (process.env.JWT_SECRET.length < 32) {
 const app = express();
 const httpServer = createServer(app);
 
+const ALLOWED_ORIGINS = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+].filter(Boolean);
+
 export const io = new Server(httpServer, {
   cors: {
-    origin:      process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin:      ALLOWED_ORIGINS,
     methods:     ['GET', 'POST'],
     credentials: true,
   },
@@ -46,7 +51,14 @@ export const io = new Server(httpServer, {
 
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors({
-  origin:      process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman, etc.)
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: origin '${origin}' not allowed`));
+    }
+  },
   credentials: true,
   methods:     ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 }));

@@ -21,6 +21,12 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const fetchedRef = useRef(false);
 
+  // Stable refs so the interceptor can call state setters without
+  // being recreated on every token change (avoids stale-closure issues)
+  const setTokenRef   = useRef(setToken);
+  const setUserRef    = useRef(setUser);
+  const setLoadingRef = useRef(setLoading);
+
   const api = useMemo(() => {
     const instance = axios.create({
       baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
@@ -32,12 +38,13 @@ export const AuthProvider = ({ children }) => {
       (error) => {
         if (error.response?.status === 401) {
           localStorage.removeItem('token');
-          if (
-            !window.location.pathname.startsWith('/login') &&
-            !window.location.pathname.startsWith('/signup')
-          ) {
-            window.location.href = '/login';
-          }
+          // Use React state — NOT window.location.href — so we never race
+          // the finally block and never leave loading=true forever.
+          // ProtectedRoute will redirect to /login automatically.
+          fetchedRef.current = false;
+          setTokenRef.current(null);
+          setUserRef.current(null);
+          setLoadingRef.current(false);
         }
         return Promise.reject(error);
       }
@@ -160,7 +167,11 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {loading ? (
+        <div className="flex h-screen w-full items-center justify-center bg-zinc-950">
+          <div className="w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : children}
     </AuthContext.Provider>
   );
 };
