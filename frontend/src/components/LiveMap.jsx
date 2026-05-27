@@ -10,6 +10,29 @@ import { SHELTER_TYPE_META, SHELTER_STATUS_HEX } from '../constants/shelter';
 
 const PULSE_RADII = [3000, 6000, 9000];
 
+// ── Dark map theme (matches the app's zinc-950 dark UI) ───────────────────────
+const darkMapStyles = [
+  { elementType: 'geometry',                                   stylers: [{ color: '#18181b' }] },
+  { elementType: 'labels.text.stroke',                         stylers: [{ color: '#18181b' }] },
+  { elementType: 'labels.text.fill',                           stylers: [{ color: '#71717a' }] },
+  { featureType: 'administrative.locality',  elementType: 'labels.text.fill',  stylers: [{ color: '#a1a1aa' }] },
+  { featureType: 'poi',                      elementType: 'labels.text.fill',  stylers: [{ color: '#71717a' }] },
+  { featureType: 'poi.park',                 elementType: 'geometry',           stylers: [{ color: '#1c1c1f' }] },
+  { featureType: 'poi.park',                 elementType: 'labels.text.fill',  stylers: [{ color: '#4b5563' }] },
+  { featureType: 'road',                     elementType: 'geometry',           stylers: [{ color: '#27272a' }] },
+  { featureType: 'road',                     elementType: 'geometry.stroke',    stylers: [{ color: '#212124' }] },
+  { featureType: 'road',                     elementType: 'labels.text.fill',   stylers: [{ color: '#9ca3af' }] },
+  { featureType: 'road.highway',             elementType: 'geometry',           stylers: [{ color: '#3f3f46' }] },
+  { featureType: 'road.highway',             elementType: 'geometry.stroke',    stylers: [{ color: '#2d2d30' }] },
+  { featureType: 'road.highway',             elementType: 'labels.text.fill',   stylers: [{ color: '#d4d4d8' }] },
+  { featureType: 'transit',                  elementType: 'geometry',           stylers: [{ color: '#1c1c1f' }] },
+  { featureType: 'transit.station',          elementType: 'labels.text.fill',   stylers: [{ color: '#a1a1aa' }] },
+  { featureType: 'water',                    elementType: 'geometry',           stylers: [{ color: '#0f172a' }] },
+  { featureType: 'water',                    elementType: 'labels.text.fill',   stylers: [{ color: '#3b82f6' }] },
+  { featureType: 'water',                    elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
+];
+
+
 // Safe Google Maps symbol accessor — returns null before API loads
 const gmSymbol = (name) => {
   try { return window.google?.maps?.SymbolPath?.[name] ?? null; }

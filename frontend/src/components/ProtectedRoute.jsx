@@ -4,13 +4,9 @@ import { useAuth } from '../context/AuthContext';
 const ProtectedRoute = ({ allowedRoles }) => {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-zinc-950">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  // AuthContext renders a full-screen spinner while loading, so by the time
+  // ProtectedRoute mounts, loading will always be false. Guard kept for safety.
+  if (loading) return null;
 
   if (!user) {
     return <Navigate to="/login" replace />;

@@ -9,3 +9,34 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # ── IMPORTANT: Set these in the Render dashboard → Environment tab ──────
+      # They are listed here as references so Render knows to expect them.
+      # Never hardcode secrets in this file.
+      - key: FRONTEND_URL
+        value: https://resqai-roan.vercel.app   # ← your Vercel URL
+      - key: PORT
+        value: 5000
+      - key: MONGO_URI
+        sync: false   # pulled from Render secret store / dashboard
+      - key: JWT_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: 587
+      - key: EMAIL_SECURE
+        value: false
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

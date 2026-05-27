@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 
 const AuthContext = createContext();
@@ -19,76 +19,77 @@ export const AuthProvider = ({ children }) => {
   const [user,    setUser]    = useState(null);
   const [token,   setToken]   = useState(() => localStorage.getItem('token') || null);
   const [loading, setLoading] = useState(true);
-  const fetchedRef = useRef(false);
 
-  // Stable refs so the interceptor can call state setters without
-  // being recreated on every token change (avoids stale-closure issues)
-  const setTokenRef   = useRef(setToken);
-  const setUserRef    = useRef(setUser);
-  const setLoadingRef = useRef(setLoading);
-
+  // Build an axios instance that always sends the current token.
+  // Recreated only when token changes (so headers stay fresh after login).
   const api = useMemo(() => {
     const instance = axios.create({
       baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
 
+    // On 401: clear storage only. React state + routing handled by callers / ProtectedRoute.
+    // Do NOT touch React state here — doing so inside useMemo triggers cascading re-renders
+    // that race with ongoing async operations and leave loading stuck at true.
     instance.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (error.response?.status === 401) {
+      (res) => res,
+      (err) => {
+        if (err.response?.status === 401) {
           localStorage.removeItem('token');
-          // Use React state — NOT window.location.href — so we never race
-          // the finally block and never leave loading=true forever.
-          // ProtectedRoute will redirect to /login automatically.
-          fetchedRef.current = false;
-          setTokenRef.current(null);
-          setUserRef.current(null);
-          setLoadingRef.current(false);
         }
-        return Promise.reject(error);
+        return Promise.reject(err);
       }
     );
 
     return instance;
   }, [token]);
 
-  // Restore session from stored token on mount
+  // ── Session restoration ────────────────────────────────────────────────────
+  // Runs ONCE on mount. Empty deps array is intentional — we only need to
+  // restore a persisted session at startup. After that every auth action
+  // (login / logout / persistAuth) manages state explicitly, so there is
+  // nothing to "watch" on token changes here.
   useEffect(() => {
+    const storedToken = localStorage.getItem('token');
+
+    // No stored session → nothing to restore, show the app immediately.
+    if (!storedToken) {
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
-    const fetchUser = async () => {
-      const storedToken = localStorage.getItem('token');
-      if (!storedToken) {
+    // Use a one-off axios instance with the stored token so we don't depend
+    // on the `api` memo (which might not have the right header yet on first render).
+    const authApi = axios.create({
+      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+      headers: { Authorization: `Bearer ${storedToken}` },
+    });
+
+    authApi.get('/auth/me')
+      .then(({ data }) => {
+        if (cancelled) return;
+        setUser(data);
         setLoading(false);
-        return;
-      }
-      try {
-        const { data } = await api.get('/auth/me');
-        if (!cancelled) setUser(data);
-      } catch {
-        if (!cancelled) {
-          localStorage.removeItem('token');
-          setToken(null);
-          setUser(null);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Token is invalid / expired — clear everything and show app (login page).
+        localStorage.removeItem('token');
+        setToken(null);
+        setUser(null);
+        setLoading(false);
+      });
 
-    if (user) { setLoading(false); return; }
-    if (fetchedRef.current) return;
-    fetchedRef.current = true;
-
-    fetchUser();
     return () => { cancelled = true; };
-  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
   const persistAuth = useCallback((data) => {
     const { token: newToken, ...userData } = data;
     localStorage.setItem('token', newToken);
-    fetchedRef.current = true;
     setToken(newToken);
     setUser(userData);
   }, []);
@@ -97,7 +98,7 @@ export const AuthProvider = ({ children }) => {
     setUser((prev) => (prev ? { ...prev, ...patch } : prev));
   }, []);
 
-  // ── Auth actions ────────────────────────────────────────────────────────────
+  // ── Auth actions ───────────────────────────────────────────────────────────
 
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
@@ -135,17 +136,15 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
-  const resetPassword = async (token, password) => {
-    const { data } = await api.post('/auth/reset-password', { token, password });
+  const resetPassword = async (tkn, password) => {
+    const { data } = await api.post('/auth/reset-password', { token: tkn, password });
     return data;
   };
 
   const logout = () => {
     localStorage.removeItem('token');
-    fetchedRef.current = false;
     setToken(null);
     setUser(null);
-    setLoading(false);
   };
 
   const value = {

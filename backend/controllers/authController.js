@@ -393,11 +393,12 @@ export const googleAuth = async (req, res) => {
     if (!response.ok) throw new Error('Failed to fetch Google user info');
 
     const { name, email, picture } = await response.json();
-    const normalizedEmail = email.toLowerCase().trim(); // BUG FIX: was missing normalization
+    const normalizedEmail = email.toLowerCase().trim();
 
     let user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
+      // First-time Google sign-in — create the account
       const assignedRole = ['citizen', 'responder'].includes(role) ? role : 'citizen';
       user = await User.create({
         name,
@@ -405,12 +406,16 @@ export const googleAuth = async (req, res) => {
         password:        crypto.randomBytes(32).toString('hex'),
         avatar:          picture,
         role:            assignedRole,
-        isEmailVerified: true, // Google already verified this email
+        isEmailVerified: true,
       });
-    } else if (!user.isEmailVerified) {
-      // Mark existing unverified account as verified (user proved ownership via Google)
-      user.isEmailVerified = true;
-      await user.save();
+    } else {
+      // Returning user — always sync name + avatar from Google (source of truth)
+      // and mark email as verified if it wasn't already.
+      let changed = false;
+      if (user.name !== name)       { user.name   = name;    changed = true; }
+      if (user.avatar !== picture)  { user.avatar = picture; changed = true; }
+      if (!user.isEmailVerified)    { user.isEmailVerified = true; changed = true; }
+      if (changed) await user.save();
     }
 
     return res.json(buildAuthResponse(user));
