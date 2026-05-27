@@ -3,6 +3,17 @@ import axios from 'axios';
 
 const AuthContext = createContext();
 
+// Sanitize the API URL from env — ensures it always starts with http(s)://
+// Guards against Vercel/Render misconfiguration where the protocol is omitted.
+const getApiUrl = () => {
+  const raw = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  // Missing protocol — assume https for production
+  return `https://${raw}`;
+};
+
+const API_URL = getApiUrl();
+
 // eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);
 
@@ -24,7 +35,7 @@ export const AuthProvider = ({ children }) => {
   // Recreated only when token changes (so headers stay fresh after login).
   const api = useMemo(() => {
     const instance = axios.create({
-      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+      baseURL: API_URL,
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
 
@@ -63,7 +74,7 @@ export const AuthProvider = ({ children }) => {
     // Use a one-off axios instance with the stored token so we don't depend
     // on the `api` memo (which might not have the right header yet on first render).
     const authApi = axios.create({
-      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+      baseURL: API_URL,
       headers: { Authorization: `Bearer ${storedToken}` },
     });
 
