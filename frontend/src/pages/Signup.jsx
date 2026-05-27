@@ -8,7 +8,10 @@ import {
 import { useGoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const _rawApi = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API = _rawApi.startsWith('http://') || _rawApi.startsWith('https://')
+  ? _rawApi.trim()
+  : `https://${_rawApi.trim()}`;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

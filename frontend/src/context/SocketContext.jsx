@@ -26,7 +26,10 @@ export const SocketProvider = ({ children }) => {
       return;
     }
 
-    const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+    const _rawSocket = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+    const socketUrl = _rawSocket.startsWith('http://') || _rawSocket.startsWith('https://')
+      ? _rawSocket.trim()
+      : `https://${_rawSocket.trim()}`;
     const s = io(socketUrl, {
       auth:        { token },           // send JWT so server can validate if needed
       reconnection: true,

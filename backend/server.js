@@ -36,9 +36,14 @@ if (process.env.JWT_SECRET.length < 32) {
 const app = express();
 const httpServer = createServer(app);
 
+// Support multiple frontend origins: one env var can be a comma-separated list
+// so that both the Vercel production URL and localhost work without separate vars.
 const ALLOWED_ORIGINS = [
-  process.env.FRONTEND_URL,
+  ...(process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map((u) => u.trim()).filter(Boolean)
+    : []),
   'http://localhost:5173',
+  'http://localhost:5174',
 ].filter(Boolean);
 
 export const io = new Server(httpServer, {

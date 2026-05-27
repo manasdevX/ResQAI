@@ -4,10 +4,11 @@ import axios from 'axios';
 const AuthContext = createContext();
 
 // Sanitize the API URL from env — ensures it always starts with http(s)://
-// Guards against Vercel/Render misconfiguration where the protocol is omitted.
+// Guards against Vercel/Render misconfiguration where the protocol is omitted or has extra whitespace.
 const getApiUrl = () => {
-  const raw = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  const raw = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').trim();
+  const lower = raw.toLowerCase();
+  if (lower.startsWith('http://') || lower.startsWith('https://')) return raw;
   // Missing protocol — assume https for production
   return `https://${raw}`;
 };
