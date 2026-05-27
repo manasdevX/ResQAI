@@ -1,3 +1,6 @@
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first'); // Render free tier has no IPv6 egress
+
 import express from 'express';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';

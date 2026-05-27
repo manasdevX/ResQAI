@@ -9,7 +9,6 @@ const createTransporter = () => {
     port:             parseInt(EMAIL_PORT || '587'),
     secure:           EMAIL_SECURE === 'true',
     auth:             { user: EMAIL_USER, pass: EMAIL_PASS },
-    family:           4,        // Force IPv4 — Render free tier has no IPv6 egress
     connectionTimeout: 10_000,
     greetingTimeout:   8_000,
     socketTimeout:     15_000,
