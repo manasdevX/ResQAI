@@ -1,14 +1,29 @@
 import nodemailer from 'nodemailer';
+import { resolve4 } from 'dns/promises';
 
-const createTransporter = () => {
+// dns.resolve4() explicitly requests A-records (IPv4), bypassing the OS resolver
+// order entirely. This is the only reliable way to avoid IPv6 on Render free tier,
+// where dns.setDefaultResultOrder and nodemailer's `family:4` option have no effect.
+const createTransporter = async () => {
   const { EMAIL_USER, EMAIL_PASS, EMAIL_HOST, EMAIL_PORT, EMAIL_SECURE } = process.env;
   if (!EMAIL_USER || !EMAIL_PASS) return null;
 
+  const hostname = EMAIL_HOST || 'smtp.gmail.com';
+
+  let host = hostname;
+  try {
+    const [ip] = await resolve4(hostname);
+    host = ip;
+  } catch {
+    // DNS resolution failed — fall back to hostname and let nodemailer try
+  }
+
   return nodemailer.createTransport({
-    host:             EMAIL_HOST || 'smtp.gmail.com',
-    port:             parseInt(EMAIL_PORT || '587'),
-    secure:           EMAIL_SECURE === 'true',
-    auth:             { user: EMAIL_USER, pass: EMAIL_PASS },
+    host,
+    port:              parseInt(EMAIL_PORT || '587'),
+    secure:            EMAIL_SECURE === 'true',
+    auth:              { user: EMAIL_USER, pass: EMAIL_PASS },
+    tls:               { servername: hostname }, // cert validation uses hostname, not IP
     connectionTimeout: 10_000,
     greetingTimeout:   8_000,
     socketTimeout:     15_000,
@@ -16,7 +31,7 @@ const createTransporter = () => {
 };
 
 export const sendPasswordResetEmail = async (to, name, resetUrl) => {
-  const transporter = createTransporter();
+  const transporter = await createTransporter();
   const firstName = name?.split(' ')[0] || 'there';
 
   if (!transporter) {
@@ -83,7 +98,7 @@ export const sendPasswordResetEmail = async (to, name, resetUrl) => {
 };
 
 export const sendOTPEmail = async (to, name, otp) => {
-  const transporter = createTransporter();
+  const transporter = await createTransporter();
 
   if (!transporter) {
     console.log(`\n  [ResQAI Email] ⚠ Email not configured — OTP for ${to} : ${otp}\n`);
