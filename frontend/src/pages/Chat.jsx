@@ -324,7 +324,7 @@ const Chat = () => {
         {/* Header */}
         <div className="px-4 pt-4 pb-3 border-b border-zinc-800">
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-full bg-red-600 flex items-center justify-center text-xs font-bold shrink-0">R</div>
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-xs font-bold shrink-0 shadow-sm shadow-red-600/30">R</div>
             <div>
               <h1 className="text-sm font-bold leading-none">ResQAI Chat</h1>
               <p className="text-[10px] text-zinc-500 mt-0.5">Real-time coordination</p>

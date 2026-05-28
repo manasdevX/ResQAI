@@ -139,7 +139,7 @@ const Profile = () => {
       )}
 
       {/* Avatar card */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+      <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-6">
         <div className="flex items-center gap-5">
           <div className="relative shrink-0">
             <div className="w-20 h-20 rounded-full overflow-hidden bg-zinc-700 flex items-center justify-center border-2 border-zinc-600">
@@ -191,7 +191,7 @@ const Profile = () => {
       </div>
 
       {/* Editable fields */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
+      <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-6 space-y-4">
         <h2 className="text-sm font-bold text-zinc-200">Personal Information</h2>
 
         {/* Name */}
@@ -268,7 +268,7 @@ const Profile = () => {
       </div>
 
       {/* Security card */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
+      <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-6 space-y-4">
         <h2 className="text-sm font-bold text-zinc-200 flex items-center gap-2">
           <Lock className="w-4 h-4 text-zinc-500" /> Change Password
         </h2>

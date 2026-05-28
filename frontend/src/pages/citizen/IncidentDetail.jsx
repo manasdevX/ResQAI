@@ -35,7 +35,7 @@ const STATUS_LABEL_COLOR = {
 const Section = ({ title, icon: Icon, iconClass = 'text-zinc-400', children, defaultOpen = true }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+    <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl overflow-hidden">
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center gap-2.5 px-5 py-4 hover:bg-zinc-800/50 transition"
@@ -147,9 +147,9 @@ const IncidentDetail = () => {
     return (
       <div className="min-h-screen bg-zinc-950 p-4 space-y-4 max-w-2xl mx-auto pt-8">
         <div className="h-8  bg-zinc-900 border border-zinc-800 rounded-xl animate-pulse w-40" />
-        <div className="h-36 bg-zinc-900 border border-zinc-800 rounded-2xl animate-pulse" />
-        <div className="h-48 bg-zinc-900 border border-zinc-800 rounded-2xl animate-pulse" />
-        <div className="h-64 bg-zinc-900 border border-zinc-800 rounded-2xl animate-pulse" />
+        <div className="h-36 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl animate-pulse" />
+        <div className="h-48 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl animate-pulse" />
+        <div className="h-64 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl animate-pulse" />
       </div>
     );
   }
@@ -210,7 +210,7 @@ const IncidentDetail = () => {
       <div className="relative max-w-2xl mx-auto px-4 py-6 space-y-4">
 
         {/* ── Identity card ──────────────────────────────────────────────── */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+        <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl overflow-hidden">
           {/* Severity accent */}
           <div className={`h-1 w-full ${SEVERITY_DOT[incident.severity] || 'bg-zinc-600'}`} />
           <div className="p-5">

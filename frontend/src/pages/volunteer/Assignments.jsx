@@ -307,7 +307,7 @@ const VolunteerAssignments = () => {
         {loading ? (
           <div className="space-y-3">
             {[1, 2].map(i => (
-              <div key={i} className="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl animate-pulse space-y-3">
+              <div key={i} className="p-4 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl animate-pulse space-y-3">
                 <div className="h-4 bg-zinc-800 rounded w-3/4" />
                 <div className="h-3 bg-zinc-800 rounded w-1/2" />
               </div>

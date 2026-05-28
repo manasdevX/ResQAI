@@ -74,7 +74,7 @@ const MyReports = () => {
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
-            <div key={i} className="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl animate-pulse space-y-3">
+            <div key={i} className="p-4 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl animate-pulse space-y-3">
               <div className="h-4 bg-zinc-800 rounded w-3/4" />
               <div className="h-3 bg-zinc-800 rounded w-1/2" />
               <div className="h-2 bg-zinc-800 rounded-full" />
@@ -96,7 +96,7 @@ const MyReports = () => {
             const isExpanded  = expanded === inc._id;
 
             return (
-              <div key={inc._id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden hover:border-zinc-700 transition-all">
+              <div key={inc._id} className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl overflow-hidden hover:border-zinc-700 transition-all">
                 <button
                   onClick={() => setExpanded(isExpanded ? null : inc._id)}
                   className="w-full text-left p-4"

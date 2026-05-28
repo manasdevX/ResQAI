@@ -62,10 +62,10 @@ const AdminAnalytics = () => {
     return (
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => <div key={i} className="h-24 bg-zinc-900 border border-zinc-800 rounded-2xl animate-pulse" />)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-24 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl animate-pulse" />)}
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {[1, 2, 3, 4].map(i => <div key={i} className="h-48 bg-zinc-900 border border-zinc-800 rounded-2xl animate-pulse" />)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-48 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl animate-pulse" />)}
         </div>
       </div>
     );
@@ -245,7 +245,7 @@ const AdminAnalytics = () => {
         </div>
 
         {/* Shelter utilization */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 xl:col-span-2">
+        <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-5 xl:col-span-2">
           <h3 className="text-sm font-bold text-zinc-200 mb-4">Shelter Utilization</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[

@@ -357,7 +357,7 @@ const AdminShelterManager = () => {
           {loading ? (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               {[1,2,3].map(i => (
-                <div key={i} className="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl animate-pulse space-y-3">
+                <div key={i} className="p-4 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl animate-pulse space-y-3">
                   <div className="h-4 bg-zinc-800 rounded w-3/4" />
                   <div className="h-3 bg-zinc-800 rounded w-1/2" />
                   <div className="h-2 bg-zinc-800 rounded-full" />
@@ -373,7 +373,7 @@ const AdminShelterManager = () => {
           ) : (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               {displayed.map(s => (
-                <div key={s._id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden hover:border-zinc-700 transition-all">
+                <div key={s._id} className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl overflow-hidden hover:border-zinc-700 transition-all">
                   <div className={`h-0.5 w-full ${s.status === 'active' ? 'bg-green-500' : s.status === 'full' ? 'bg-red-500' : s.status === 'preparing' ? 'bg-blue-500' : 'bg-zinc-600'}`} />
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-2 mb-2">

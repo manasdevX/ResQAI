@@ -142,7 +142,7 @@ const AdminDashboard = () => {
       {sosCount > 0 && (
         <div className="flex items-center gap-3 px-5 py-2.5 bg-red-950/90 border-b border-red-800 shrink-0 animate-pulse">
           <span className="text-lg">🚨</span>
-          <span className="text-sm font-bold text-red-300">{sosCount} active SOS emergency{sosCount !== 1 ? 'ies' : ''}</span>
+          <span className="text-sm font-bold text-red-300">{sosCount} active SOS emergenc{sosCount !== 1 ? 'ies' : 'y'}</span>
           <span className="text-xs text-red-400/70">— SOS incidents are highlighted in the feed below</span>
         </div>
       )}

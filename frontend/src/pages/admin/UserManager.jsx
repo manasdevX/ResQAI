@@ -160,7 +160,7 @@ const AdminUserManager = () => {
       {loading ? (
         <div className="space-y-2">
           {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl animate-pulse flex items-center gap-4">
+            <div key={i} className="p-4 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl animate-pulse flex items-center gap-4">
               <div className="w-10 h-10 rounded-full bg-zinc-800" />
               <div className="flex-1 space-y-2">
                 <div className="h-3.5 bg-zinc-800 rounded w-1/3" />

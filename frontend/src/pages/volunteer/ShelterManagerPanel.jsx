@@ -206,7 +206,7 @@ const ShelterManagerPanel = () => {
     return (
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {[1, 2, 3].map(i => (
-          <div key={i} className="h-32 bg-zinc-900 border border-zinc-800 rounded-2xl animate-pulse" />
+          <div key={i} className="h-32 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl animate-pulse" />
         ))}
       </div>
     );
@@ -283,7 +283,7 @@ const ShelterManagerPanel = () => {
       </div>
 
       {/* ── Shelter identity card ──────────────────────────────────────────── */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+      <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl overflow-hidden">
         {/* Coloured top strip */}
         <div className={`h-1 w-full ${
           shelter.status === 'active'   ? 'bg-green-500' :
@@ -332,7 +332,7 @@ const ShelterManagerPanel = () => {
       </div>
 
       {/* ── Status switcher ────────────────────────────────────────────────── */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+      <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-5">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-zinc-400" />
@@ -376,7 +376,7 @@ const ShelterManagerPanel = () => {
       </div>
 
       {/* ── Occupancy panel ────────────────────────────────────────────────── */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
+      <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-blue-400" />
           <p className="text-sm font-semibold text-zinc-200">Occupancy Control</p>
@@ -460,7 +460,7 @@ const ShelterManagerPanel = () => {
       </div>
 
       {/* ── Amenities editor ───────────────────────────────────────────────── */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3">
+      <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Info className="w-4 h-4 text-zinc-400" />
@@ -518,7 +518,7 @@ const ShelterManagerPanel = () => {
       </div>
 
       {/* ── Notes / Description ────────────────────────────────────────────── */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3">
+      <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-5 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-zinc-200">Shelter Notes</p>
           {editNotes ? (
@@ -565,7 +565,7 @@ const ShelterManagerPanel = () => {
 
       {/* ── Recent occupants ───────────────────────────────────────────────── */}
       {shelter.registeredOccupants?.length > 0 && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3">
+        <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-5 space-y-3">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-zinc-400" />
             <p className="text-sm font-semibold text-zinc-200">

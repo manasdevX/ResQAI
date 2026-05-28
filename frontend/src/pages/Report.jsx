@@ -27,7 +27,7 @@ const Report = () => (
       <div className="h-4 w-px bg-zinc-700/60" />
 
       <div className="flex items-center gap-2">
-        <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center shadow-lg shadow-red-900/50">
+        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg shadow-red-900/50">
           <AlertTriangle className="w-3.5 h-3.5 text-white" />
         </div>
         <span className="text-sm font-bold text-zinc-100">Report Incident</span>

@@ -240,7 +240,9 @@ const CitizenLayout = () => {
             <AvatarChip avatar={avatar} initials={initials} size="lg" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-zinc-100 truncate">{user?.name}</p>
-              <p className="text-xs text-zinc-500 capitalize mt-0.5">{user?.role} · Citizen</p>
+              <p className="text-xs text-zinc-500 mt-0.5 truncate">
+                {user?.email}
+              </p>
             </div>
             {unreadCount > 0 && (
               <span className="text-[10px] font-black px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-full">
