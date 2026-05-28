@@ -90,22 +90,24 @@ const CitizenHome = () => {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
-      {/* SOS Acknowledged banner — shown only to the citizen who triggered SOS */}
+      {/* SOS Acknowledged banner */}
       {sosAcknowledged && (
-        <div className="flex items-start gap-3 p-4 bg-green-950/80 border-2 border-green-600/60 rounded-2xl">
-          <span className="text-2xl shrink-0">✅</span>
+        <div className="flex items-start gap-3 p-4 bg-green-950/60 border-2 border-green-600/50 rounded-2xl animate-fade-up">
+          <div className="w-9 h-9 rounded-xl bg-green-500/20 flex items-center justify-center shrink-0">
+            <CheckCircle className="w-5 h-5 text-green-400" />
+          </div>
           <div className="flex-1">
             <p className="text-sm font-bold text-green-300">Help is on the way!</p>
-            <p className="text-xs text-green-400/80 mt-0.5">
+            <p className="text-xs text-green-400/80 mt-0.5 leading-relaxed">
               {sosAcknowledged.responder?.name
-                ? <><span className="font-semibold">{sosAcknowledged.responder.name}</span> has accepted your emergency and is responding.</>
+                ? <><span className="font-semibold text-green-300">{sosAcknowledged.responder.name}</span> has accepted your emergency and is responding.</>
                 : 'A responder has accepted your emergency and is responding.'}
             </p>
-            <p className="text-xs text-green-600 mt-1">Stay safe and wait for assistance to arrive.</p>
+            <p className="text-xs text-green-600/80 mt-1">Stay safe and wait for assistance.</p>
           </div>
           <button
             onClick={() => setSOSAcknowledged(null)}
-            className="text-green-600 hover:text-green-400 transition-colors shrink-0"
+            className="text-green-600 hover:text-green-400 transition-colors shrink-0 p-1 rounded-lg hover:bg-green-900/30"
             aria-label="Dismiss"
           >
             <X className="w-4 h-4" />
@@ -113,10 +115,12 @@ const CitizenHome = () => {
         </div>
       )}
 
-      {/* SOS Alert banner — shown to ALL citizens when someone nearby triggers SOS */}
+      {/* SOS Alert banner */}
       {sosAlert && (
-        <div className="flex items-start gap-3 p-4 bg-red-950/80 border-2 border-red-600/60 rounded-2xl animate-pulse">
-          <span className="text-2xl shrink-0">🚨</span>
+        <div className="flex items-start gap-3 p-4 bg-red-950/70 border-2 border-red-600/50 rounded-2xl">
+          <div className="w-9 h-9 rounded-xl bg-red-500/20 flex items-center justify-center shrink-0 animate-sos-pulse">
+            <span className="text-lg">🚨</span>
+          </div>
           <div>
             <p className="text-sm font-bold text-red-300">SOS Alert Nearby</p>
             <p className="text-xs text-red-400/70 mt-0.5">{sosAlert.user?.name} has triggered an SOS emergency.</p>
@@ -125,52 +129,66 @@ const CitizenHome = () => {
       )}
 
       {/* Greeting */}
-      <div>
-        <h1 className="text-xl font-black text-zinc-100">
-          Hi, {user?.name?.split(' ')[0]} 👋
-        </h1>
-        <p className="text-sm text-zinc-500 mt-0.5">Stay safe. Help is always nearby.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-black text-zinc-100 tracking-tight">
+            Hi, {user?.name?.split(' ')[0]} 👋
+          </h1>
+          <p className="text-sm text-zinc-500 mt-0.5">Stay safe. Help is always nearby.</p>
+        </div>
+        {location && (
+          <div className="flex items-center gap-1.5 text-[11px] text-green-400/80 font-medium bg-green-950/30 border border-green-800/30 rounded-lg px-2.5 py-1.5">
+            <MapPin className="w-3 h-3 shrink-0" />
+            <span>Location active</span>
+          </div>
+        )}
       </div>
 
       {locationError && (
-        <div className="flex items-center gap-2 p-3 bg-zinc-800/60 border border-zinc-700/50 rounded-xl text-zinc-400 text-xs">
-          <MapPin className="w-3.5 h-3.5 shrink-0 text-zinc-500" /> {locationError}
+        <div className="flex items-center gap-2.5 p-3 bg-zinc-800/50 border border-zinc-700/40 rounded-xl text-zinc-400 text-xs">
+          <MapPin className="w-3.5 h-3.5 shrink-0 text-zinc-500" />
+          <span>{locationError}</span>
         </div>
       )}
 
       {/* SOS + Mark Safe */}
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         <SOSButton />
 
-        {!user?.isSafe || safeDone ? (
-          safeDone ? (
-            <div className="flex items-center gap-2.5 p-3.5 bg-green-950/40 border border-green-700/40 rounded-xl">
-              <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
-              <p className="text-sm font-medium text-green-300">You're marked as safe</p>
-            </div>
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Mark Safe / Already Safe */}
+          {!user?.isSafe || safeDone ? (
+            safeDone ? (
+              <div className="flex items-center gap-2 p-3 bg-green-950/40 border border-green-700/40 rounded-xl">
+                <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+                <p className="text-xs font-semibold text-green-300">Marked as safe</p>
+              </div>
+            ) : (
+              <button
+                onClick={handleMarkSafe}
+                disabled={markingSafe}
+                className="flex items-center justify-center gap-2 py-3 bg-green-700/15 hover:bg-green-700/25 border border-green-600/35 rounded-xl text-green-400 text-xs font-semibold transition-all"
+              >
+                <CheckCircle className="w-4 h-4 shrink-0" />
+                {markingSafe ? 'Marking…' : 'Mark Safe'}
+              </button>
+            )
           ) : (
-            <button
-              onClick={handleMarkSafe}
-              disabled={markingSafe}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-green-700/20 hover:bg-green-700/30 border border-green-600/40 rounded-xl text-green-400 text-sm font-semibold transition-all"
-            >
-              <CheckCircle className="w-4 h-4" />
-              {markingSafe ? 'Marking…' : 'Mark Yourself Safe'}
-            </button>
-          )
-        ) : (
-          <div className="flex items-center gap-2.5 p-3.5 bg-green-950/30 border border-green-800/30 rounded-xl">
-            <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
-            <p className="text-sm text-green-400/70">You are marked as safe</p>
-          </div>
-        )}
+            <div className="flex items-center gap-2 p-3 bg-green-950/25 border border-green-800/25 rounded-xl">
+              <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+              <p className="text-xs text-green-400/70 font-medium">You're safe</p>
+            </div>
+          )}
 
-        <button
-          onClick={() => setShowResources(true)}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-orange-700/15 hover:bg-orange-700/25 border border-orange-600/30 rounded-xl text-orange-400 text-sm font-semibold transition-all"
-        >
-          <Package className="w-4 h-4" /> Request Food / Water / Medical Help
-        </button>
+          {/* Request Resources */}
+          <button
+            onClick={() => setShowResources(true)}
+            className="flex items-center justify-center gap-2 py-3 bg-orange-700/12 hover:bg-orange-700/22 border border-orange-600/25 rounded-xl text-orange-400 text-xs font-semibold transition-all"
+          >
+            <Package className="w-4 h-4 shrink-0" />
+            Request Help
+          </button>
+        </div>
       </div>
 
       {/* Weather */}
@@ -178,18 +196,20 @@ const CitizenHome = () => {
 
       {/* Quick actions */}
       <div>
-        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Quick Actions</p>
+        <p className="section-label">Quick Actions</p>
         <div className="grid grid-cols-2 gap-2.5">
           {QUICK_ACTIONS.map(({ to, icon: Icon, label, desc, color }) => (
             <Link
               key={to}
               to={to}
-              className={`flex flex-col gap-2 p-4 bg-zinc-900 border rounded-2xl transition-all group ${color}`}
+              className={`flex flex-col gap-2.5 p-4 bg-zinc-900/80 border rounded-2xl transition-all duration-200 group card-hover ${color}`}
             >
-              <Icon className="w-5 h-5 text-zinc-400 group-hover:text-zinc-200 transition" />
+              <div className="w-8 h-8 rounded-lg bg-zinc-800/80 flex items-center justify-center group-hover:bg-zinc-700/60 transition-colors">
+                <Icon className="w-4 h-4 text-zinc-400 group-hover:text-zinc-200 transition-colors" />
+              </div>
               <div>
-                <p className="text-sm font-semibold text-zinc-200">{label}</p>
-                <p className="text-xs text-zinc-500 mt-0.5">{desc}</p>
+                <p className="text-sm font-semibold text-zinc-200 leading-tight">{label}</p>
+                <p className="text-xs text-zinc-500 mt-0.5 leading-snug">{desc}</p>
               </div>
             </Link>
           ))}
@@ -200,15 +220,19 @@ const CitizenHome = () => {
       {nearbyIncidents.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Nearby Incidents</p>
-            <span className="flex items-center gap-1 text-[10px] text-red-400">
-              <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" /> LIVE
+            <p className="section-label mb-0">Nearby Incidents</p>
+            <span className="flex items-center gap-1.5 text-[10px] text-red-400 font-bold">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+              </span>
+              LIVE
             </span>
           </div>
 
           <div className="space-y-2">
             {nearbyIncidents.map(inc => (
-              <div key={inc._id} className="flex items-start gap-3 p-3.5 bg-zinc-900 border border-zinc-800 rounded-xl">
+              <div key={inc._id} className="flex items-start gap-3 p-3.5 bg-zinc-900/80 border border-zinc-800/80 rounded-xl card-hover cursor-default">
                 <span className="text-xl shrink-0 mt-0.5">{TYPE_ICONS[inc.type] || '📍'}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
@@ -222,7 +246,7 @@ const CitizenHome = () => {
                     {inc.location?.address || 'Nearby'}
                   </p>
                   {inc.aiTriage?.recommendedActions?.[0] && (
-                    <p className="text-xs text-blue-400/80 mt-1 flex items-center gap-1">
+                    <p className="text-[11px] text-blue-400/80 mt-1 flex items-center gap-1 leading-snug">
                       <Zap className="w-2.5 h-2.5 shrink-0" />
                       {inc.aiTriage.recommendedActions[0]}
                     </p>
@@ -235,9 +259,12 @@ const CitizenHome = () => {
       )}
 
       {location && nearbyIncidents.length === 0 && (
-        <div className="text-center py-8 text-zinc-600">
-          <p className="text-2xl mb-2">🛡️</p>
-          <p className="text-sm">No active incidents near you. Stay safe!</p>
+        <div className="text-center py-10 text-zinc-600">
+          <div className="w-14 h-14 rounded-full bg-zinc-800/60 border border-zinc-700/40 flex items-center justify-center mx-auto mb-3">
+            <span className="text-2xl">🛡️</span>
+          </div>
+          <p className="text-sm font-medium text-zinc-500">No active incidents near you</p>
+          <p className="text-xs text-zinc-600 mt-1">Stay safe and alert</p>
         </div>
       )}
 

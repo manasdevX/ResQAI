@@ -188,6 +188,28 @@ const AdminDashboard = () => {
         </div>
       )}
 
+      {/* Stats strip */}
+      <div className="shrink-0 px-5 py-3 border-b border-zinc-800/60 bg-zinc-900/50 flex items-center gap-3 flex-wrap">
+        {[
+          { value: activeCount,    label: 'Active',    color: 'text-green-400',  dot: 'bg-green-500',  bg: 'bg-green-500/10 border-green-500/20' },
+          { value: criticalCount,  label: 'Critical',  color: 'text-red-400',    dot: 'bg-red-500',    bg: 'bg-red-500/10 border-red-500/20' },
+          { value: sosCount,       label: 'SOS',       color: 'text-orange-400', dot: 'bg-orange-500', bg: 'bg-orange-500/10 border-orange-500/20' },
+          { value: resolvedCount,  label: 'Resolved',  color: 'text-zinc-400',   dot: 'bg-zinc-500',   bg: 'bg-zinc-800/60 border-zinc-700/40' },
+          ...(availableResponders !== null
+            ? [{ value: availableResponders, label: 'On Duty', color: 'text-blue-400', dot: 'bg-blue-500', bg: 'bg-blue-500/10 border-blue-500/20' }]
+            : []),
+        ].map(({ value, label, color, dot, bg }) => (
+          <div key={label} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold ${bg}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${dot} ${label === 'Active' || label === 'SOS' ? 'animate-pulse' : ''}`} />
+            <span className={`text-base font-black tabular-nums ${color}`}>{value}</span>
+            <span className="text-zinc-500 font-medium">{label}</span>
+          </div>
+        ))}
+        <div className="ml-auto hidden sm:block">
+          <WeatherWidget compact />
+        </div>
+      </div>
+
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
         {/* Map */}
@@ -203,38 +225,20 @@ const AdminDashboard = () => {
             <LiveMap incidents={incidents} latestIncidentId={latestIncidentId} />
           )}
 
-          <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-zinc-900/90 backdrop-blur-sm rounded-full border border-zinc-700 text-xs font-medium z-10">
-            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+          <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 float-card text-xs font-medium z-10">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+            </span>
             LIVE — {incidents.length} incident{incidents.length !== 1 ? 's' : ''}
           </div>
 
-          <div className="absolute top-4 right-4 z-10">
-            <WeatherWidget compact />
-          </div>
-
-          {/* Stats bar */}
-          <div className="absolute bottom-6 right-4 flex flex-col gap-2 z-10">
-            {[
-              { label: `${activeCount} Active`,    color: 'bg-green-400' },
-              { label: `${criticalCount} Critical`, color: 'bg-red-500' },
-              { label: `${resolvedCount} Resolved`, color: 'bg-zinc-400' },
-              ...(availableResponders !== null
-                ? [{ label: `${availableResponders} Responders on duty`, color: 'bg-blue-400' }]
-                : []),
-            ].map(({ label, color }) => (
-              <div key={label} className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900/90 backdrop-blur-sm rounded-full border border-zinc-700 text-xs font-medium">
-                <span className={`w-2 h-2 rounded-full ${color}`} />
-                {label}
-              </div>
-            ))}
-          </div>
-
           {/* Legend */}
-          <div className="absolute bottom-6 left-4 bg-zinc-900/90 backdrop-blur-sm border border-zinc-700 rounded-xl p-3 text-xs space-y-1.5 z-10">
-            <p className="text-zinc-400 font-semibold uppercase tracking-wider text-[10px] mb-2">Severity</p>
+          <div className="absolute bottom-6 left-4 float-card p-3 text-xs space-y-1.5 z-10">
+            <p className="text-zinc-500 font-bold uppercase tracking-wider text-[10px] mb-2">Severity</p>
             {[['Critical','bg-red-500'],['High','bg-orange-500'],['Medium','bg-yellow-500'],['Low','bg-green-500']].map(([label, color]) => (
               <div key={label} className="flex items-center gap-2">
-                <span className={`w-3 h-3 rounded-full ${color}`} />
+                <span className={`w-2.5 h-2.5 rounded-full ${color}`} />
                 <span className="text-zinc-300">{label}</span>
               </div>
             ))}
@@ -242,10 +246,19 @@ const AdminDashboard = () => {
         </div>
 
         {/* Sidebar */}
-        <aside className="w-80 xl:w-96 bg-zinc-900 border-l border-zinc-800 flex flex-col overflow-hidden shrink-0">
-          <div className="px-4 py-3 border-b border-zinc-800 shrink-0">
-            <h2 className="text-sm font-semibold text-zinc-200">Incident Feed</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Real-time via Socket.IO</p>
+        <aside className="w-80 xl:w-96 bg-zinc-900/80 border-l border-zinc-800/60 flex flex-col overflow-hidden shrink-0">
+          <div className="px-4 py-3 border-b border-zinc-800/60 shrink-0 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-zinc-200">Incident Feed</h2>
+              <p className="text-[11px] text-zinc-500 mt-0.5 flex items-center gap-1.5">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
+                </span>
+                Real-time via Socket.IO
+              </p>
+            </div>
+            <span className="text-xs font-bold text-zinc-500 tabular-nums">{incidents.length}</span>
           </div>
 
           <div ref={sidebarRef} className="flex-1 overflow-y-auto divide-y divide-zinc-800/60">

@@ -80,9 +80,9 @@ const ResetPassword = () => {
       <div className="w-full max-w-md">
 
         {/* Logo */}
-        <div className="flex items-center gap-2 mb-8">
-          <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center font-black text-sm shadow-lg shadow-red-600/30">R</div>
-          <span className="font-bold">ResQAI</span>
+        <div className="flex items-center gap-2.5 mb-8">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center font-black text-sm shadow-lg shadow-red-600/30">R</div>
+          <span className="font-black tracking-tight">ResQ<span className="text-red-400">AI</span></span>
         </div>
 
         {done ? (
@@ -100,7 +100,7 @@ const ResetPassword = () => {
         ) : (
           /* ── Form ────────────────────────────────────────────────────────── */
           <>
-            <h1 className="text-2xl font-bold mb-1">Set a new password</h1>
+            <h1 className="text-2xl font-black tracking-tight mb-1">Set a new password</h1>
             <p className="text-sm text-zinc-500 mb-8">Choose a strong password you haven't used before.</p>
 
             {error && (

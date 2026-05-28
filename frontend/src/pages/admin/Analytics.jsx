@@ -23,14 +23,14 @@ const HBar = ({ label, value, max, colorClass, icon }) => {
 };
 
 const StatCard = ({ label, value, sub, icon: Icon, color }) => (
-  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+  <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-4 card-hover transition-all">
     <div className="flex items-start justify-between gap-2">
-      <div>
-        <p className="text-2xl font-black text-zinc-100">{value ?? '—'}</p>
-        <p className="text-xs font-semibold text-zinc-400 mt-0.5">{label}</p>
-        {sub && <p className="text-[10px] text-zinc-600 mt-1">{sub}</p>}
+      <div className="min-w-0 flex-1">
+        <p className="text-2xl font-black text-zinc-100 tabular-nums tracking-tight">{value ?? '—'}</p>
+        <p className="text-xs font-semibold text-zinc-400 mt-1 leading-tight">{label}</p>
+        {sub && <p className="text-[10px] text-zinc-600 mt-1 leading-snug">{sub}</p>}
       </div>
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${color}`}>
         <Icon className="w-4 h-4" />
       </div>
     </div>
@@ -100,16 +100,16 @@ const AdminAnalytics = () => {
   const maxType    = Math.max(...incidents.byType.map(x => x.count), 1);
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-black text-zinc-100">Analytics</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">Incident trends and response statistics</p>
+          <h1 className="text-lg font-black text-zinc-100 tracking-tight">Analytics</h1>
+          <p className="text-xs text-zinc-500 mt-0.5">Incident trends and operational response statistics</p>
         </div>
         <button
           onClick={fetchSummary}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-xs font-medium text-zinc-300 transition"
+          className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/60 rounded-xl text-xs font-semibold text-zinc-300 hover:text-zinc-100 transition-all"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </button>
@@ -158,7 +158,7 @@ const AdminAnalytics = () => {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
         {/* Last 7 days bar chart */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+        <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-5">
           <h3 className="text-sm font-bold text-zinc-200 mb-4">Incidents — Last 7 Days</h3>
           <div className="flex items-end gap-2 h-28">
             {last7Days.map(({ date, count }) => {
@@ -181,7 +181,7 @@ const AdminAnalytics = () => {
         </div>
 
         {/* By Severity */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+        <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-5">
           <h3 className="text-sm font-bold text-zinc-200 mb-4">Incidents by Severity</h3>
           <div className="space-y-3">
             {bySeverity.map(({ label, value }) => (
@@ -199,7 +199,7 @@ const AdminAnalytics = () => {
         </div>
 
         {/* By Type */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+        <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-5">
           <h3 className="text-sm font-bold text-zinc-200 mb-4">Incidents by Type</h3>
           <div className="space-y-3">
             {incidents.byType.length === 0
@@ -212,7 +212,7 @@ const AdminAnalytics = () => {
         </div>
 
         {/* By Status + resolution ring */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+        <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl p-5">
           <h3 className="text-sm font-bold text-zinc-200 mb-4">Incidents by Status</h3>
           <div className="space-y-3">
             {incidents.byStatus.length === 0

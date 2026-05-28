@@ -42,9 +42,9 @@ const ForgotPassword = () => {
       <div className="w-full max-w-md">
 
         {/* Logo */}
-        <div className="flex items-center gap-2 mb-8">
-          <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center font-black text-sm shadow-lg shadow-red-600/30">R</div>
-          <span className="font-bold">ResQAI</span>
+        <div className="flex items-center gap-2.5 mb-8">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center font-black text-sm shadow-lg shadow-red-600/30">R</div>
+          <span className="font-black tracking-tight">ResQ<span className="text-red-400">AI</span></span>
         </div>
 
         {sent ? (
@@ -77,7 +77,7 @@ const ForgotPassword = () => {
         ) : (
           /* ── Form state ─────────────────────────────────────────────────── */
           <>
-            <h1 className="text-2xl font-bold mb-1">Forgot your password?</h1>
+            <h1 className="text-2xl font-black tracking-tight mb-1">Forgot your password?</h1>
             <p className="text-sm text-zinc-500 mb-8">
               Enter your account email and we'll send you a reset link.
             </p>
@@ -116,7 +116,7 @@ const ForgotPassword = () => {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2"
               >
                 {isSubmitting
                   ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>

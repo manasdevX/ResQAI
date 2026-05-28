@@ -135,9 +135,9 @@ const CitizenLayout = () => {
     <div className="h-screen bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden">
 
       {/* ── Top navbar ──────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 bg-zinc-900/96 backdrop-blur-xl border-b border-zinc-800/60 shrink-0">
+      <header className="sticky top-0 z-40 bg-zinc-900/95 backdrop-blur-2xl border-b border-zinc-800/50 shrink-0">
         {/* Red accent gradient line */}
-        <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-red-500/70 to-transparent" />
+        <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-red-500/80 to-transparent" />
 
         <div className="max-w-screen-2xl mx-auto px-5 sm:px-8 flex items-center justify-between h-[60px] gap-4">
 
@@ -283,15 +283,25 @@ const CitizenLayout = () => {
             key={to}
             to={to}
             className={({ isActive }) =>
-              `flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] font-semibold transition-all ${
-                isActive ? 'text-red-400' : 'text-zinc-500 hover:text-zinc-300'
+              `flex-1 flex flex-col items-center justify-center pt-2 pb-3 gap-1 text-[10px] font-semibold transition-all relative ${
+                isActive ? 'text-red-400' : 'text-zinc-500 active:text-zinc-300'
               }`
             }
           >
             {({ isActive }) => (
               <>
-                <span className={`p-1.5 rounded-xl transition-all ${isActive ? 'bg-red-600/20' : ''}`}>
-                  <Icon className="w-[19px] h-[19px]" />
+                {isActive && (
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[3px] bg-red-500 rounded-b-full" />
+                )}
+                <span className={`p-1.5 rounded-xl transition-all duration-200 ${isActive ? 'bg-red-500/15' : ''}`}>
+                  {to === '/profile' && unreadCount > 0 ? (
+                    <span className="relative">
+                      <Icon className="w-[19px] h-[19px]" />
+                      <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-zinc-900" />
+                    </span>
+                  ) : (
+                    <Icon className="w-[19px] h-[19px]" />
+                  )}
                 </span>
                 <span>{label}</span>
               </>

@@ -306,8 +306,9 @@ const Signup = () => {
 
         {/* Left panel */}
         <div className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-center items-center p-10 bg-zinc-900 border-r border-zinc-800 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-72 h-72 bg-blue-600/8 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-red-600/8 rounded-full blur-3xl -translate-x-1/3 translate-y-1/3 pointer-events-none" />
+          <div className="absolute inset-0 hero-dots pointer-events-none" />
+          <div className="absolute top-0 right-0 w-72 h-72 bg-blue-600/12 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-red-600/10 rounded-full blur-3xl -translate-x-1/3 translate-y-1/3 pointer-events-none" />
           <div className="relative text-center max-w-xs">
             <div className="w-20 h-20 rounded-full bg-blue-600/10 border border-blue-500/20 flex items-center justify-center mx-auto mb-6">
               <ShieldAlert className="w-10 h-10 text-blue-400" />
@@ -324,22 +325,22 @@ const Signup = () => {
         </div>
 
         {/* Right OTP form */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 bg-zinc-950">
           <div className="w-full max-w-md">
 
-            <div className="flex items-center gap-2 mb-8 lg:hidden">
-              <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center font-black text-sm">R</div>
-              <span className="font-bold">ResQAI</span>
+            <div className="flex items-center gap-2.5 mb-8 lg:hidden">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center font-black text-sm shadow-lg shadow-red-600/30">R</div>
+              <span className="font-black tracking-tight">ResQ<span className="text-red-400">AI</span></span>
             </div>
 
             <button
               onClick={() => { setStep('form'); setOtp(Array(OTP_LENGTH).fill('')); setOtpError(''); }}
-              className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-300 mb-6 transition-colors"
+              className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-300 mb-6 transition-colors group"
             >
-              <ArrowLeft className="w-4 h-4" /> Back
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" /> Back
             </button>
 
-            <h1 className="text-2xl font-bold mb-1">Verify your email</h1>
+            <h1 className="text-2xl font-black tracking-tight mb-1">Verify your email</h1>
             <p className="text-sm text-zinc-500 mb-7">
               Enter the 6-digit code sent to{' '}
               <span className="text-zinc-300 font-medium">{verifiedEmail}</span>
@@ -430,13 +431,17 @@ const Signup = () => {
 
       {/* Left hero */}
       <div className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between p-10 bg-zinc-900 border-r border-zinc-800 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-72 h-72 bg-blue-600/8 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-red-600/8 rounded-full blur-3xl -translate-x-1/3 translate-y-1/3 pointer-events-none" />
+        <div className="absolute inset-0 hero-dots pointer-events-none" />
+        <div className="absolute top-0 right-0 w-72 h-72 bg-blue-600/12 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-red-600/10 rounded-full blur-3xl -translate-x-1/3 translate-y-1/3 pointer-events-none" />
 
         <div className="relative">
           <div className="flex items-center gap-3 mb-12">
-            <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center text-base font-black shadow-lg shadow-red-600/30">R</div>
-            <span className="text-xl font-bold tracking-tight">ResQAI</span>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-base font-black shadow-lg shadow-red-600/30">R</div>
+            <div>
+              <span className="text-xl font-black tracking-tight">ResQ<span className="text-red-400">AI</span></span>
+              <p className="text-[10px] text-zinc-500 font-medium -mt-0.5 uppercase tracking-wider">Emergency Response</p>
+            </div>
           </div>
           <h2 className="text-4xl xl:text-5xl font-black leading-[1.1] text-zinc-100 mb-5">
             Join the<br />
@@ -466,12 +471,12 @@ const Signup = () => {
       </div>
 
       {/* Right form */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 overflow-y-auto">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 overflow-y-auto bg-zinc-950">
         <div className="w-full max-w-md py-6">
 
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center font-black text-sm">R</div>
-            <span className="font-bold">ResQAI</span>
+          <div className="flex items-center gap-2.5 mb-8 lg:hidden">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center font-black text-sm shadow-lg shadow-red-600/30">R</div>
+            <span className="font-black tracking-tight">ResQ<span className="text-red-400">AI</span></span>
           </div>
 
           {/* Invite badge */}
@@ -487,27 +492,30 @@ const Signup = () => {
             </div>
           ) : (
             <>
-              <h1 className="text-2xl font-bold mb-1">Create your account</h1>
+              <h1 className="text-2xl font-black tracking-tight mb-1">Create your account</h1>
               <p className="text-sm text-zinc-500 mb-6">Join the ResQAI emergency response network.</p>
 
               {/* Role toggle */}
-              <div className="mb-6 p-1 bg-zinc-900 border border-zinc-800 rounded-xl flex gap-1">
+              <div className="mb-6 p-1 bg-zinc-900/80 border border-zinc-800/80 rounded-xl flex gap-1">
                 {[
-                  { value: 'citizen',   label: 'Citizen',   desc: 'I need help / report emergencies' },
-                  { value: 'responder', label: 'Volunteer', desc: 'I want to help others' },
-                ].map(({ value, label, desc }) => (
+                  { value: 'citizen',   label: 'Citizen',   icon: '👤', desc: 'Need help or reporting' },
+                  { value: 'responder', label: 'Volunteer', icon: '🦺', desc: 'Helping others' },
+                ].map(({ value, label, icon, desc }) => (
                   <button
                     key={value}
                     type="button"
                     onClick={() => setRole(value)}
-                    className={`flex-1 flex flex-col items-center py-2.5 px-2 rounded-lg text-center transition-all ${
+                    className={`flex-1 flex items-center gap-2.5 py-2.5 px-3 rounded-lg text-left transition-all ${
                       role === value
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                        : 'text-zinc-400 hover:text-zinc-200'
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
+                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
                     }`}
                   >
-                    <span className="text-sm font-semibold">{label}</span>
-                    <span className={`text-[10px] mt-0.5 ${role === value ? 'text-blue-200' : 'text-zinc-600'}`}>{desc}</span>
+                    <span className="text-base shrink-0">{icon}</span>
+                    <div>
+                      <p className="text-sm font-semibold leading-tight">{label}</p>
+                      <p className={`text-[10px] mt-0.5 leading-tight ${role === value ? 'text-blue-200' : 'text-zinc-600'}`}>{desc}</p>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -650,7 +658,7 @@ const Signup = () => {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 mt-2"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 mt-2"
             >
               {submitting
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending verification code…</>
@@ -672,7 +680,7 @@ const Signup = () => {
               <button
                 onClick={() => signupWithGoogle()}
                 disabled={submitting}
-                className="w-full flex items-center justify-center gap-3 py-3 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 border border-zinc-700 hover:border-zinc-600 rounded-xl text-sm font-semibold transition-all duration-200"
+                className="w-full flex items-center justify-center gap-3 py-3 bg-zinc-900 hover:bg-zinc-800/80 disabled:opacity-50 border border-zinc-800 hover:border-zinc-700 rounded-xl text-sm font-semibold transition-all duration-200"
               >
                 <svg viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />

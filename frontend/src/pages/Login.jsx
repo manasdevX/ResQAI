@@ -76,68 +76,73 @@ const Login = () => {
 
       {/* Left hero */}
       <div className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between p-10 bg-zinc-900 border-r border-zinc-800 relative overflow-hidden">
+        {/* Dot pattern */}
+        <div className="absolute inset-0 hero-dots opacity-100 pointer-events-none" />
         {/* Ambient glows */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-red-600/12 rounded-full blur-3xl -translate-x-1/3 -translate-y-1/3 pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-600/8 rounded-full blur-3xl translate-x-1/3 translate-y-1/3 pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-orange-600/3 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 left-0 w-96 h-96 bg-red-600/15 rounded-full blur-3xl -translate-x-1/3 -translate-y-1/3 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl translate-x-1/3 translate-y-1/3 pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-orange-600/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative">
           {/* Logo */}
           <div className="flex items-center gap-3 mb-12">
-            <div className="w-11 h-11 rounded-2xl bg-red-600 flex items-center justify-center font-black text-lg shadow-xl shadow-red-600/40">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center font-black text-lg shadow-xl shadow-red-600/40">
               <span className="text-white">R</span>
             </div>
             <div>
               <span className="text-xl font-black tracking-tight">ResQ<span className="text-red-400">AI</span></span>
-              <p className="text-[10px] text-zinc-500 font-medium -mt-0.5">Emergency Response Platform</p>
+              <p className="text-[10px] text-zinc-500 font-medium -mt-0.5 uppercase tracking-wider">Emergency Response Platform</p>
             </div>
           </div>
 
-          <h2 className="text-4xl xl:text-5xl font-black leading-[1.1] text-zinc-100 mb-5">
+          <h2 className="text-4xl xl:text-5xl font-black leading-[1.08] text-zinc-100 mb-5">
             Emergency<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400">
               Coordination
             </span><br />
             Made Smart.
           </h2>
-          <p className="text-zinc-400 text-base leading-relaxed max-w-sm">
+          <p className="text-zinc-400 text-sm leading-relaxed max-w-sm">
             AI-powered real-time incident response for civilians,
             volunteers, and emergency administrators.
           </p>
         </div>
 
-        <div className="relative space-y-3.5">
+        <div className="relative space-y-2.5">
           {[
-            { icon: '🗺️', label: 'Live incident map with geospatial search', color: 'text-blue-400' },
-            { icon: '🤖', label: 'AI triage and risk scoring via Gemini',     color: 'text-purple-400' },
-            { icon: '🏥', label: 'Real-time shelter & hospital finder',        color: 'text-teal-400'  },
-            { icon: '🚨', label: 'One-tap SOS with GPS location broadcast',   color: 'text-red-400'   },
-          ].map(({ icon, label, color }) => (
-            <div key={label} className="flex items-center gap-3 text-sm">
-              <span className={`w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-base shrink-0`}>{icon}</span>
-              <span className="text-zinc-300">{label}</span>
+            { icon: '🗺️', label: 'Live incident map with geospatial search' },
+            { icon: '🤖', label: 'AI triage and risk scoring via Gemini'     },
+            { icon: '🏥', label: 'Real-time shelter & hospital finder'        },
+            { icon: '🚨', label: 'One-tap SOS with GPS location broadcast'   },
+          ].map(({ icon, label }) => (
+            <div key={label} className="flex items-center gap-3 text-sm group">
+              <span className="w-9 h-9 rounded-xl bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-base shrink-0 group-hover:border-zinc-600 transition-colors">{icon}</span>
+              <span className="text-zinc-300 font-medium">{label}</span>
             </div>
           ))}
 
           {/* Live system status */}
-          <div className="mt-6 flex items-center gap-2 px-3 py-2 bg-green-950/30 border border-green-800/30 rounded-xl w-fit">
-            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+          <div className="mt-5 flex items-center gap-2.5 px-3.5 py-2.5 bg-green-950/30 border border-green-800/30 rounded-xl w-fit">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+            </span>
             <span className="text-xs text-green-400 font-semibold">All systems operational</span>
           </div>
         </div>
       </div>
 
       {/* Right form */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 bg-zinc-950">
         <div className="w-full max-w-md">
 
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center font-black text-sm">R</div>
-            <span className="font-bold">ResQAI</span>
+          <div className="flex items-center gap-2.5 mb-8 lg:hidden">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center font-black text-sm shadow-lg shadow-red-600/30">R</div>
+            <span className="font-black tracking-tight">ResQ<span className="text-red-400">AI</span></span>
           </div>
 
-          <h1 className="text-2xl font-bold mb-1">Welcome back</h1>
-          <p className="text-sm text-zinc-500 mb-8">Sign in to access your dashboard.</p>
+          <h1 className="text-2xl font-black tracking-tight mb-1">Welcome back</h1>
+          <p className="text-sm text-zinc-500 mb-7">Sign in to access your dashboard.</p>
 
           {error && (
             <div className="flex items-start gap-2.5 mb-5 p-3.5 bg-red-950/40 border border-red-900/50 rounded-xl text-sm text-red-400">
@@ -219,7 +224,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2"
             >
               {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Signing in…</> : 'Sign in'}
             </button>
@@ -227,7 +232,7 @@ const Login = () => {
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-zinc-800" />
+              <div className="w-full border-t border-zinc-800/80" />
             </div>
             <div className="relative flex justify-center">
               <span className="px-3 bg-zinc-950 text-xs text-zinc-600">or continue with</span>
@@ -237,7 +242,7 @@ const Login = () => {
           <button
             onClick={() => loginWithGoogle()}
             disabled={isSubmitting}
-            className="w-full flex items-center justify-center gap-3 py-3 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 border border-zinc-700 hover:border-zinc-600 rounded-xl text-sm font-semibold transition-all duration-200"
+            className="w-full flex items-center justify-center gap-3 py-3 bg-zinc-900 hover:bg-zinc-800/80 disabled:opacity-50 border border-zinc-800 hover:border-zinc-700 rounded-xl text-sm font-semibold transition-all duration-200"
           >
             <svg viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />

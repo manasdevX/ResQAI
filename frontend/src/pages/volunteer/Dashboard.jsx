@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import WeatherWidget from '../../components/WeatherWidget';
-import { MapPin, ClipboardList, Package, MessageCircle, Zap, Users, AlertTriangle, Plus, X } from 'lucide-react';
+import { MapPin, ClipboardList, Package, MessageCircle, Zap, AlertTriangle, Plus, X } from 'lucide-react';
 
 const VolunteerDashboard = () => {
   const { user, api, updateUser } = useAuth();
@@ -162,75 +162,148 @@ const VolunteerDashboard = () => {
         </div>
       ))}
 
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-black text-zinc-100">Welcome back, {user?.name?.split(' ')[0]}</h1>
-        <p className="text-sm text-zinc-500 mt-0.5">
-          {user?.isAvailable ? '🟢 You are ON DUTY — volunteers can see you' : '⚪ You are OFF DUTY — toggle to go active'}
-        </p>
-        <p className="text-[11px] text-zinc-600 mt-1 flex items-center gap-1">
-          {gpsStatus === 'detecting' && <><span className="inline-block w-2 h-2 rounded-full bg-yellow-500 animate-pulse" /> Detecting your location…</>}
-          {gpsStatus === 'granted'   && <><span className="inline-block w-2 h-2 rounded-full bg-green-500" /> Showing stats for your area</>}
-          {gpsStatus === 'denied'    && <><span className="inline-block w-2 h-2 rounded-full bg-zinc-600" /> Location unavailable — showing global stats</>}
-        </p>
+      {/* Header + Duty status */}
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-black text-zinc-100 tracking-tight">
+              Welcome back, {user?.name?.split(' ')[0]}
+            </h1>
+            <p className="text-xs text-zinc-500 mt-0.5 flex items-center gap-1.5">
+              {gpsStatus === 'detecting' && (
+                <><span className="inline-flex w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Detecting location…</>
+              )}
+              {gpsStatus === 'granted' && (
+                <><span className="inline-flex w-1.5 h-1.5 rounded-full bg-green-500" /> Showing stats for your area</>
+              )}
+              {gpsStatus === 'denied' && (
+                <><span className="inline-flex w-1.5 h-1.5 rounded-full bg-zinc-600" /> Global stats</>
+              )}
+            </p>
+          </div>
+
+          {/* Compact duty toggle chip */}
+          <div className={`shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-all ${
+            user?.isAvailable
+              ? 'bg-green-500/12 border-green-500/25 text-green-400'
+              : 'bg-zinc-800/60 border-zinc-700/50 text-zinc-500'
+          }`}>
+            {user?.isAvailable ? (
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              </span>
+            ) : (
+              <span className="w-2 h-2 rounded-full bg-zinc-600" />
+            )}
+            {user?.isAvailable ? 'ON DUTY' : 'OFF DUTY'}
+          </div>
+        </div>
+
+        {/* Duty status prominent card — only shown to responders (not shelter managers) */}
+        {user?.role !== 'shelter_manager' && (
+          <div className={`p-4 rounded-2xl border transition-all ${
+            user?.isAvailable
+              ? 'bg-green-950/30 border-green-800/30'
+              : 'bg-zinc-900/60 border-zinc-800/60'
+          }`}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className={`text-sm font-bold ${user?.isAvailable ? 'text-green-300' : 'text-zinc-400'}`}>
+                  {user?.isAvailable ? 'You are on duty' : 'You are off duty'}
+                </p>
+                <p className={`text-xs mt-0.5 ${user?.isAvailable ? 'text-green-400/70' : 'text-zinc-600'}`}>
+                  {user?.isAvailable
+                    ? 'Dispatchers can see you and assign incidents'
+                    : 'Toggle ON DUTY in the sidebar to start receiving assignments'}
+                </p>
+              </div>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                user?.isAvailable ? 'bg-green-500/20' : 'bg-zinc-800'
+              }`}>
+                <Zap className={`w-5 h-5 ${user?.isAvailable ? 'text-green-400' : 'text-zinc-600'}`} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Active Incidents',  value: stats.active,  icon: AlertTriangle, color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/20' },
-          { label: 'My Assignments',    value: stats.mine,    icon: ClipboardList, color: 'text-blue-400',   bg: 'bg-blue-500/10 border-blue-500/20' },
-          { label: gpsLocation ? 'Nearby Resources' : 'Resource Requests', value: stats.resources, icon: Package, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
-        ].map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className={`flex flex-col items-center gap-1.5 p-4 rounded-2xl border ${bg}`}>
-            <Icon className={`w-5 h-5 ${color}`} />
-            <p className="text-2xl font-black text-zinc-100">{value}</p>
-            <p className="text-[10px] text-zinc-500 text-center font-medium">{label}</p>
-          </div>
+          { label: 'Active',      value: stats.active,    icon: AlertTriangle, color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/20',    to: '/volunteer/incidents'   },
+          { label: 'Assigned',    value: stats.mine,      icon: ClipboardList, color: 'text-blue-400',   bg: 'bg-blue-500/10 border-blue-500/20',   to: '/volunteer/assignments' },
+          { label: 'Resources',   value: stats.resources, icon: Package,       color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20', to: '/volunteer/resources'  },
+        ].map(({ label, value, icon: Icon, color, bg, to }) => (
+          <Link
+            key={label}
+            to={to}
+            className={`flex flex-col items-center gap-1.5 p-4 rounded-2xl border transition-all card-hover ${bg}`}
+          >
+            <Icon className={`w-4 h-4 ${color}`} />
+            <p className="text-2xl font-black text-zinc-100 tabular-nums">{value}</p>
+            <p className="text-[10px] text-zinc-500 text-center font-semibold uppercase tracking-wide">{label}</p>
+          </Link>
         ))}
       </div>
 
 
       {/* Quick links */}
-      <div className="grid grid-cols-2 gap-3">
-        {[
-          { to: '/volunteer/incidents',   icon: MapPin,        label: 'View Nearby Incidents', color: 'hover:border-blue-500/40 hover:bg-blue-950/20' },
-          { to: '/volunteer/assignments', icon: ClipboardList, label: 'My Assignments',        color: 'hover:border-purple-500/40 hover:bg-purple-950/20' },
-          { to: '/volunteer/resources',   icon: Package,       label: 'Fulfill Resources',     color: 'hover:border-orange-500/40 hover:bg-orange-950/20' },
-          { to: '/volunteer/chat',        icon: MessageCircle, label: 'Open Chat',             color: 'hover:border-green-500/40 hover:bg-green-950/20' },
-        ].map(({ to, icon: Icon, label, color }) => (
-          <Link
-            key={to}
-            to={to}
-            className={`flex items-center gap-2.5 p-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-sm font-medium text-zinc-300 hover:text-zinc-100 transition-all ${color}`}
-          >
-            <Icon className="w-4 h-4 text-zinc-500" /> {label}
-          </Link>
-        ))}
+      <div>
+        <p className="section-label">Quick Actions</p>
+        <div className="grid grid-cols-2 gap-2.5">
+          {[
+            { to: '/volunteer/incidents',   icon: MapPin,        label: 'Nearby Incidents',  desc: 'View active nearby',    color: 'hover:border-blue-500/30 hover:bg-blue-950/15'   },
+            { to: '/volunteer/assignments', icon: ClipboardList, label: 'My Assignments',    desc: 'Incidents assigned',    color: 'hover:border-purple-500/30 hover:bg-purple-950/15' },
+            { to: '/volunteer/resources',   icon: Package,       label: 'Fulfill Resources', desc: 'Help requests nearby',  color: 'hover:border-orange-500/30 hover:bg-orange-950/15' },
+            { to: '/volunteer/chat',        icon: MessageCircle, label: 'Open Chat',         desc: 'Talk to your team',     color: 'hover:border-green-500/30 hover:bg-green-950/15'  },
+          ].map(({ to, icon: Icon, label, desc, color }) => (
+            <Link
+              key={to}
+              to={to}
+              className={`flex flex-col gap-2.5 p-4 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl transition-all duration-200 group card-hover ${color}`}
+            >
+              <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center group-hover:bg-zinc-700/50 transition-colors">
+                <Icon className="w-4 h-4 text-zinc-400 group-hover:text-zinc-200 transition-colors" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-zinc-200">{label}</p>
+                <p className="text-xs text-zinc-500 mt-0.5">{desc}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* Skills */}
-      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-3">
-        <div className="flex items-center gap-2">
-          <Zap className="w-4 h-4 text-yellow-400" />
-          <p className="text-sm font-semibold text-zinc-200">My Skills</p>
+      <div className="p-4 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+              <Zap className="w-3.5 h-3.5 text-yellow-400" />
+            </div>
+            <p className="text-sm font-bold text-zinc-200">My Skills</p>
+          </div>
+          {skills.length > 0 && (
+            <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">{skills.length} skill{skills.length !== 1 ? 's' : ''}</span>
+          )}
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {skills.map(skill => (
             <span
               key={skill}
-              className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-300 rounded-full"
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-300 rounded-full capitalize"
             >
               {skill}
-              <button onClick={() => removeSkill(skill)} className="hover:text-red-400 transition">
+              <button onClick={() => removeSkill(skill)} className="hover:text-red-400 transition-colors ml-0.5" aria-label={`Remove ${skill}`}>
                 <X className="w-2.5 h-2.5" />
               </button>
             </span>
           ))}
 
           {skills.length === 0 && (
-            <p className="text-xs text-zinc-600">No skills added yet. Add your expertise so admins can assign you better.</p>
+            <p className="text-xs text-zinc-600 leading-relaxed">No skills added yet. Add your expertise so admins can match you to relevant incidents.</p>
           )}
         </div>
 
@@ -241,12 +314,12 @@ const VolunteerDashboard = () => {
             onChange={e => setNewSkill(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addSkill()}
             placeholder="e.g. first aid, driving, search & rescue…"
-            className="flex-1 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-blue-500 transition"
+            className="flex-1 px-3 py-2 bg-zinc-800/80 border border-zinc-700/60 rounded-xl text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20 transition-all"
           />
           <button
             onClick={addSkill}
             disabled={skillSaving || !newSkill.trim()}
-            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition"
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition-all"
           >
             <Plus className="w-3 h-3" /> Add
           </button>
