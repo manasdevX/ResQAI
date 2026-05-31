@@ -8,6 +8,25 @@ import { uploadToCloudinary } from '../middleware/upload.js';
 
 const badId = (res) => res.status(400).json({ success: false, message: 'Invalid ID format' });
 
+const VALID_INCIDENT_TYPES = [
+  'fire', 'flood', 'earthquake', 'cyclone', 'landslide',
+  'accident', 'medical_emergency', 'building_collapse', 'chemical_spill', 'riot', 'other',
+];
+
+// Sensible initial severity by type — AI refines this async
+const SEVERITY_BY_TYPE = {
+  earthquake:        'critical',
+  building_collapse: 'critical',
+  chemical_spill:    'critical',
+  fire:              'high',
+  flood:             'high',
+  cyclone:           'high',
+  medical_emergency: 'high',
+  landslide:         'high',
+  accident:          'medium',
+  riot:              'medium',
+  other:             'medium',
+};
 
 // Incident type → skill keywords for targeted dispatch
 // Keys must match Incident model enum exactly
@@ -73,6 +92,10 @@ export const createIncident = async (req, res) => {
     if (!type?.trim())        return res.status(400).json({ success: false, message: 'Incident type is required' });
     if (!location)            return res.status(400).json({ success: false, message: 'Location is required' });
 
+    if (!VALID_INCIDENT_TYPES.includes(type.trim())) {
+      return res.status(400).json({ success: false, message: `Invalid incident type. Must be one of: ${VALID_INCIDENT_TYPES.join(', ')}` });
+    }
+
     // Normalise multipart string fields
     location = safeParse(location, null);
     tags     = safeParse(tags, []);
@@ -88,19 +111,12 @@ export const createIncident = async (req, res) => {
     }
 
     // ── Duplicate detection ────────────────────────────────────────────────────
-    // Prevent spam: block if this user already reported an active incident
-    // within 500 m of this location in the last 30 minutes.
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60_000);
     const duplicate = await Incident.findOne({
       reportedBy: req.user._id,
       status:     { $nin: ['resolved', 'closed'] },
       createdAt:  { $gte: thirtyMinutesAgo },
-      location: {
-        $near: {
-          $geometry:   location,
-          $maxDistance: 500, // metres
-        },
-      },
+      location:   { $near: { $geometry: location, $maxDistance: 500 } },
     }).select('_id title');
 
     if (duplicate) {
@@ -114,38 +130,89 @@ export const createIncident = async (req, res) => {
     // ── Media ──────────────────────────────────────────────────────────────────
     const media = await uploadMediaFiles(req.files);
 
-    // ── AI Triage ─────────────────────────────────────────────────────────────
-    const triageData = await analyzeIncident(title, description);
-
-    // ── Save Incident ─────────────────────────────────────────────────────────
+    // ── Save incident immediately — AI runs async so user gets instant response ─
     const newIncident = new Incident({
-      title:        title.trim(),
-      description:  description.trim(),
-      type,
+      title:         title.trim(),
+      description:   description.trim(),
+      type:          type.trim(),
       location,
-      severity:     triageData.urgency || 'medium',
-      reportedBy:   req.user._id,
+      severity:      SEVERITY_BY_TYPE[type.trim()] || 'medium',
+      reportedBy:    req.user._id,
       media,
-      affectedCount: affectedCount ? Number(affectedCount) : (triageData.estimatedAffected || 0),
-      aiTriage: {
-        summary:              triageData.summary,
-        recommendedActions:   triageData.recommendedActions,
-        estimatedAffected:    triageData.estimatedAffected,
-        riskScore:            triageData.riskScore,
-        processedAt:          new Date(),
-        modelUsed:            'gemini-2.0-flash',
-      },
-      tags: Array.isArray(tags) ? tags : [],
+      affectedCount: affectedCount ? Number(affectedCount) : 0,
+      aiTriage:      null,
+      tags:          Array.isArray(tags) ? tags : [],
+      statusHistory: [{
+        status:    'reported',
+        note:      '',
+        updatedBy: req.user._id,
+        updatedAt: new Date(),
+      }],
     });
 
     const savedIncident = await newIncident.save();
-
-    // Broadcast to all dashboard clients
     io.emit('newIncident', savedIncident);
 
-    // ── Smart Dispatch ─────────────────────────────────────────────────────────
-    // Run asynchronously so it never delays the HTTP response.
-    // Find available responders; prefer skill-matched, fall back to all available.
+    // Respond immediately — don't make the user wait for AI
+    const skipped = (req.files?.length || 0) - media.length;
+    res.status(201).json({
+      success:  true,
+      message:  'Incident reported successfully',
+      incident: savedIncident,
+      ...(skipped > 0 && { mediaWarning: `${skipped} file(s) could not be uploaded and were skipped.` }),
+    });
+
+    // ── AI triage (async — fires after HTTP response is sent) ──────────────────
+    setImmediate(async () => {
+      try {
+        const triage = await analyzeIncident(title.trim(), description.trim(), type.trim());
+
+        if (!triage.aiAvailable) {
+          // Always emit so the UI stops showing "AI in progress..." and shows "unavailable"
+          io.emit('incidentUpdated', {
+            incidentId:      savedIncident._id,
+            aiTriageDone:    true,
+            aiTriageSuccess: false,
+          });
+          return;
+        }
+
+        const updated = await Incident.findByIdAndUpdate(
+          savedIncident._id,
+          {
+            severity: triage.urgency,
+            aiTriage: {
+              summary:            triage.summary,
+              recommendedActions: triage.recommendedActions,
+              estimatedAffected:  triage.estimatedAffected,
+              riskScore:          triage.riskScore,
+              processedAt:        new Date(),
+              modelUsed:          triage.modelUsed || 'gemini-2.0-flash',
+            },
+          },
+          { new: true }
+        );
+
+        if (updated) {
+          io.emit('incidentUpdated', {
+            incidentId:      updated._id,
+            severity:        updated.severity,
+            aiTriage:        updated.aiTriage,
+            aiTriageDone:    true,
+            aiTriageSuccess: true,
+          });
+        }
+      } catch (aiErr) {
+        console.error('[createIncident] Async AI triage failed:', aiErr.message);
+        io.emit('incidentUpdated', {
+          incidentId:      savedIncident._id,
+          aiTriageDone:    true,
+          aiTriageSuccess: false,
+        });
+      }
+    });
+
+    // ── Smart dispatch to skill-matched responders ─────────────────────────────
     setImmediate(async () => {
       try {
         const keywords = INCIDENT_SKILL_MAP[type] || [];
@@ -157,7 +224,6 @@ export const createIncident = async (req, res) => {
               r.skills?.some(s => keywords.some(kw => s.includes(kw) || kw.includes(s)))
             )
           : [];
-        // No skill-matched responders → notify all available ones
         if (!targets.length) targets = available;
 
         const dispatchPayload = {
@@ -166,8 +232,7 @@ export const createIncident = async (req, res) => {
           type:         savedIncident.type,
           severity:     savedIncident.severity,
           location:     savedIncident.location,
-          isSOS:        savedIncident.isSOS || false,
-          aiSummary:    savedIncident.aiTriage?.summary || null,
+          isSOS:        false,
           dispatchedAt: new Date(),
         };
 
@@ -178,46 +243,32 @@ export const createIncident = async (req, res) => {
       }
     });
 
-    // ── Auto-escalation ────────────────────────────────────────────────────────
-    // If nobody accepts within 15 minutes, alert all admins via their socket room.
-    const escalationIncidentId = savedIncident._id;
+    // ── Auto-escalation after 15 minutes if unaccepted ────────────────────────
+    const escalationId = savedIncident._id;
     setTimeout(async () => {
       try {
-        const fresh = await Incident.findById(escalationIncidentId)
+        const fresh = await Incident.findById(escalationId)
           .select('assignedResponders status title type severity');
-        if (
-          !fresh ||
-          fresh.assignedResponders.length > 0 ||
-          ['resolved', 'closed'].includes(fresh.status)
-        ) return;
+        if (!fresh || fresh.assignedResponders.length > 0 || ['resolved', 'closed'].includes(fresh.status)) return;
 
         const admins = await User.find({ role: 'admin', isActive: true }).select('_id');
-        const escalationPayload = {
+        admins.forEach(a => io.to(`user:${a._id}`).emit('incidentEscalated', {
           incidentId:  fresh._id,
           title:       fresh.title,
           type:        fresh.type,
           severity:    fresh.severity,
           message:     'No responder accepted this incident in 15 minutes. Manual assignment needed.',
           escalatedAt: new Date(),
-        };
-        admins.forEach(a => io.to(`user:${a._id}`).emit('incidentEscalated', escalationPayload));
-        console.log(`[escalation] Incident ${escalationIncidentId} escalated to ${admins.length} admin(s)`);
+        }));
+        console.log(`[escalation] Incident ${escalationId} escalated to ${admins.length} admin(s)`);
       } catch (escalationErr) {
         console.error('[escalation]', escalationErr.message);
       }
     }, 15 * 60_000);
 
-    const skipped = (req.files?.length || 0) - media.length;
-    return res.status(201).json({
-      success:  true,
-      message:  'Incident reported successfully',
-      incident: savedIncident,
-      ...(skipped > 0 && { mediaWarning: `${skipped} file(s) could not be uploaded and were skipped.` }),
-    });
   } catch (error) {
     console.error('[createIncident] Error:', error);
 
-    // Multer / upload errors bubble up here
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ success: false, message: 'File too large. Maximum 10 MB per file.' });
     }

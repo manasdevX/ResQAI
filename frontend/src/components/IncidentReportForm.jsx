@@ -122,7 +122,7 @@ const IncidentReportForm = ({ onSuccess }) => {
   // Step 1 fields
   const [title,       setTitle]       = useState('');
   const [description, setDescription] = useState('');
-  const [type,        setType]        = useState('other');
+  const [type,        setType]        = useState('');
 
   // Step 2 fields
   const [lat,     setLat]     = useState(null);
@@ -239,10 +239,30 @@ const IncidentReportForm = ({ onSuccess }) => {
   // ── Step 1 validation ─────────────────────────────────────────────────────────
   const validateStep1 = () => {
     const errs = {};
-    if (!title.trim() || title.trim().length < 5)
+
+    if (!type) {
+      errs.type = 'Please select an incident type.';
+    }
+
+    const cleanTitle = title.trim();
+    if (!cleanTitle || cleanTitle.length < 5) {
       errs.title = 'Title must be at least 5 characters.';
-    if (!description.trim() || description.trim().length < 10)
-      errs.description = 'Description must be at least 10 characters.';
+    } else if (!/[aeiouAEIOU]/.test(cleanTitle)) {
+      errs.title = 'Please provide a meaningful title.';
+    } else if (cleanTitle.length > 200) {
+      errs.title = 'Title must not exceed 200 characters.';
+    }
+
+    const cleanDesc = description.trim();
+    const wordCount = cleanDesc.split(/\s+/).filter(w => /[a-zA-Z]{2,}/.test(w)).length;
+    if (!cleanDesc || cleanDesc.length < 20) {
+      errs.description = 'Description must be at least 20 characters.';
+    } else if (wordCount < 3) {
+      errs.description = 'Please describe the incident in more detail (at least 3 real words).';
+    } else if (cleanDesc.length > 5000) {
+      errs.description = 'Description must not exceed 5000 characters.';
+    }
+
     setStep1Errors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -408,18 +428,18 @@ const IncidentReportForm = ({ onSuccess }) => {
               ) : (
                 <span />
               )}
-              <span className={`text-xs ml-auto ${description.length < 10 ? 'text-zinc-600' : 'text-zinc-500'}`}>
-                {description.length} chars
+              <span className={`text-xs ml-auto ${description.trim().length < 20 ? 'text-zinc-600' : 'text-zinc-500'}`}>
+                {description.trim().length}/20 min
               </span>
             </div>
           </div>
 
           {/* Incident Type — visual grid */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+            <label className={`block text-xs font-semibold uppercase tracking-wider mb-2 ${step1Errors.type ? 'text-red-400' : 'text-zinc-400'}`}>
               Incident Type <span className="text-red-400">*</span>
             </label>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            <div className={`grid grid-cols-3 sm:grid-cols-4 gap-2 rounded-xl transition-all ${step1Errors.type ? 'ring-1 ring-red-500/40 p-1' : ''}`}>
               {INCIDENT_TYPES.map(({ value, label }) => {
                 const [icon, ...rest] = label.split(' ');
                 const text = rest.join(' ');
@@ -428,7 +448,7 @@ const IncidentReportForm = ({ onSuccess }) => {
                   <button
                     key={value}
                     type="button"
-                    onClick={() => setType(value)}
+                    onClick={() => { setType(value); setStep1Errors(p => ({ ...p, type: '' })); }}
                     className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all ${
                       isSelected
                         ? 'bg-red-600/20 border-red-500/60 text-red-300 ring-1 ring-red-500/30'
@@ -441,6 +461,11 @@ const IncidentReportForm = ({ onSuccess }) => {
                 );
               })}
             </div>
+            {step1Errors.type && (
+              <p className="flex items-center gap-1 text-red-400 text-xs mt-1.5">
+                <AlertTriangle className="w-3 h-3 shrink-0" /> {step1Errors.type}
+              </p>
+            )}
           </div>
 
           {/* Next button */}

@@ -4,9 +4,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import {
   ArrowLeft, MapPin, Clock, AlertTriangle, RefreshCw,
-  CheckCircle2, Users, Zap, FileText, Image, Video,
-  Film, ChevronDown, ChevronUp, ExternalLink, Shield,
-  Activity, Navigation,
+  CheckCircle2, Users, Zap, FileText, Image,
+  ChevronDown, ChevronUp, ExternalLink, Shield,
+  Activity, Navigation, Loader2,
 } from 'lucide-react';
 import {
   TYPE_ICONS, SEVERITY_BADGE, SEVERITY_DOT, INCIDENT_STATUS,
@@ -104,9 +104,10 @@ const IncidentDetail = () => {
   const socket      = useSocket();
   const navigate    = useNavigate();
 
-  const [incident,  setIncident]  = useState(null);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState(null);
+  const [incident,       setIncident]       = useState(null);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState(null);
+  const [aiTriageDone,   setAiTriageDone]   = useState(false);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchIncident = useCallback(async () => {
@@ -129,12 +130,14 @@ const IncidentDetail = () => {
     if (!socket || !id) return;
     const handler = (payload) => {
       if (payload.incidentId?.toString() !== id.toString()) return;
+      if (payload.aiTriageDone) setAiTriageDone(true);
       setIncident(prev => {
         if (!prev) return prev;
         return {
           ...prev,
           status:   payload.status   ?? prev.status,
           severity: payload.severity ?? prev.severity,
+          aiTriage: 'aiTriage' in payload ? payload.aiTriage : prev.aiTriage,
         };
       });
     };
@@ -177,8 +180,12 @@ const IncidentDetail = () => {
   const typeIcon     = TYPE_ICONS[incident.type] || '📍';
   const [lng, lat]   = incident.location?.coordinates || [0, 0];
   const hasMedia     = incident.media?.length > 0;
-  const hasAiTriage  = incident.aiTriage?.summary;
   const hasAssigned  = incident.assignedResponders?.length > 0;
+
+  // AI triage states — driven by socket event so UI never gets stuck
+  const hasRealAi      = !!incident.aiTriage?.summary;
+  const aiPending      = !hasRealAi && !aiTriageDone;
+  const aiUnavailable  = !hasRealAi && aiTriageDone;
 
   const STATUS_STEPS = ['reported', 'acknowledged', 'responding', 'resolved'];
   const currentStepIdx = STATUS_STEPS.indexOf(incident.status);
@@ -323,7 +330,27 @@ const IncidentDetail = () => {
         </Section>
 
         {/* ── AI Triage ───────────────────────────────────────────────────── */}
-        {hasAiTriage && (
+        {aiPending ? (
+          <Section title="AI Triage Analysis" icon={Zap} iconClass="text-blue-400/50" defaultOpen={true}>
+            <div className="flex items-center gap-3 p-4 bg-blue-950/10 border border-blue-900/20 rounded-xl">
+              <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+              <div>
+                <p className="text-sm text-blue-300/80 font-medium">AI analysis in progress…</p>
+                <p className="text-xs text-zinc-500 mt-0.5">Updates automatically when complete.</p>
+              </div>
+            </div>
+          </Section>
+        ) : aiUnavailable ? (
+          <Section title="AI Triage Analysis" icon={Zap} iconClass="text-zinc-600" defaultOpen={false}>
+            <div className="flex items-center gap-3 p-4 bg-zinc-800/40 border border-zinc-700/40 rounded-xl">
+              <AlertTriangle className="w-4 h-4 text-zinc-500 shrink-0" />
+              <div>
+                <p className="text-sm text-zinc-400 font-medium">AI analysis unavailable</p>
+                <p className="text-xs text-zinc-600 mt-0.5">Gemini API key not configured on the server. Manual review required.</p>
+              </div>
+            </div>
+          </Section>
+        ) : hasRealAi ? (
           <Section title="AI Triage Analysis" icon={Zap} iconClass="text-blue-400" defaultOpen={true}>
             <div className="space-y-4">
               {/* Summary */}
@@ -342,14 +369,14 @@ const IncidentDetail = () => {
                     incident.aiTriage.riskScore >= 40 ? 'text-orange-400' :
                     'text-green-400'
                   }`}>
-                    {incident.aiTriage.riskScore}
-                    <span className="text-sm text-zinc-500">/100</span>
+                    {incident.aiTriage.riskScore ?? '—'}
+                    {incident.aiTriage.riskScore != null && <span className="text-sm text-zinc-500">/100</span>}
                   </p>
                   <p className="text-[10px] text-zinc-500 mt-0.5">Risk Score</p>
                 </div>
                 <div className="p-3 bg-zinc-800/60 border border-zinc-700/50 rounded-xl text-center">
                   <p className="text-2xl font-black text-zinc-100">
-                    ~{incident.aiTriage.estimatedAffected || 0}
+                    ~{incident.aiTriage.estimatedAffected ?? 0}
                   </p>
                   <p className="text-[10px] text-zinc-500 mt-0.5">Est. Affected</p>
                 </div>
@@ -383,7 +410,7 @@ const IncidentDetail = () => {
               </p>
             </div>
           </Section>
-        )}
+        ) : null}
 
         {/* ── Assigned Responders ─────────────────────────────────────────── */}
         {hasAssigned && (

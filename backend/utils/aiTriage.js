@@ -3,77 +3,79 @@ import dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const API_KEY = process.env.GEMINI_API_KEY || '';
+const genAI   = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
-// gemini-2.0-flash — confirmed working with this API key
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+// Try primary model first, fall back to stable model if unavailable
+const MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash'];
 
-/**
- * Analyzes an incident and returns structured triage data.
- * @param {string} title
- * @param {string} description
- * @returns {Promise<{summary, urgency, recommendedActions, estimatedAffected, riskScore}>}
- */
 const withTimeout = (promise, ms) =>
   Promise.race([
     promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('AI triage timed out')), ms)
-    ),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timed out')), ms)),
   ]);
 
-export const analyzeIncident = async (title, description) => {
-  try {
-    const prompt = `You are an emergency response AI triage assistant.
-Analyze the following incident report and respond with ONLY valid JSON — no markdown, no code fences.
+/**
+ * Analyze an incident with Gemini AI.
+ * Always resolves — never throws. Returns { aiAvailable: false } on any failure
+ * so the caller can decide whether to store triage data or leave it null.
+ */
+export const analyzeIncident = async (title, description, type = 'other') => {
+  if (!genAI) {
+    console.warn('[aiTriage] GEMINI_API_KEY is not set — skipping AI analysis');
+    return { aiAvailable: false };
+  }
 
-Incident Title: ${title}
-Incident Description: ${description}
+  const prompt = `You are an emergency response AI triage assistant.
+Analyze this incident and respond ONLY with valid JSON — no markdown, no code fences, no extra text.
 
-JSON format (respond with this exact structure):
+Incident type: ${type.replace(/_/g, ' ')}
+Title: ${title}
+Description: ${description}
+
+Required JSON format (respond with this exact structure):
 {
-  "summary": "A concise 1-2 sentence summary of the incident",
+  "summary": "1-2 sentence clear, actionable summary of the emergency situation",
   "urgency": "low | medium | high | critical",
-  "recommendedActions": ["action 1", "action 2", "action 3"],
-  "estimatedAffected": <number, estimate based on description, 0 if unknown>,
-  "riskScore": <integer 0-100>
+  "recommendedActions": ["specific action 1", "specific action 2", "specific action 3"],
+  "estimatedAffected": <integer — best estimate from context, 0 if truly unknown>,
+  "riskScore": <integer 0-100 where 100 is maximum risk>
 }`;
 
-    const result = await withTimeout(model.generateContent(prompt), 15000);
-    const responseText = result.response.text().trim();
+  for (const modelName of MODELS) {
+    try {
+      const model  = genAI.getGenerativeModel({ model: modelName });
+      const result = await withTimeout(model.generateContent(prompt), 10000);
+      const raw    = result.response.text().trim()
+        .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
 
-    // Strip markdown code fences if model wraps response
-    const cleaned = responseText
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/\s*```$/i, '')
-      .trim();
+      const parsed = JSON.parse(raw);
+      const VALID_URGENCY = ['low', 'medium', 'high', 'critical'];
 
-    const parsed = JSON.parse(cleaned);
-
-    // Validate required fields
-    const urgencyValues = ['low', 'medium', 'high', 'critical'];
-    return {
-      summary:            parsed.summary            || 'No summary provided',
-      urgency:            urgencyValues.includes(parsed.urgency) ? parsed.urgency : 'medium',
-      recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : [],
-      estimatedAffected:  Number.isFinite(parsed.estimatedAffected) ? parsed.estimatedAffected : 0,
-      riskScore:          Number.isFinite(parsed.riskScore) ? Math.min(100, Math.max(0, parsed.riskScore)) : 50,
-    };
-  } catch (error) {
-    const msg = error.message || String(error);
-    if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.includes('Too Many Requests')) {
-      console.warn('[aiTriage] Rate limited by Gemini API — using fallback triage');
-    } else {
-      console.error('[aiTriage] AI triage error:', msg);
+      return {
+        aiAvailable:        true,
+        modelUsed:          modelName,
+        summary:            typeof parsed.summary === 'string' && parsed.summary.trim() ? parsed.summary.trim() : null,
+        urgency:            VALID_URGENCY.includes(parsed.urgency) ? parsed.urgency : 'medium',
+        recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions.slice(0, 5) : [],
+        estimatedAffected:  Number.isFinite(parsed.estimatedAffected) ? Math.max(0, Math.round(parsed.estimatedAffected)) : 0,
+        riskScore:          Number.isFinite(parsed.riskScore) ? Math.min(100, Math.max(0, Math.round(parsed.riskScore))) : null,
+      };
+    } catch (err) {
+      const msg = err.message || '';
+      if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.includes('Too Many Requests')) {
+        console.warn(`[aiTriage] Rate limited on ${modelName} — trying fallback model`);
+        continue;
+      }
+      if (msg.includes('404') || msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('invalid model')) {
+        console.warn(`[aiTriage] Model ${modelName} unavailable — trying fallback model`);
+        continue;
+      }
+      // Unexpected error — log and bail
+      console.error(`[aiTriage] Error with model ${modelName}: ${msg}`);
+      break;
     }
-    // Safe fallback — incident is always saved regardless of AI status
-    return {
-      summary:            'AI analysis unavailable. Please review manually.',
-      urgency:            'high',
-      recommendedActions: ['Review incident details manually', 'Dispatch scout team'],
-      estimatedAffected:  0,
-      riskScore:          50,
-    };
   }
+
+  return { aiAvailable: false };
 };

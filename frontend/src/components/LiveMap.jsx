@@ -220,11 +220,13 @@ const LiveMap = ({
               </span>
             </div>
             <p className="text-xs text-gray-600 mb-2 line-clamp-3">{selectedIncident.description}</p>
-            {selectedIncident.aiTriage && (
+            {selectedIncident.aiTriage?.summary && (
               <div className="bg-blue-50 border border-blue-200 rounded p-2">
                 <p className="text-xs font-semibold text-blue-700 mb-0.5">🤖 AI Summary</p>
                 <p className="text-xs text-blue-600">{selectedIncident.aiTriage.summary}</p>
-                <p className="text-xs text-blue-500 mt-1">Risk: <strong>{selectedIncident.aiTriage.riskScore}/100</strong></p>
+                {selectedIncident.aiTriage.riskScore != null && (
+                  <p className="text-xs text-blue-500 mt-1">Risk: <strong>{selectedIncident.aiTriage.riskScore}/100</strong></p>
+                )}
               </div>
             )}
             {selectedIncident.location?.address && (

@@ -156,13 +156,13 @@ const MyReports = () => {
                   <div className="px-4 pb-4 space-y-3 border-t border-zinc-800 pt-3">
                     <p className="text-sm text-zinc-400 leading-relaxed">{inc.description}</p>
 
-                    {inc.aiTriage && (
+                    {inc.aiTriage?.summary && (
                       <div className="p-3 bg-blue-950/30 border border-blue-900/30 rounded-xl">
                         <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1.5">AI Triage</p>
                         <p className="text-xs text-blue-200/80 leading-relaxed">{inc.aiTriage.summary}</p>
                         <div className="flex gap-3 mt-2 text-[10px] text-blue-300">
-                          <span>Risk: <strong>{inc.aiTriage.riskScore}/100</strong></span>
-                          <span>Affected: <strong>~{inc.aiTriage.estimatedAffected}</strong></span>
+                          {inc.aiTriage.riskScore != null && <span>Risk: <strong>{inc.aiTriage.riskScore}/100</strong></span>}
+                          <span>Affected: <strong>~{inc.aiTriage.estimatedAffected ?? 0}</strong></span>
                         </div>
                       </div>
                     )}

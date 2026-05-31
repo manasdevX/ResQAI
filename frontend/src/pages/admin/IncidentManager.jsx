@@ -403,13 +403,13 @@ const AdminIncidentManager = () => {
                 </button>
               </div>
 
-              {selected.aiTriage && (
+              {selected.aiTriage?.summary && (
                 <div className="p-4 bg-blue-950/30 border border-blue-900/40 rounded-xl">
                   <p className="text-xs font-bold text-blue-400 mb-2">🤖 AI Triage Analysis</p>
                   <p className="text-sm text-blue-200 leading-relaxed">{selected.aiTriage.summary}</p>
                   <div className="flex gap-4 mt-3 text-xs text-blue-300">
-                    <span>Risk Score: <strong>{selected.aiTriage.riskScore}/100</strong></span>
-                    <span>Est. Affected: <strong>~{selected.aiTriage.estimatedAffected}</strong></span>
+                    {selected.aiTriage.riskScore != null && <span>Risk Score: <strong>{selected.aiTriage.riskScore}/100</strong></span>}
+                    <span>Est. Affected: <strong>~{selected.aiTriage.estimatedAffected ?? 0}</strong></span>
                   </div>
                   {selected.aiTriage.recommendedActions?.length > 0 && (
                     <div className="mt-3">

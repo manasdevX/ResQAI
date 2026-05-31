@@ -45,7 +45,7 @@ const IncidentToast = ({ incident, onDismiss }) => {
               </p>
               <p className="text-sm font-semibold text-white truncate">{incident?.title}</p>
               <p className="text-xs text-zinc-400 mt-0.5 line-clamp-2">{incident?.description}</p>
-              {incident?.aiTriage && (
+              {incident?.aiTriage?.riskScore != null && (
                 <p className={`text-xs mt-1 font-medium ${style.text}`}>
                   🤖 Risk score: {incident.aiTriage.riskScore}/100
                 </p>

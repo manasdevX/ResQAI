@@ -297,13 +297,13 @@ const AdminDashboard = () => {
 
                     {selectedPanel?._id === inc._id && (
                       <div className="mt-3 space-y-2">
-                        {inc.aiTriage && (
+                        {inc.aiTriage?.summary && (
                           <div className="p-3 bg-blue-950/30 border border-blue-900/40 rounded-lg text-left">
                             <p className="text-[11px] font-semibold text-blue-400 mb-1">🤖 AI Triage</p>
                             <p className="text-xs text-blue-200 leading-relaxed">{inc.aiTriage.summary}</p>
                             <div className="flex gap-3 mt-2 text-[10px] text-blue-300">
-                              <span>Risk: <strong>{inc.aiTriage.riskScore}/100</strong></span>
-                              <span>Affected: <strong>~{inc.aiTriage.estimatedAffected}</strong></span>
+                              {inc.aiTriage.riskScore != null && <span>Risk: <strong>{inc.aiTriage.riskScore}/100</strong></span>}
+                              <span>Affected: <strong>~{inc.aiTriage.estimatedAffected ?? 0}</strong></span>
                             </div>
                           </div>
                         )}

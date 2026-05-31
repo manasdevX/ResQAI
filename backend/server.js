@@ -24,9 +24,12 @@ dotenv.config({ quiet: true });
 const REQUIRED_ENV = ['MONGO_URI', 'JWT_SECRET'];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 
-// Non-fatal warning — media uploads will fail gracefully if these are absent
+// Non-fatal warnings — features degrade gracefully when these are absent
 if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
   console.warn('  ⚠  Cloudinary credentials not set — media uploads will be unavailable.');
+}
+if (!process.env.GEMINI_API_KEY) {
+  console.warn('  ⚠  GEMINI_API_KEY not set — AI triage will be unavailable.');
 }
 if (missing.length) {
   console.error(`\n❌ Missing required environment variables: ${missing.join(', ')}`);
@@ -107,6 +110,18 @@ app.use('/api/auth/reset-password',  authLimiter);
 
 app.get('/', (req, res) => res.send('ResQAI API is running...'));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+
+// Credential check — confirms which API keys are configured (values never exposed)
+app.get('/api/debug/credentials', (req, res) => res.json({
+  cloudinary: {
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME    ? '✓ set' : '✗ missing',
+    api_key:    process.env.CLOUDINARY_API_KEY       ? '✓ set' : '✗ missing',
+    api_secret: process.env.CLOUDINARY_API_SECRET    ? '✓ set' : '✗ missing',
+  },
+  gemini: {
+    api_key:    process.env.GEMINI_API_KEY           ? '✓ set' : '✗ missing',
+  },
+}));
 
 app.use('/api/auth',      authRoutes);
 app.use('/api/incidents', incidentRoutes);
