@@ -187,7 +187,7 @@ export const createIncident = async (req, res) => {
               estimatedAffected:  triage.estimatedAffected,
               riskScore:          triage.riskScore,
               processedAt:        new Date(),
-              modelUsed:          triage.modelUsed || 'gemini-2.0-flash',
+              modelUsed:          triage.modelUsed || 'gemini-1.5-flash',
             },
           },
           { new: true }

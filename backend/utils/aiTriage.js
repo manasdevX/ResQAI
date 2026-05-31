@@ -6,8 +6,8 @@ dotenv.config({ quiet: true });
 const API_KEY = process.env.GEMINI_API_KEY || '';
 const genAI   = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
-// Try primary model first, fall back to stable model if unavailable
-const MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+// gemini-1.5-flash first — free tier available; gemini-2.0-flash as upgrade fallback
+const MODELS = ['gemini-1.5-flash', 'gemini-2.0-flash'];
 
 const withTimeout = (promise, ms) =>
   Promise.race([

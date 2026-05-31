@@ -1,6 +1,5 @@
 import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
-import { Readable } from 'stream';
 import dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });
@@ -55,11 +54,10 @@ export const avatarUpload = multer({
  */
 export const uploadToCloudinary = (buffer, options) =>
   new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(options, (error, result) => {
+    cloudinary.uploader.upload_stream(options, (error, result) => {
       if (error) reject(error);
       else resolve(result);
-    });
-    Readable.from(buffer).pipe(stream);
+    }).end(buffer);
   });
 
 export default upload;
