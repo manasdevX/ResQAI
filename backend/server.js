@@ -111,17 +111,50 @@ app.use('/api/auth/reset-password',  authLimiter);
 app.get('/', (req, res) => res.send('ResQAI API is running...'));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// Credential check — confirms which API keys are configured (values never exposed)
+// Credential presence check
 app.get('/api/debug/credentials', (req, res) => res.json({
   cloudinary: {
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME    ? '✓ set' : '✗ missing',
-    api_key:    process.env.CLOUDINARY_API_KEY       ? '✓ set' : '✗ missing',
-    api_secret: process.env.CLOUDINARY_API_SECRET    ? '✓ set' : '✗ missing',
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? '✓ set' : '✗ missing',
+    api_key:    process.env.CLOUDINARY_API_KEY    ? '✓ set' : '✗ missing',
+    api_secret: process.env.CLOUDINARY_API_SECRET ? '✓ set' : '✗ missing',
   },
-  gemini: {
-    api_key:    process.env.GEMINI_API_KEY           ? '✓ set' : '✗ missing',
-  },
+  gemini: { api_key: process.env.GEMINI_API_KEY ? '✓ set' : '✗ missing' },
 }));
+
+// Live credential test — actually calls both APIs to verify values are correct
+app.get('/api/debug/test', async (req, res) => {
+  const results = {};
+
+  // ── Test Cloudinary ──────────────────────────────────────────────────────────
+  try {
+    const { v2: cloudinary } = await import('cloudinary');
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key:    process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+    await cloudinary.api.ping();
+    results.cloudinary = { ok: true, message: '✓ Credentials valid — Cloudinary API reachable' };
+  } catch (err) {
+    results.cloudinary = { ok: false, message: `✗ ${err.message || err.error?.message || 'Unknown error'}`, http_code: err.http_code };
+  }
+
+  // ── Test Gemini ──────────────────────────────────────────────────────────────
+  try {
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const result = await Promise.race([
+      model.generateContent('Say "ok" in one word.'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timed out after 10s')), 10000)),
+    ]);
+    results.gemini = { ok: true, message: `✓ Credentials valid — response: "${result.response.text().trim()}"` };
+  } catch (err) {
+    results.gemini = { ok: false, message: `✗ ${err.message || 'Unknown error'}` };
+  }
+
+  res.json(results);
+});
 
 app.use('/api/auth',      authRoutes);
 app.use('/api/incidents', incidentRoutes);
