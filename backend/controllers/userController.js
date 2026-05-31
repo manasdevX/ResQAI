@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { User } from '../models/index.js';
-
 import { io } from '../server.js';
+import { uploadToCloudinary } from '../middleware/upload.js';
 
 // @desc   Toggle volunteer availability (ON/OFF DUTY)
 // @route  PATCH /api/users/availability
@@ -153,9 +153,23 @@ export const uploadAvatar = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No image file provided' });
     }
 
+    let avatarUrl;
+    try {
+      const result = await uploadToCloudinary(req.file.buffer, {
+        folder:          'resqai_avatars',
+        resource_type:   'image',
+        public_id:       `avatar_${req.user._id}_${Date.now()}`,
+        transformation:  [{ width: 300, height: 300, crop: 'fill', gravity: 'face', quality: 'auto' }],
+      });
+      avatarUrl = result.secure_url;
+    } catch (uploadErr) {
+      console.error('[uploadAvatar] Cloudinary error — http_code:', uploadErr.http_code, '| message:', uploadErr.message);
+      return res.status(503).json({ success: false, message: 'Avatar upload is temporarily unavailable. Please try again later.' });
+    }
+
     const user = await User.findByIdAndUpdate(
       req.user._id,
-      { avatar: req.file.path }, // Cloudinary secure URL
+      { avatar: avatarUrl },
       { new: true }
     ).select('name email avatar');
 

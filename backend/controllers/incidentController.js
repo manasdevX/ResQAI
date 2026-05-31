@@ -4,6 +4,7 @@ import User from '../models/User.js';
 import { analyzeIncident } from '../utils/aiTriage.js';
 import { io } from '../server.js';
 import { notify } from '../utils/notify.js';
+import { uploadToCloudinary } from '../middleware/upload.js';
 
 const badId = (res) => res.status(400).json({ success: false, message: 'Invalid ID format' });
 
@@ -26,21 +27,27 @@ const INCIDENT_SKILL_MAP = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-/** Normalise uploaded Cloudinary files → media array for the schema */
-const buildMediaArray = (files = []) =>
-  files.map((file) => {
-    let type = 'image';
-    if (file.mimetype?.startsWith('video/'))             type = 'video';
-    else if (file.mimetype?.startsWith('audio/'))        type = 'audio';
-    else if (file.mimetype?.includes('pdf'))             type = 'document';
-
-    return {
-      url:      file.path,       // Cloudinary secure URL
-      publicId: file.filename,   // Cloudinary public_id
-      type,
-      caption:  '',
-    };
-  });
+/** Upload req.files buffers to Cloudinary; silently skip any that fail. */
+const uploadMediaFiles = async (files = [], folder = 'resqai_incidents') => {
+  const media = [];
+  for (const file of files) {
+    try {
+      const result = await uploadToCloudinary(file.buffer, {
+        folder,
+        resource_type: 'auto',
+        public_id: `${Date.now()}_${file.originalname.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '')}`,
+      });
+      let type = 'image';
+      if (file.mimetype?.startsWith('video/'))      type = 'video';
+      else if (file.mimetype?.startsWith('audio/')) type = 'audio';
+      else if (file.mimetype?.includes('pdf'))      type = 'document';
+      media.push({ url: result.secure_url, publicId: result.public_id, type, caption: '' });
+    } catch (err) {
+      console.error(`[upload] Failed to upload "${file.originalname}" — http_code: ${err.http_code}, message: ${err.message}`);
+    }
+  }
+  return media;
+};
 
 /** Safe JSON parse — returns fallback on failure */
 const safeParse = (value, fallback) => {
@@ -105,7 +112,7 @@ export const createIncident = async (req, res) => {
     }
 
     // ── Media ──────────────────────────────────────────────────────────────────
-    const media = buildMediaArray(req.files);
+    const media = await uploadMediaFiles(req.files);
 
     // ── AI Triage ─────────────────────────────────────────────────────────────
     const triageData = await analyzeIncident(title, description);
@@ -200,10 +207,12 @@ export const createIncident = async (req, res) => {
       }
     }, 15 * 60_000);
 
+    const skipped = (req.files?.length || 0) - media.length;
     return res.status(201).json({
       success:  true,
       message:  'Incident reported successfully',
       incident: savedIncident,
+      ...(skipped > 0 && { mediaWarning: `${skipped} file(s) could not be uploaded and were skipped.` }),
     });
   } catch (error) {
     console.error('[createIncident] Error:', error);
@@ -305,7 +314,10 @@ export const uploadIncidentMedia = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No media files uploaded' });
     }
 
-    const newMedia = buildMediaArray(req.files);
+    const newMedia = await uploadMediaFiles(req.files);
+    if (!newMedia.length) {
+      return res.status(503).json({ success: false, message: 'Media upload failed. Please try again.' });
+    }
     incident.media.push(...newMedia);
     await incident.save();
 

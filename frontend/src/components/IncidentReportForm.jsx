@@ -143,6 +143,7 @@ const IncidentReportForm = ({ onSuccess }) => {
   const [submitted,         setSubmitted]         = useState(false);
   const [submitError,       setSubmitError]       = useState('');
   const [uploadUnavailable, setUploadUnavailable] = useState(false);
+  const [mediaWarning,      setMediaWarning]      = useState('');
 
   // Validation errors
   const [step1Errors, setStep1Errors] = useState({});
@@ -285,13 +286,14 @@ const IncidentReportForm = ({ onSuccess }) => {
       }));
       filesToSubmit.forEach(file => formData.append('media', file));
 
-      await api.post('/report', formData, {
+      const { data } = await api.post('/report', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (ev) => {
           if (ev.total) setProgress(Math.round((ev.loaded * 100) / ev.total));
         },
       });
 
+      if (data.mediaWarning) setMediaWarning(data.mediaWarning);
       setSubmitted(true);
       if (onSuccess) onSuccess();
       setTimeout(() => navigate(roleHome(user?.role)), 3000);
@@ -337,6 +339,13 @@ const IncidentReportForm = ({ onSuccess }) => {
           <Zap className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
           <span className="text-xs text-blue-300 font-medium">AI triage processing…</span>
         </div>
+
+        {mediaWarning && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-950/40 border border-amber-800/40 rounded-full">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="text-xs text-amber-300">{mediaWarning}</span>
+          </div>
+        )}
 
         <p className="text-xs text-zinc-600">Redirecting to home in a moment…</p>
       </div>

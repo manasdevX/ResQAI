@@ -1,6 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import multer from 'multer';
+import { Readable } from 'stream';
 import dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });
@@ -17,17 +17,6 @@ const ALLOWED_MIME_TYPES = [
   'application/pdf',
 ];
 
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: async (req, file) => ({
-    folder: 'resqai_incidents',
-    resource_type: 'auto',
-    // Use the original filename (sanitized) as public_id
-    public_id: `${Date.now()}_${file.originalname.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '')}`,
-  }),
-});
-
-/** Reject files with wrong mime type */
 const fileFilter = (req, file, cb) => {
   if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
     cb(null, true);
@@ -39,33 +28,38 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
+// Files land in req.file.buffer — Cloudinary upload happens in the controller
+// so upload failures never block incident creation.
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10 MB per file
-    files: 5,                   // max 5 files per request
+    files: 5,
   },
 });
 
-// Single-image avatar upload (2 MB, images only, stored in resqai_avatars/)
-const avatarStorage = new CloudinaryStorage({
-  cloudinary,
-  params: async (req) => ({
-    folder:        'resqai_avatars',
-    resource_type: 'image',
-    public_id:     `avatar_${req.user._id}_${Date.now()}`,
-    transformation: [{ width: 300, height: 300, crop: 'fill', gravity: 'face', quality: 'auto' }],
-  }),
-});
-
+// Avatar upload — images only, 2 MB limit
 export const avatarUpload = multer({
-  storage: avatarStorage,
+  storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
     else cb(new Error('Only image files are allowed for avatars'), false);
   },
   limits: { fileSize: 2 * 1024 * 1024, files: 1 },
 });
+
+/**
+ * Upload a Buffer to Cloudinary.
+ * Rejects with the raw Cloudinary error (includes http_code and message).
+ */
+export const uploadToCloudinary = (buffer, options) =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(options, (error, result) => {
+      if (error) reject(error);
+      else resolve(result);
+    });
+    Readable.from(buffer).pipe(stream);
+  });
 
 export default upload;
