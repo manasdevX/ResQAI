@@ -23,6 +23,11 @@ dotenv.config({ quiet: true });
 
 const REQUIRED_ENV = ['MONGO_URI', 'JWT_SECRET'];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
+
+// Non-fatal warning — media uploads will fail gracefully if these are absent
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+  console.warn('  ⚠  Cloudinary credentials not set — media uploads will be unavailable.');
+}
 if (missing.length) {
   console.error(`\n❌ Missing required environment variables: ${missing.join(', ')}`);
   console.error('   Set them in backend/.env before starting the server.\n');

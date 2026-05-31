@@ -138,10 +138,11 @@ const IncidentReportForm = ({ onSuccess }) => {
   const [dragOver,   setDragOver]   = useState(false);
 
   // Submit
-  const [submitting,  setSubmitting]  = useState(false);
-  const [progress,    setProgress]    = useState(0);
-  const [submitted,   setSubmitted]   = useState(false);
-  const [submitError, setSubmitError] = useState('');
+  const [submitting,        setSubmitting]        = useState(false);
+  const [progress,          setProgress]          = useState(0);
+  const [submitted,         setSubmitted]         = useState(false);
+  const [submitError,       setSubmitError]       = useState('');
+  const [uploadUnavailable, setUploadUnavailable] = useState(false);
 
   // Validation errors
   const [step1Errors, setStep1Errors] = useState({});
@@ -250,10 +251,12 @@ const IncidentReportForm = ({ onSuccess }) => {
   };
 
   // ── Submit ────────────────────────────────────────────────────────────────────
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // forceFiles: pass [] to submit without any media (used by the fallback button)
+  const handleSubmit = async (e, forceFiles = null) => {
+    e?.preventDefault();
     setStep2Error('');
     setSubmitError('');
+    setUploadUnavailable(false);
 
     if (lat === null || lng === null || lat === undefined || lng === undefined) {
       setStep2Error('Please set the incident location on the map or use GPS.');
@@ -266,11 +269,11 @@ const IncidentReportForm = ({ onSuccess }) => {
       return;
     }
 
-
     setSubmitting(true);
     setProgress(0);
 
     try {
+      const filesToSubmit = forceFiles !== null ? forceFiles : mediaFiles;
       const formData = new FormData();
       formData.append('title',       title.trim());
       formData.append('description', description.trim());
@@ -280,12 +283,12 @@ const IncidentReportForm = ({ onSuccess }) => {
         coordinates: [lng, lat],
         address:     address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
       }));
-      mediaFiles.forEach(file => formData.append('media', file));
+      filesToSubmit.forEach(file => formData.append('media', file));
 
       await api.post('/report', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        onUploadProgress: (e) => {
-          if (e.total) setProgress(Math.round((e.loaded * 100) / e.total));
+        onUploadProgress: (ev) => {
+          if (ev.total) setProgress(Math.round((ev.loaded * 100) / ev.total));
         },
       });
 
@@ -294,9 +297,15 @@ const IncidentReportForm = ({ onSuccess }) => {
       setTimeout(() => navigate(roleHome(user?.role)), 3000);
     } catch (err) {
       console.error('[IncidentReportForm] submit error:', err);
-      setSubmitError(
-        err.response?.data?.message || 'Failed to submit report. Please try again.'
-      );
+      const code = err.response?.data?.code;
+      if (code === 'UPLOAD_UNAVAILABLE') {
+        setUploadUnavailable(true);
+        setSubmitError('Media upload is temporarily unavailable. Your report text and location will still be submitted.');
+      } else {
+        setSubmitError(
+          err.response?.data?.message || 'Failed to submit report. Please try again.'
+        );
+      }
     } finally {
       setSubmitting(false);
       setProgress(0);
@@ -591,9 +600,22 @@ const IncidentReportForm = ({ onSuccess }) => {
 
           {/* Submit error */}
           {submitError && (
-            <div className="flex items-start gap-2.5 p-3.5 bg-red-950/40 border border-red-800/40 rounded-xl text-red-400 text-sm">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{submitError}</span>
+            <div className="flex flex-col gap-3 p-3.5 bg-red-950/40 border border-red-800/40 rounded-xl">
+              <div className="flex items-start gap-2.5 text-red-400 text-sm">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{submitError}</span>
+              </div>
+              {uploadUnavailable && (
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => { setMediaFiles([]); handleSubmit(null, []); }}
+                  className="self-start flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Submit without media
+                </button>
+              )}
             </div>
           )}
 
