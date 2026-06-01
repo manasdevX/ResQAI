@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -51,13 +51,43 @@ const redIcon = new L.Icon({
 const MediaPreview = ({ file, onRemove }) => {
   const isImage = file.type.startsWith('image/');
   const sizeMB  = (file.size / (1024 * 1024)).toFixed(1);
-  const url     = useMemo(() => URL.createObjectURL(file), [file]);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+
+  // ── Blob URL lifecycle ─────────────────────────────────────────────────────
+  // WHY useState + useEffect instead of useMemo + useEffect or useRef:
+  //
+  // React 18 StrictMode double-invokes effects in development:
+  //   mount → effect runs (create URL) → cleanup (revoke URL) → remount → effect runs again (create fresh URL)
+  //
+  // With useRef: the cleanup revokes URL but ref still holds the stale revoked
+  //   value, so `if (!urlRef.current)` skips recreation → ERR_FILE_NOT_FOUND.
+  // With useMemo: memo runs before the effect, creating URL A. StrictMode
+  //   cleanup revokes URL A. The memo may return URL A again (memoized) → same bug.
+  //
+  // With useState + useEffect: creation and revocation both happen inside the
+  //   effect. StrictMode cleanup revokes and remount creates a new URL. The
+  //   component always shows a valid URL.
+  const [url, setUrl] = useState('');
+
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(file);
+    setUrl(objectUrl);
+    // Revoke on cleanup — fires on unmount AND on StrictMode remount cycle
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+      setUrl('');
+    };
+  }, [file]); // Re-runs only when the actual file object changes
 
   return (
     <div className="relative group rounded-xl overflow-hidden border border-zinc-700 bg-zinc-800 aspect-square">
-      {isImage ? (
-        <img src={url} alt={file.name} className="w-full h-full object-cover" />
+      {/* Show image preview when url is ready; fallback to icon otherwise */}
+      {isImage && url ? (
+        <img
+          src={url}
+          alt={file.name}
+          className="w-full h-full object-cover"
+          onError={() => setUrl('')} // clear on any load error so fallback shows
+        />
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-zinc-500 p-2">
           <ImageIcon className="w-8 h-8" />

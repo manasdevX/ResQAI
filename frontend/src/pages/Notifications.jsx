@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
 import {
   Bell, CheckCheck, Loader2, ChevronDown, AlertTriangle,
-  Package, X, ExternalLink, AlertOctagon, Users, Building2, Radio, Cpu,
+  Package, X, ExternalLink, AlertOctagon, Users, Building2, Radio, Cpu, ArrowLeft,
 } from 'lucide-react';
 
 /* ─── Type metadata ──────────────────────────────────────────────────────────── */
@@ -163,6 +163,14 @@ const NotificationsPage = () => {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+
+        {/* Back navigation — this is a standalone (layout-less) route */}
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-200 transition -mb-2"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
 
         {/* Page header */}
         <div className="flex items-center justify-between gap-4">

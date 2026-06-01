@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
@@ -92,7 +92,6 @@ function App() {
                   <Route path="/volunteer/shelter"     element={<ShelterManagerPanel />} />
                   <Route path="/volunteer/chat"        element={<Chat />} />
                   <Route path="/volunteer/profile"     element={<Profile />} />
-                  <Route path="/notifications"         element={<Notifications />} />
                 </Route>
               </Route>
 
@@ -104,7 +103,6 @@ function App() {
                   <Route path="/shelters"           element={<Shelters />} />
                   <Route path="/resources"          element={<CitizenResources />} />
                   <Route path="/my-reports"         element={<CitizenMyReports />} />
-                  <Route path="/notifications"      element={<Notifications />} />
                   <Route path="/chat"               element={<Chat />} />
                   <Route path="/profile"            element={<Profile />} />
                 </Route>
@@ -113,6 +111,10 @@ function App() {
               {/* ── Shared incident detail — all authenticated roles ─────────────── */}
               <Route element={<ProtectedRoute allowedRoles={['citizen', 'responder', 'shelter_manager', 'admin']} />}>
                 <Route path="/incidents/:id" element={<IncidentDetail />} />
+                {/* Notifications is a single shared route for ALL roles — previously
+                    duplicated under the volunteer + citizen layouts, where the
+                    volunteer-guarded copy shadowed the others and bounced citizens/admins. */}
+                <Route path="/notifications" element={<Notifications />} />
               </Route>
 
               {/* ── 404 ─────────────────────────────────────────────────────────── */}

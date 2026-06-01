@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { User } from '../models/index.js';
 import { io } from '../server.js';
-import { uploadToCloudinary } from '../middleware/upload.js';
+import { uploadToCloudinary, sanitizePublicId } from '../middleware/upload.js';
 
 // @desc   Toggle volunteer availability (ON/OFF DUTY)
 // @route  PATCH /api/users/availability
@@ -71,7 +71,7 @@ export const updateSkills = async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.user._id,
       { skills: cleaned },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     return res.json({ success: true, skills: user.skills });
@@ -134,7 +134,7 @@ export const updateProfile = async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.user._id,
       { $set: updates },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).select('name email phone avatar role skills');
 
     return res.json({ success: true, message: 'Profile updated', user });
@@ -152,25 +152,37 @@ export const uploadAvatar = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No image file provided' });
     }
+    
+    console.log(`[userController] req.file inspect:`, { 
+      originalname: req.file.originalname, 
+      mimetype: req.file.mimetype, 
+      size: req.file.size, 
+      buffer_len: req.file.buffer?.length 
+    });
+    console.log(`[userController] BEFORE UPLOAD: file path: ${req.file.path ? req.file.path : 'Missing (buffer mode)'}`);
+    console.log(`[userController] file originalname: ${req.file.originalname}`);
+    console.log(`[userController] file mimetype: ${req.file.mimetype}`);
+    console.log(`[userController] file size: ${req.file.size} buffer length: ${req.file.buffer?.length}`);
 
     let avatarUrl;
     try {
-      const result = await uploadToCloudinary(req.file.buffer, {
+      const result = await uploadToCloudinary(req.file.buffer, req.file.mimetype, {
         folder:          'resqai_avatars',
         resource_type:   'image',
         public_id:       `avatar_${req.user._id}_${Date.now()}`,
+        // In case transformations cause issues with strict settings, we keep it but it's supervised now.
         transformation:  [{ width: 300, height: 300, crop: 'fill', gravity: 'face', quality: 'auto' }],
       });
       avatarUrl = result.secure_url;
     } catch (uploadErr) {
-      console.error('[uploadAvatar] Cloudinary error — http_code:', uploadErr.http_code, '| message:', uploadErr.message);
+      console.error('[uploadAvatar] Full Cloudinary error object:', JSON.stringify(uploadErr, null, 2));
       return res.status(503).json({ success: false, message: 'Avatar upload is temporarily unavailable. Please try again later.' });
     }
 
     const user = await User.findByIdAndUpdate(
       req.user._id,
       { avatar: avatarUrl },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('name email avatar');
 
     return res.json({ success: true, message: 'Avatar updated', avatar: user.avatar, user });

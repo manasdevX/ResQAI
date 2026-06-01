@@ -146,7 +146,7 @@ export const acknowledgeResourceRequest = async (req, res) => {
         acknowledgedBy: req.user._id,
         acknowledgedAt: new Date(),
       },
-      { new: true }
+      { returnDocument: 'after' }
     ).populate('requestedBy', 'name phone avatar')
      .populate('acknowledgedBy', 'name avatar');
 
@@ -183,7 +183,7 @@ export const fulfillResourceRequest = async (req, res) => {
     const request = await ResourceRequest.findOneAndUpdate(
       { _id: req.params.id, status: { $ne: 'fulfilled' } },
       { status: 'fulfilled', fulfilledBy: req.user._id, fulfilledAt: new Date() },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!request) {

@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import {
   ArrowLeft, MapPin, Clock, AlertTriangle, RefreshCw,
-  CheckCircle2, Users, Zap, FileText, Image,
+  Users, Zap, FileText, Image,
   ChevronDown, ChevronUp, ExternalLink, Shield,
   Activity, Navigation, Loader2,
 } from 'lucide-react';
@@ -115,7 +115,17 @@ const IncidentDetail = () => {
     setError(null);
     try {
       const { data } = await api.get(`/incidents/${id}`);
-      if (data.success) setIncident(data.incident);
+      if (data.success) {
+        setIncident(data.incident);
+
+        // If the incident already has real AI triage data, mark it done immediately
+        // so we don't show a stale "AI analysing…" spinner on page refresh.
+        // Also mark it done if the incident is older than 30s — AI should have
+        // finished or failed by then, and a socket event would update us anyway.
+        const hasAi = !!data.incident.aiTriage?.summary;
+        const ageMs = Date.now() - new Date(data.incident.createdAt).getTime();
+        if (hasAi || ageMs > 30_000) setAiTriageDone(true);
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load incident');
     } finally {

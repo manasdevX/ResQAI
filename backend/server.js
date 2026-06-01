@@ -18,16 +18,14 @@ import inviteRoutes from './routes/inviteRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import { setupChatSocket } from './controllers/chatController.js';
+import { sanitizeRequest } from './middleware/sanitize.js';
+import { protect, authorize } from './middleware/authMiddleware.js';
 
 dotenv.config({ quiet: true });
 
-const REQUIRED_ENV = ['MONGO_URI', 'JWT_SECRET'];
+const REQUIRED_ENV = ['MONGO_URI', 'JWT_SECRET', 'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 
-// Non-fatal warnings — features degrade gracefully when these are absent
-if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-  console.warn('  ⚠  Cloudinary credentials not set — media uploads will be unavailable.');
-}
 if (!process.env.GEMINI_API_KEY) {
   console.warn('  ⚠  GEMINI_API_KEY not set — AI triage will be unavailable.');
 }
@@ -82,6 +80,10 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Strip MongoDB operator keys ($, .) from all incoming input to prevent
+// NoSQL operator injection. Must run after body parsing, before any route.
+app.use(sanitizeRequest);
+
 const apiLimiter = rateLimit({
   windowMs:        15 * 60 * 1000,
   max:             200,
@@ -111,8 +113,13 @@ app.use('/api/auth/reset-password',  authLimiter);
 app.get('/', (req, res) => res.send('ResQAI API is running...'));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
+// ── Debug endpoints ───────────────────────────────────────────────────────────
+// Admin-only: these reveal credential status and actively call Gemini/Cloudinary,
+// so they must not be reachable anonymously (quota-burn / info-leak vector).
+const debugGuard = [protect, authorize('admin')];
+
 // Credential presence check
-app.get('/api/debug/credentials', (req, res) => res.json({
+app.get('/api/debug/credentials', ...debugGuard, (req, res) => res.json({
   cloudinary: {
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? '✓ set' : '✗ missing',
     api_key:    process.env.CLOUDINARY_API_KEY    ? '✓ set' : '✗ missing',
@@ -122,16 +129,16 @@ app.get('/api/debug/credentials', (req, res) => res.json({
 }));
 
 // Live credential test — actually calls both APIs to verify values are correct
-app.get('/api/debug/test', async (req, res) => {
+app.get('/api/debug/test', ...debugGuard, async (req, res) => {
   const results = {};
 
   // ── Test Cloudinary ──────────────────────────────────────────────────────────
   try {
     const { v2: cloudinary } = await import('cloudinary');
     cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key:    process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET,
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME?.trim(),
+      api_key:    process.env.CLOUDINARY_API_KEY?.trim(),
+      api_secret: process.env.CLOUDINARY_API_SECRET?.trim(),
     });
     await cloudinary.api.ping();
     results.cloudinary = { ok: true, message: '✓ Credentials valid — Cloudinary API reachable' };

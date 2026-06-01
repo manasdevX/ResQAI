@@ -482,7 +482,7 @@ export const checkInShelter = async (req, res) => {
         $addToSet: { registeredOccupants: userId },
         $inc:      { currentOccupancy: 1 },
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!shelter) {

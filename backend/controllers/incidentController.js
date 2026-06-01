@@ -4,7 +4,7 @@ import User from '../models/User.js';
 import { analyzeIncident } from '../utils/aiTriage.js';
 import { io } from '../server.js';
 import { notify } from '../utils/notify.js';
-import { uploadToCloudinary } from '../middleware/upload.js';
+import { uploadToCloudinary, sanitizePublicId, resolveResourceType } from '../middleware/upload.js';
 
 const badId = (res) => res.status(400).json({ success: false, message: 'Invalid ID format' });
 
@@ -49,20 +49,44 @@ const INCIDENT_SKILL_MAP = {
 /** Upload req.files buffers to Cloudinary; silently skip any that fail. */
 const uploadMediaFiles = async (files = [], folder = 'resqai_incidents') => {
   const media = [];
+  console.log(`[incidentController] Recevied ${files.length} files to upload.`);
+  console.log(`[incidentController] req.files inspect:`, files.map(f => ({ originalname: f.originalname, mimetype: f.mimetype, size: f.size, buffer_len: f.buffer?.length })));
   for (const file of files) {
+    console.log(`[incidentController] BEFORE UPLOAD: file path: ${file.path ? file.path : 'Missing (buffer mode)'}`);
+    console.log(`[incidentController] file originalname: ${file.originalname}`);
+    console.log(`[incidentController] file mimetype: ${file.mimetype}`);
+    console.log(`[incidentController] file size: ${file.size} buffer length: ${file.buffer?.length}`);
     try {
-      const result = await uploadToCloudinary(file.buffer, {
+      // Resolve the concrete resource_type from the MIME type BEFORE uploading.
+      // Passing 'auto' to Cloudinary SDK v2 causes a 403 because the SDK signs
+      // the request for the /auto/upload endpoint but Cloudinary's server
+      // re-validates the signature against the resolved concrete endpoint.
+      const resource_type = resolveResourceType(file.mimetype);
+
+      // Strip the file extension from the public_id. Cloudinary SDK v2 treats
+      // any dot-separated suffix that matches a known format as the `format`
+      // parameter, altering the signed payload and causing another 403.
+      const public_id = `${Date.now()}_${sanitizePublicId(file.originalname)}`;
+
+      const result = await uploadToCloudinary(file.buffer, file.mimetype, {
         folder,
-        resource_type: 'auto',
-        public_id: `${Date.now()}_${file.originalname.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '')}`,
+        resource_type,
+        public_id,
       });
+
+      // Determine the media type for the stored record
       let type = 'image';
       if (file.mimetype?.startsWith('video/'))      type = 'video';
       else if (file.mimetype?.startsWith('audio/')) type = 'audio';
       else if (file.mimetype?.includes('pdf'))      type = 'document';
+
       media.push({ url: result.secure_url, publicId: result.public_id, type, caption: '' });
     } catch (err) {
-      console.error(`[upload] Failed to upload "${file.originalname}" — http_code: ${err.http_code}, message: ${err.message}`);
+      // Log full detail so we can diagnose future upload errors easily
+      console.error(
+        `[upload] Failed: "${file.originalname}" — HTTP ${err.http_code ?? err.status ?? 'unknown'} | ${err.message}`
+      );
+      throw err; // Stop swallowing errors so that the client gets clear feedback
     }
   }
   return media;
@@ -165,7 +189,8 @@ export const createIncident = async (req, res) => {
     // ── AI triage (async — fires after HTTP response is sent) ──────────────────
     setImmediate(async () => {
       try {
-        const triage = await analyzeIncident(title.trim(), description.trim(), type.trim());
+        const mediaUrls = media.map(m => m.url);
+        const triage = await analyzeIncident(title.trim(), description.trim(), type.trim(), mediaUrls);
 
         if (!triage.aiAvailable) {
           // Always emit so the UI stops showing "AI in progress..." and shows "unavailable"
@@ -187,10 +212,10 @@ export const createIncident = async (req, res) => {
               estimatedAffected:  triage.estimatedAffected,
               riskScore:          triage.riskScore,
               processedAt:        new Date(),
-              modelUsed:          triage.modelUsed || 'gemini-1.5-flash',
+              modelUsed:          triage.modelUsed || 'gemini-2.0-flash',
             },
           },
-          { new: true }
+          { returnDocument: 'after' }
         );
 
         if (updated) {
@@ -457,7 +482,7 @@ export const updateIncidentSeverity = async (req, res) => {
       return res.status(400).json({ success: false, message: `Invalid severity. Must be one of: ${VALID_SEVERITIES.join(', ')}` });
     }
 
-    const incident = await Incident.findByIdAndUpdate(id, { severity }, { new: true, runValidators: true });
+    const incident = await Incident.findByIdAndUpdate(id, { severity }, { returnDocument: 'after', runValidators: true });
     if (!incident) return res.status(404).json({ success: false, message: 'Incident not found' });
 
     io.emit('incidentUpdated', { incidentId: id, severity, updatedBy: req.user.name });
@@ -604,7 +629,7 @@ export const acceptIncidentTask = async (req, res) => {
     const incident = await Incident.findOneAndUpdate(
       { _id: id, assignedResponders: { $ne: userId } },
       { $addToSet: { assignedResponders: userId } },
-      { new: true },
+      { returnDocument: 'after' },
     ).populate('reportedBy', '_id');
 
     if (!incident) {
