@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { AlertTriangle, Loader2, CheckCircle, X } from 'lucide-react';
 
 const SOSButton = () => {
-  const { api } = useAuth();
+  const { api, updateUser } = useAuth();
   const [phase, setPhase] = useState('idle'); // idle | confirm | sending | done | error
   const [errorMsg, setErrorMsg] = useState('');
   const timerRef = useRef(null);
@@ -51,6 +51,10 @@ const SOSButton = () => {
           address:     `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`,
         },
       });
+
+      // Firing an SOS means you're in distress — reflect that immediately so the
+      // home screen surfaces the "Mark Safe" control to confirm once you're okay.
+      updateUser({ isSafe: false });
 
       setPhase('done');
       scheduleReset(4000);

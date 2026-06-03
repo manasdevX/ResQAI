@@ -35,20 +35,27 @@ export const toggleAvailability = async (req, res) => {
   }
 };
 
-// @desc   Mark the current user as safe
+// @desc   Update the current user's safety status (Safe ⇄ Need Help)
 // @route  PATCH /api/users/safe
 // @access Private
 export const markSafe = async (req, res) => {
   try {
-    await User.findByIdAndUpdate(req.user._id, { isSafe: true });
+    // Accept an explicit desired state so the control works as a two-way toggle.
+    // Defaults to `true` (mark safe) for backward compatibility.
+    const desired = typeof req.body?.isSafe === 'boolean' ? req.body.isSafe : true;
+
+    await User.findByIdAndUpdate(req.user._id, { isSafe: desired });
 
     return res.json({
       success: true,
-      message: 'You have been marked as safe',
+      isSafe:  desired,
+      message: desired
+        ? 'You have been marked as safe'
+        : 'Status updated — you have flagged that you need help',
     });
   } catch (error) {
     console.error('[markSafe]', error);
-    return res.status(500).json({ success: false, message: 'Failed to mark safe' });
+    return res.status(500).json({ success: false, message: 'Failed to update safety status' });
   }
 };
 

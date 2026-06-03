@@ -135,9 +135,15 @@ export const createIncident = async (req, res) => {
     }
 
     // ── Duplicate detection ────────────────────────────────────────────────────
+    // Only treat it as a duplicate when the SAME user reports the SAME incident
+    // TYPE at the same spot within 30 min. Genuinely different emergencies at one
+    // location (e.g. an SOS beacon followed by a flood report) are distinct and
+    // must both be allowed. SOS beacons (isSOS) never block a regular report.
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60_000);
     const duplicate = await Incident.findOne({
       reportedBy: req.user._id,
+      type:       type.trim(),
+      isSOS:      { $ne: true },
       status:     { $nin: ['resolved', 'closed'] },
       createdAt:  { $gte: thirtyMinutesAgo },
       location:   { $near: { $geometry: location, $maxDistance: 500 } },
@@ -596,6 +602,10 @@ export const createSOSIncident = async (req, res) => {
     });
 
     const saved = await incident.save();
+
+    // The reporter is in distress — flag them as not-safe so the "Mark Safe"
+    // control surfaces on their home screen until they confirm they're okay.
+    await User.updateOne({ _id: req.user._id }, { isSafe: false });
 
     io.emit('sosAlert', {
       incidentId: saved._id,

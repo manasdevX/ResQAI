@@ -24,7 +24,6 @@ const CitizenHome = () => {
   const [location,         setLocation]         = useState(null);
   const [locationError,    setLocationError]    = useState(null);
   const [markingSafe,      setMarkingSafe]       = useState(false);
-  const [safeDone,         setSafeDone]          = useState(false);
   const [showResources,    setShowResources]     = useState(false);
   const [sosAlert,         setSOSAlert]          = useState(null);
   const [sosAcknowledged,  setSOSAcknowledged]   = useState(null);
@@ -76,12 +75,14 @@ const CitizenHome = () => {
     };
   }, [socket]);
 
-  const handleMarkSafe = async () => {
+  // Two-way safety toggle: Safe ⇄ Need Help. Sends the desired state so a
+  // citizen can both confirm they're safe and flag that they need help.
+  const handleToggleSafe = async () => {
+    const next = !user?.isSafe;
     setMarkingSafe(true);
     try {
-      await api.patch('/users/safe');
-      updateUser({ isSafe: true });
-      setSafeDone(true);
+      const { data } = await api.patch('/users/safe', { isSafe: next });
+      updateUser({ isSafe: typeof data?.isSafe === 'boolean' ? data.isSafe : next });
     } catch { /* silent */ } finally {
       setMarkingSafe(false);
     }
@@ -156,29 +157,25 @@ const CitizenHome = () => {
         <SOSButton />
 
         <div className="grid grid-cols-2 gap-2.5">
-          {/* Mark Safe / Already Safe */}
-          {!user?.isSafe || safeDone ? (
-            safeDone ? (
-              <div className="flex items-center gap-2 p-3 bg-green-950/40 border border-green-700/40 rounded-xl">
-                <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
-                <p className="text-xs font-semibold text-green-300">Marked as safe</p>
-              </div>
-            ) : (
-              <button
-                onClick={handleMarkSafe}
-                disabled={markingSafe}
-                className="flex items-center justify-center gap-2 py-3 bg-green-700/15 hover:bg-green-700/25 border border-green-600/35 rounded-xl text-green-400 text-xs font-semibold transition-all"
-              >
-                <CheckCircle className="w-4 h-4 shrink-0" />
-                {markingSafe ? 'Marking…' : 'Mark Safe'}
-              </button>
-            )
-          ) : (
-            <div className="flex items-center gap-2 p-3 bg-green-950/25 border border-green-800/25 rounded-xl">
-              <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
-              <p className="text-xs text-green-400/70 font-medium">You're safe</p>
-            </div>
-          )}
+          {/* Safety status — two-way toggle (Safe ⇄ Need Help) */}
+          <button
+            onClick={handleToggleSafe}
+            disabled={markingSafe}
+            aria-pressed={!!user?.isSafe}
+            title={user?.isSafe
+              ? "You're marked safe — tap if you need help"
+              : 'Tap to mark yourself safe'}
+            className={`flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-semibold transition-all disabled:opacity-60 ${
+              user?.isSafe
+                ? 'bg-green-700/15 hover:bg-green-700/25 border border-green-600/35 text-green-400'
+                : 'bg-amber-700/15 hover:bg-amber-700/25 border border-amber-600/40 text-amber-400'
+            }`}
+          >
+            {user?.isSafe
+              ? <CheckCircle className="w-4 h-4 shrink-0" />
+              : <AlertOctagon className="w-4 h-4 shrink-0" />}
+            {markingSafe ? 'Updating…' : (user?.isSafe ? "You're Safe" : 'Mark Safe')}
+          </button>
 
           {/* Request Resources */}
           <button
