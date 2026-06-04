@@ -21,8 +21,7 @@ export const useAuth = () => useContext(AuthContext);
 export const roleHome = (role) => {
   switch (role) {
     case 'admin':           return '/admin';
-    case 'responder':       return '/volunteer';
-    case 'shelter_manager': return '/volunteer';
+    case 'responder': return '/volunteer';
     default:                return '/home';
   }
 };
@@ -139,7 +138,9 @@ export const AuthProvider = ({ children }) => {
 
   const googleLogin = async (googleToken, role) => {
     const { data } = await api.post('/auth/google', { token: googleToken, role });
-    persistAuth(data);
+    if (!data.requiresRole) {
+      persistAuth(data);
+    }
     return data;
   };
 

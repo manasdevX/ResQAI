@@ -161,7 +161,7 @@ const NotificationsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="h-full overflow-y-auto bg-zinc-950 text-zinc-100">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
 
         {/* Back navigation — this is a standalone (layout-less) route */}

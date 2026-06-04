@@ -61,6 +61,9 @@ export const getDMHistory = async (req, res) => {
       req.user._id, userId, { limit, skip }
     );
 
+    // Prevent browser from caching DM history — stale 304s cause empty responses
+    res.set('Cache-Control', 'no-store');
+
     // Return in chronological order (findConversation returns newest first)
     return res.status(200).json({
       success: true,
@@ -251,6 +254,9 @@ export const getUnreadCounts = async (req, res) => {
  */
 export const deleteMessage = async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.messageId)) {
+      return res.status(400).json({ success: false, message: 'Invalid message ID' });
+    }
     const message = await Message.findById(req.params.messageId);
     if (!message) return res.status(404).json({ success: false, message: 'Message not found' });
     if (message.isDeleted) return res.status(400).json({ success: false, message: 'Message already deleted' });
@@ -307,7 +313,12 @@ export const setupChatSocket = (io) => {
     socket.on('chat:sendDM', async ({ recipientId, content, replyTo, tempId }) => {
       if (!socket.userId || !content?.trim() || !recipientId) return;
       if (recipientId === socket.userId) return; // prevent self-DM
-      if (content.trim().length > 10000) return socket.emit('chat:error', { message: 'Message too long (max 10,000 characters)' });
+      if (content.trim().length > 10000) {
+        return socket.emit('chat:messageFailed', { tempId, message: 'Message too long (max 10,000 characters)' });
+      }
+
+      // replyTo must be a real DB ObjectId — reject temp IDs to prevent CastError
+      const safeReplyTo = replyTo && mongoose.isValidObjectId(replyTo) ? replyTo : undefined;
 
       try {
         const message = await Message.create({
@@ -315,7 +326,7 @@ export const setupChatSocket = (io) => {
           recipient:   recipientId,
           messageType: 'direct',
           content:     content.trim(),
-          ...(replyTo && { replyTo }),
+          ...(safeReplyTo && { replyTo: safeReplyTo }),
         });
 
         const populated = await message.populate([
@@ -327,10 +338,11 @@ export const setupChatSocket = (io) => {
 
         // Deliver to recipient's personal room
         io.to(`user:${recipientId}`).emit('chat:newDM', payload);
-        // Echo back to sender
+        // Echo back to sender (replaces the optimistic temp message)
         io.to(`user:${socket.userId}`).emit('chat:newDM', payload);
       } catch (err) {
-        socket.emit('chat:error', { message: 'Failed to send message' });
+        console.error('[chat:sendDM] save error:', err.message);
+        socket.emit('chat:messageFailed', { tempId, message: 'Failed to send message. Please try again.' });
       }
     });
 

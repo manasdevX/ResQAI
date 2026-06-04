@@ -44,7 +44,14 @@ const ShelterCard = ({ shelter, isHighlit, onClick, isCheckedIn, onCheckIn, onCh
         <div className="flex items-start gap-2.5">
           <span className="text-2xl shrink-0 mt-0.5">{typeInfo.icon}</span>
           <div>
-            <h3 className="text-sm font-semibold text-zinc-100 leading-tight">{shelter.name}</h3>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h3 className="text-sm font-semibold text-zinc-100 leading-tight">{shelter.name}</h3>
+              {isCheckedIn && (
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-green-500/20 border border-green-500/40 text-green-300 uppercase tracking-wide">
+                  ✓ You are here
+                </span>
+              )}
+            </div>
             <p className="text-xs text-zinc-500 mt-0.5 flex items-center gap-1">
               <MapPin className="w-3 h-3 shrink-0" />
               {shelter.location?.city}, {shelter.location?.state}
@@ -143,7 +150,7 @@ const PlaceCard = ({ place, isHighlit, onClick }) => (
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-sm font-semibold text-zinc-100 leading-tight">{place.name}</h3>
           <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border text-blue-400 bg-blue-500/10 border-blue-500/30">
-            OSM
+            Verified
           </span>
         </div>
         <p className="text-xs text-zinc-500 mt-0.5 flex items-center gap-1">
@@ -179,9 +186,10 @@ const Shelters = () => {
   const socket = useSocket();
 
   // DB shelters state
-  const [shelters,             setShelters]             = useState([]);
-  const [myCheckedInShelterId, setMyCheckedInShelterId] = useState(null);
-  const [checkInLoading,       setCheckInLoading]       = useState(null);
+  const [shelters,               setShelters]               = useState([]);
+  const [myCheckedInShelterId,   setMyCheckedInShelterId]   = useState(null);
+  const [myCheckedInShelterName, setMyCheckedInShelterName] = useState(null);
+  const [checkInLoading,         setCheckInLoading]         = useState(null);
   const [checkInMsg,           setCheckInMsg]           = useState(null);
   const [confirmCheckOut,      setConfirmCheckOut]      = useState(null); // shelterId awaiting confirm
   const [loading,              setLoading]              = useState(true);
@@ -206,7 +214,8 @@ const Shelters = () => {
   const [placesError,   setPlacesError]   = useState(null);
   const [placeType,     setPlaceType]     = useState('hospital');
 
-  const cardRefs = useRef({});
+  const cardRefs        = useRef({});
+  const placesAbortRef  = useRef(null);
 
   // ── DB shelters fetch ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -216,7 +225,6 @@ const Shelters = () => {
       setError(null);
       try {
         let shelterList = [];
-        let checkedInId = null;
         if (searchNearby && userLocation) {
           const params = new URLSearchParams({
             lng: userLocation.lng, lat: userLocation.lat,
@@ -225,17 +233,24 @@ const Shelters = () => {
           if (filterType !== 'all') params.append('type', filterType);
           const { data } = await api.get(`/shelters/nearby?${params}`);
           shelterList = data.shelters || [];
+          // Don't clear myCheckedInShelterId when switching to nearby search —
+          // the user is still checked in even if the shelter is outside the search radius.
+          if (!cancelled) setShelters(shelterList);
         } else {
           const params = new URLSearchParams();
           if (filterStatus !== 'all') params.append('status', filterStatus);
           if (filterType   !== 'all') params.append('type',   filterType);
           const { data } = await api.get(`/shelters?${params}`);
           shelterList = data.shelters || [];
-          checkedInId = data.myCheckedInShelterId || null;
-        }
-        if (!cancelled) {
-          setShelters(shelterList);
-          setMyCheckedInShelterId(checkedInId);
+          const checkedInId   = data.myCheckedInShelterId || null;
+          const checkedInName = checkedInId
+            ? (shelterList.find(s => s._id === checkedInId)?.name || null)
+            : null;
+          if (!cancelled) {
+            setShelters(shelterList);
+            setMyCheckedInShelterId(checkedInId);
+            setMyCheckedInShelterName(checkedInName);
+          }
         }
       } catch (err) {
         if (!cancelled) setError(err.response?.data?.message || 'Failed to load shelters');
@@ -247,15 +262,23 @@ const Shelters = () => {
     return () => { cancelled = true; };
   }, [api, searchNearby, userLocation, filterStatus, filterType, appliedRadius, refreshTrigger]);
 
-  // ── Google Places fetch ────────────────────────────────────────────────────
+  // ── OSM Places fetch ───────────────────────────────────────────────────────
   const fetchPlaces = useCallback(async (loc) => {
     if (!loc) return;
+    // Cancel any in-flight request to prevent stale responses overwriting newer ones
+    if (placesAbortRef.current) placesAbortRef.current.abort();
+    placesAbortRef.current = new AbortController();
+
     setPlacesLoading(true);
     setPlacesError(null);
     try {
-      const { data } = await api.get(`/shelters/places?lat=${loc.lat}&lng=${loc.lng}&type=${placeType}&radius=${appliedRadius * 1000}`);
+      const { data } = await api.get(
+        `/shelters/places?lat=${loc.lat}&lng=${loc.lng}&type=${placeType}&radius=${appliedRadius * 1000}`,
+        { signal: placesAbortRef.current.signal }
+      );
       setPlaces(data.places || []);
     } catch (err) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
       setPlacesError(err.response?.data?.message || 'Failed to load nearby places');
     } finally {
       setPlacesLoading(false);
@@ -301,16 +324,46 @@ const Shelters = () => {
     return () => clearTimeout(t);
   }, [error]);
 
-  // Live occupancy updates via socket
+  // Live shelter updates via socket
   useEffect(() => {
     if (!socket) return;
+
     const onOccupancy = ({ shelterId, currentOccupancy, status }) => {
       setShelters(prev => prev.map(s =>
         s._id === shelterId ? { ...s, currentOccupancy, status } : s
       ));
     };
+
+    const onCreated = (shelter) => {
+      setShelters(prev => [shelter, ...prev]);
+    };
+
+    const onUpdated = (payload) => {
+      if (!payload) return;
+      // payload is either a full shelter object or { shelterId, ...partialFields }
+      const id = payload._id || payload.shelterId;
+      if (!id) return;
+      setShelters(prev => prev.map(s =>
+        s._id?.toString() === id.toString() ? { ...s, ...payload } : s
+      ));
+    };
+
+    const onDeleted = ({ shelterId }) => {
+      if (!shelterId) return;
+      setShelters(prev => prev.filter(s => s._id?.toString() !== shelterId.toString()));
+    };
+
     socket.on('shelterOccupancyUpdated', onOccupancy);
-    return () => socket.off('shelterOccupancyUpdated', onOccupancy);
+    socket.on('shelterCreated',          onCreated);
+    socket.on('shelterUpdated',          onUpdated);
+    socket.on('shelterDeleted',          onDeleted);
+
+    return () => {
+      socket.off('shelterOccupancyUpdated', onOccupancy);
+      socket.off('shelterCreated',          onCreated);
+      socket.off('shelterUpdated',          onUpdated);
+      socket.off('shelterDeleted',          onDeleted);
+    };
   }, [socket]);
 
   const handleCheckIn = async (shelterId) => {
@@ -319,6 +372,7 @@ const Shelters = () => {
     try {
       const { data } = await api.post(`/shelters/${shelterId}/checkin`);
       setMyCheckedInShelterId(shelterId);
+      setMyCheckedInShelterName(shelters.find(s => s._id === shelterId)?.name || data.shelter?.name || '');
       setShelters(prev => prev.map(s =>
         s._id === shelterId ? { ...s, currentOccupancy: data.shelter.currentOccupancy, status: data.shelter.status } : s
       ));
@@ -344,6 +398,7 @@ const Shelters = () => {
     try {
       const { data } = await api.post(`/shelters/${shelterId}/checkout`);
       setMyCheckedInShelterId(null);
+      setMyCheckedInShelterName(null);
       setShelters(prev => prev.map(s =>
         s._id === shelterId ? { ...s, currentOccupancy: data.shelter.currentOccupancy, status: data.shelter.status } : s
       ));
@@ -366,8 +421,12 @@ const Shelters = () => {
     return true;
   });
 
-  const activeCount   = shelters.filter(s => s.status === 'active').length;
-  const totalSpots    = shelters.reduce((a, s) => a + Math.max(0, (s.totalCapacity || 0) - (s.currentOccupancy || 0)), 0);
+  const activeCount    = shelters.filter(s => s.status === 'active').length;
+  const totalSpots     = shelters.reduce((a, s) => a + Math.max(0, (s.totalCapacity || 0) - (s.currentOccupancy || 0)), 0);
+  // currentShelter resolves from the live list when available; otherwise falls back to stored name.
+  // This keeps the banner visible during nearby search even if the checked-in shelter isn't in the list.
+  const currentShelter = myCheckedInShelterId ? shelters.find(s => s._id === myCheckedInShelterId) : null;
+  const checkedInDisplayName = currentShelter?.name || myCheckedInShelterName;
 
   return (
     <div className="flex h-[calc(100vh-56px)] overflow-hidden">
@@ -388,6 +447,27 @@ const Shelters = () => {
               <span className="text-zinc-300 font-medium">{totalSpots.toLocaleString()} spots</span>
             </div>
           </div>
+
+          {/* Currently checked-in indicator — shown always, independent of current list/filter */}
+          {myCheckedInShelterId && checkedInDisplayName && (
+            <div className="flex items-center gap-2.5 p-2.5 bg-green-950/40 border border-green-700/40 rounded-xl">
+              <div className="relative shrink-0">
+                <span className="w-2 h-2 rounded-full bg-green-400 block" />
+                <span className="animate-ping absolute inset-0 w-2 h-2 rounded-full bg-green-400 opacity-60" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-green-300 truncate">You are checked in</p>
+                <p className="text-[11px] text-green-500/80 truncate">{checkedInDisplayName}</p>
+              </div>
+              <button
+                onClick={() => handleCheckOut(myCheckedInShelterId)}
+                disabled={checkInLoading === myCheckedInShelterId}
+                className="shrink-0 text-[10px] font-semibold px-2 py-1 rounded-lg border border-orange-700/50 text-orange-400 bg-orange-950/30 hover:bg-orange-950/60 transition disabled:opacity-50"
+              >
+                {confirmCheckOut === myCheckedInShelterId ? 'Confirm?' : 'Check Out'}
+              </button>
+            </div>
+          )}
 
           {/* Search */}
           <div className="relative">
@@ -497,7 +577,7 @@ const Shelters = () => {
             onClick={() => { setTab('nearby'); if (userLocation) fetchPlaces(userLocation); else handleLocate(); }}
             className={`flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition ${tab === 'nearby' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-zinc-500 hover:text-zinc-300'}`}
           >
-            🗺️ OSM Places {places.length > 0 && `(${places.length})`}
+            🗺️ Nearby Places {places.length > 0 && `(${places.length})`}
           </button>
         </div>
 
@@ -568,7 +648,7 @@ const Shelters = () => {
                 <div className="text-center py-12 text-zinc-500">
                   <MapPin className="w-8 h-8 mx-auto mb-3 opacity-30" />
                   <p className="text-sm font-medium">Location required</p>
-                  <p className="text-xs mt-1">Click "Find Near Me" to search nearby places on OpenStreetMap</p>
+                  <p className="text-xs mt-1">Click "Find Near Me" to find hospitals, shelters &amp; services near you</p>
                 </div>
               ) : placesLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (

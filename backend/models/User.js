@@ -49,7 +49,7 @@ const UserSchema = new Schema(
 
     role: {
       type: String,
-      enum: ['citizen', 'responder', 'admin', 'shelter_manager'],
+      enum: ['citizen', 'responder', 'admin'],
       default: 'citizen',
     },
 

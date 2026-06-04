@@ -1,38 +1,29 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import {
   LayoutDashboard, MapPin, ClipboardList, Package,
-  MessageCircle, User, LogOut, Zap, Building2, Bell,
-  ChevronRight, Activity, Menu,
+  MessageCircle, User, LogOut, Zap, Bell,
+  ChevronRight, Activity, Menu, X,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import NotificationBell from '../components/NotificationBell';
 
 const NAV_RESPONDER = [
-  { to: '/volunteer',             icon: LayoutDashboard, label: 'Dashboard',         exact: true  },
-  { to: '/volunteer/incidents',   icon: MapPin,          label: 'Nearby Incidents',  exact: false },
-  { to: '/volunteer/assignments', icon: ClipboardList,   label: 'My Assignments',    exact: false },
-  { to: '/volunteer/resources',   icon: Package,         label: 'Resource Requests', exact: false },
-  { to: '/notifications',         icon: Bell,            label: 'Notifications',     exact: false },
-  { to: '/volunteer/chat',        icon: MessageCircle,   label: 'Chat',              exact: false },
-  { to: '/volunteer/profile',     icon: User,            label: 'Profile',           exact: false },
+  { to: '/volunteer',              icon: LayoutDashboard, label: 'Dashboard',         exact: true  },
+  { to: '/volunteer/incidents',    icon: MapPin,          label: 'Nearby Incidents',  exact: false },
+  { to: '/volunteer/assignments',  icon: ClipboardList,   label: 'My Assignments',    exact: false },
+  { to: '/volunteer/resources',    icon: Package,         label: 'Resource Requests', exact: false },
+  { to: '/notifications',          icon: Bell,            label: 'Notifications',     exact: false },
+  { to: '/volunteer/chat',         icon: MessageCircle,   label: 'Chat',              exact: false },
+  { to: '/volunteer/profile',      icon: User,            label: 'Profile',           exact: false },
 ];
 
-const NAV_SHELTER_MANAGER = [
-  { to: '/volunteer',             icon: LayoutDashboard, label: 'Overview',   exact: true  },
-  { to: '/volunteer/shelter',     icon: Building2,       label: 'My Shelter', exact: false },
-  { to: '/notifications',         icon: Bell,            label: 'Alerts',     exact: false },
-  { to: '/volunteer/chat',        icon: MessageCircle,   label: 'Chat',       exact: false },
-  { to: '/volunteer/profile',     icon: User,            label: 'Profile',    exact: false },
-];
-
-const VolunteerSidebar = ({ nav, isShelterManager, user, toggling, onToggleAvailability, onLogout }) => {
+const VolunteerSidebar = ({ nav, user, toggling, onToggleAvailability, onLogout }) => {
   const navLinkClass = ({ isActive }) =>
     `group flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all duration-200 relative ${
       isActive
-        ? isShelterManager
-          ? 'bg-teal-600/15 text-teal-400 font-semibold'
-          : 'bg-blue-600/15 text-blue-400 font-semibold'
+        ? 'bg-blue-600/15 text-blue-400 font-semibold'
         : 'text-zinc-400 hover:bg-zinc-800/80 hover:text-zinc-100 font-medium'
     }`;
 
@@ -41,29 +32,22 @@ const VolunteerSidebar = ({ nav, isShelterManager, user, toggling, onToggleAvail
       {/* Logo */}
       <div className="px-4 pt-4 pb-3 border-b border-zinc-800/60">
         <div className="flex items-center gap-2.5">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shadow-lg ${
-            isShelterManager
-              ? 'bg-gradient-to-br from-teal-500 to-teal-700 shadow-teal-600/40'
-              : 'bg-gradient-to-br from-blue-500 to-blue-700 shadow-blue-600/40'
-          }`}>
-            {isShelterManager
-              ? <Building2 className="w-[18px] h-[18px] text-white" />
-              : <Activity className="w-[18px] h-[18px] text-white" />
-            }
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shadow-lg bg-gradient-to-br from-blue-500 to-blue-700 shadow-blue-600/40">
+            <Activity className="w-[18px] h-[18px] text-white" />
           </div>
           <div>
             <p className="text-sm font-black text-zinc-100 tracking-tight">
-              ResQ<span className={isShelterManager ? 'text-teal-400' : 'text-blue-400'}>AI</span>
+              ResQ<span className="text-blue-400">AI</span>
             </p>
             <p className="text-[9px] text-zinc-500 mt-0.5 font-semibold uppercase tracking-widest">
-              {isShelterManager ? 'Shelter Portal' : 'Responder Portal'}
+              Responder Portal
             </p>
           </div>
         </div>
       </div>
 
-      {/* Availability toggle (only for responders) */}
-      {!isShelterManager && (
+      {/* Availability toggle */}
+      {(
         <div className="px-3 py-3 border-b border-zinc-800/60">
           <button
             onClick={onToggleAvailability}
@@ -102,9 +86,7 @@ const VolunteerSidebar = ({ nav, isShelterManager, user, toggling, onToggleAvail
               {({ isActive }) => (
                 <>
                   {isActive && (
-                    <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 rounded-r-full ${
-                      isShelterManager ? 'bg-teal-400' : 'bg-blue-400'
-                    }`} />
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 rounded-r-full bg-blue-400" />
                   )}
                   <Icon className="w-4 h-4 shrink-0" />
                   <span className="flex-1 truncate">{label}</span>
@@ -119,9 +101,7 @@ const VolunteerSidebar = ({ nav, isShelterManager, user, toggling, onToggleAvail
       {/* User footer */}
       <div className="p-3 border-t border-zinc-800/60">
         <div className="flex items-center gap-2.5 mb-2.5 px-1">
-          <div className={`w-8 h-8 rounded-full bg-gradient-to-br overflow-hidden ${
-            isShelterManager ? 'from-teal-500 to-teal-700' : 'from-blue-500 to-blue-700'
-          } flex items-center justify-center text-xs font-black text-white shadow-sm shrink-0`}>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br overflow-hidden from-blue-500 to-blue-700 flex items-center justify-center text-xs font-black text-white shadow-sm shrink-0">
             {user?.avatar
               ? <img src={user.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               : user?.name?.[0]?.toUpperCase() || 'V'
@@ -129,7 +109,7 @@ const VolunteerSidebar = ({ nav, isShelterManager, user, toggling, onToggleAvail
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold text-zinc-200 truncate">{user?.name}</p>
-            <p className={`text-[10px] capitalize truncate font-medium ${isShelterManager ? 'text-teal-400' : 'text-blue-400'}`}>
+            <p className="text-[10px] capitalize truncate font-medium text-blue-400">
               {user?.role?.replace('_', ' ')}
             </p>
           </div>
@@ -148,15 +128,24 @@ const VolunteerSidebar = ({ nav, isShelterManager, user, toggling, onToggleAvail
 
 const VolunteerLayout = () => {
   const { user, api, logout, updateUser } = useAuth();
+  const socket    = useSocket();
   const navigate  = useNavigate();
   const location  = useLocation();
-  const [toggling,   setToggling]   = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  const isShelterManager = user?.role === 'shelter_manager';
-  const nav = isShelterManager ? NAV_SHELTER_MANAGER : NAV_RESPONDER;
+  const [toggling,        setToggling]        = useState(false);
+  const [mobileOpen,      setMobileOpen]      = useState(false);
+  const [broadcastAlert,  setBroadcastAlert]  = useState(null);
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const onBroadcast = (alert) => {
+      setBroadcastAlert(alert);
+      setTimeout(() => setBroadcastAlert(null), 15000);
+    };
+    socket.on('alertBroadcast', onBroadcast);
+    return () => socket.off('alertBroadcast', onBroadcast);
+  }, [socket]);
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -172,8 +161,7 @@ const VolunteerLayout = () => {
   };
 
   const sidebarProps = {
-    nav,
-    isShelterManager,
+    nav: NAV_RESPONDER,
     user,
     toggling,
     onToggleAvailability: toggleAvailability,
@@ -215,29 +203,51 @@ const VolunteerLayout = () => {
             <Menu className="w-5 h-5 text-zinc-400" />
           </button>
           <div className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-lg flex items-center justify-center shadow-sm ${
-              isShelterManager
-                ? 'bg-gradient-to-br from-teal-500 to-teal-700 shadow-teal-600/30'
-                : 'bg-gradient-to-br from-blue-500 to-blue-700 shadow-blue-600/30'
-            }`}>
-              {isShelterManager
-                ? <Building2 className="w-3 h-3 text-white" />
-                : <Activity className="w-3 h-3 text-white" />
-              }
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center shadow-sm bg-gradient-to-br from-blue-500 to-blue-700 shadow-blue-600/30">
+              <Activity className="w-3 h-3 text-white" />
             </div>
             <span className="font-black text-sm tracking-tight">
-              ResQ<span className={isShelterManager ? 'text-teal-400' : 'text-blue-400'}>AI</span>
+              ResQ<span className="text-blue-400">AI</span>
             </span>
-            <span className="text-[10px] text-zinc-600 font-medium">
-              {isShelterManager ? 'Shelter' : 'Responder'}
-            </span>
+            <span className="text-[10px] text-zinc-600 font-medium">Responder</span>
           </div>
           <div className="ml-auto">
             <NotificationBell />
           </div>
         </div>
 
-        <Outlet />
+        {/* Broadcast alert banner (shown on every volunteer page) */}
+        {broadcastAlert && (
+          <div className={`shrink-0 flex items-start gap-3 px-5 py-3 text-sm font-medium border-b animate-pulse ${
+            broadcastAlert.alertType === 'evacuation' ? 'bg-red-950/90 border-red-800/60 text-red-100' :
+            broadcastAlert.alertType === 'medical'    ? 'bg-orange-950/90 border-orange-800/60 text-orange-100' :
+            broadcastAlert.alertType === 'shelter'    ? 'bg-blue-950/90 border-blue-800/60 text-blue-100' :
+            'bg-zinc-800/90 border-zinc-700/60 text-zinc-100'
+          }`}>
+            <span className="text-xl shrink-0">
+              {broadcastAlert.alertType === 'evacuation' ? '🚨' :
+               broadcastAlert.alertType === 'medical'    ? '🚑' :
+               broadcastAlert.alertType === 'shelter'    ? '🏠' : '📢'}
+            </span>
+            <div className="flex-1 min-w-0">
+              <span className="font-black uppercase text-xs tracking-wider opacity-80 mr-2">
+                {broadcastAlert.alertType} Alert
+              </span>
+              {broadcastAlert.message}
+            </div>
+            <button
+              onClick={() => setBroadcastAlert(null)}
+              className="shrink-0 opacity-60 hover:opacity-100 transition-opacity p-1"
+              aria-label="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto">
+          <Outlet />
+        </div>
       </div>
     </div>
   );

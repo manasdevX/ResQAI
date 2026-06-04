@@ -2,22 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import ResourceRequestModal from '../../components/ResourceRequestModal';
 import { RefreshCw, Package, MapPin, Clock, CheckCircle, AlertTriangle, Plus } from 'lucide-react';
-
-const TYPE_ICONS = {
-  food:     { icon: '🍱', label: 'Food',     color: 'text-orange-400 bg-orange-500/10 border-orange-500/30' },
-  water:    { icon: '💧', label: 'Water',    color: 'text-blue-400 bg-blue-500/10 border-blue-500/30' },
-  medical:  { icon: '🏥', label: 'Medical',  color: 'text-red-400 bg-red-500/10 border-red-500/30' },
-  rescue:   { icon: '🚨', label: 'Rescue',   color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' },
-  shelter:  { icon: '🏠', label: 'Shelter',  color: 'text-purple-400 bg-purple-500/10 border-purple-500/30' },
-  clothing: { icon: '👕', label: 'Clothing', color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30' },
-};
-
-const URGENCY_COLORS = {
-  low:      'text-green-400 bg-green-500/10 border-green-500/30',
-  medium:   'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
-  high:     'text-orange-400 bg-orange-500/10 border-orange-500/30',
-  critical: 'text-red-400 bg-red-500/10 border-red-500/30',
-};
+import { RESOURCE_TYPE_META as TYPE_ICONS, URGENCY_STYLE as URGENCY_COLORS } from '../../constants/resources';
 
 const CitizenResources = () => {
   const { api } = useAuth();

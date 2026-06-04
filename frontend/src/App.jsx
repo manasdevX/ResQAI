@@ -35,7 +35,6 @@ const VolunteerDashboard     = lazy(() => import('./pages/volunteer/Dashboard'))
 const VolunteerIncidents     = lazy(() => import('./pages/volunteer/Incidents'));
 const VolunteerAssignments   = lazy(() => import('./pages/volunteer/Assignments'));
 const VolunteerResources     = lazy(() => import('./pages/volunteer/Resources'));
-const ShelterManagerPanel    = lazy(() => import('./pages/volunteer/ShelterManagerPanel'));
 
 // Citizen pages
 const CitizenHome        = lazy(() => import('./pages/citizen/Home'));
@@ -82,14 +81,13 @@ function App() {
                 </Route>
               </Route>
 
-              {/* ── Volunteer / Shelter Manager ──────────────────────────────────── */}
-              <Route element={<ProtectedRoute allowedRoles={['responder', 'shelter_manager']} />}>
+              {/* ── Volunteer (responder only) ──────────────────────────────────── */}
+              <Route element={<ProtectedRoute allowedRoles={['responder']} />}>
                 <Route element={<VolunteerLayout />}>
                   <Route path="/volunteer"              element={<VolunteerDashboard />} />
                   <Route path="/volunteer/incidents"   element={<VolunteerIncidents />} />
                   <Route path="/volunteer/assignments" element={<VolunteerAssignments />} />
                   <Route path="/volunteer/resources"   element={<VolunteerResources />} />
-                  <Route path="/volunteer/shelter"     element={<ShelterManagerPanel />} />
                   <Route path="/volunteer/chat"        element={<Chat />} />
                   <Route path="/volunteer/profile"     element={<Profile />} />
                 </Route>
@@ -109,7 +107,7 @@ function App() {
               </Route>
 
               {/* ── Shared incident detail — all authenticated roles ─────────────── */}
-              <Route element={<ProtectedRoute allowedRoles={['citizen', 'responder', 'shelter_manager', 'admin']} />}>
+              <Route element={<ProtectedRoute allowedRoles={['citizen', 'responder', 'admin']} />}>
                 <Route path="/incidents/:id" element={<IncidentDetail />} />
                 {/* Notifications is a single shared route for ALL roles — previously
                     duplicated under the volunteer + citizen layouts, where the

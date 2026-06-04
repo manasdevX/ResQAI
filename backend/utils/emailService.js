@@ -96,6 +96,21 @@ export const sendOTPEmail = async (to, name, otp) => {
   }
 };
 
+export const sendInviteEmail = async (to, inviteUrl, expiresAt) => {
+  const expiry = new Date(expiresAt).toLocaleString('en-US', {
+    dateStyle: 'medium', timeStyle: 'short',
+  });
+  const sent = await dispatch(
+    to,
+    'You\'ve been invited to join ResQAI as an Administrator',
+    buildInviteHTML(to, inviteUrl, expiry),
+    `You've been invited to join ResQAI as an Administrator.\n\nClick the link below to create your account. It expires on ${expiry}.\n\n${inviteUrl}\n\nIf you didn't expect this invitation, you can ignore this email.`,
+  );
+  if (!sent) {
+    console.log(`\n  [ResQAI Email] ⚠ Email not configured — invite link for ${to} : ${inviteUrl}\n`);
+  }
+};
+
 // ─── HTML builders ────────────────────────────────────────────────────────────
 
 function buildResetHTML(firstName, resetUrl) {
@@ -208,6 +223,61 @@ function buildOTPEmailHTML(name, otp) {
               </div>
               <p style="color:#52525b;font-size:12px;line-height:1.6;margin:0;">
                 Didn't create a ResQAI account? You can safely ignore this email — the code will expire automatically.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#09090b;padding:18px 36px;border-top:1px solid #27272a;text-align:center;">
+              <p style="color:#3f3f46;font-size:11px;margin:0;">© 2025 ResQAI Emergency Platform · All rights reserved</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+function buildInviteHTML(email, inviteUrl, expiry) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>You're invited to ResQAI</title>
+</head>
+<body style="margin:0;padding:0;background:#09090b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#09090b;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" style="max-width:520px;background:#18181b;border-radius:16px;overflow:hidden;border:1px solid #27272a;">
+          <tr>
+            <td style="background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);padding:28px 36px;text-align:center;">
+              <div style="font-size:22px;font-weight:800;color:white;letter-spacing:-0.5px;">ResQAI</div>
+              <p style="color:rgba(255,255,255,0.7);margin:4px 0 0;font-size:13px;">Emergency Coordination Platform</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:36px 36px 28px;">
+              <h1 style="color:#f4f4f5;font-size:22px;font-weight:700;margin:0 0 12px;">You've been invited!</h1>
+              <p style="color:#a1a1aa;font-size:14px;line-height:1.7;margin:0 0 8px;">
+                Hi <strong style="color:#e4e4e7;">${email}</strong>,
+              </p>
+              <p style="color:#a1a1aa;font-size:14px;line-height:1.7;margin:0 0 28px;">
+                An administrator has invited you to join <strong style="color:#f4f4f5;">ResQAI</strong> as an <strong style="color:#f87171;">Administrator</strong>. Click the button below to create your account. This link expires on <strong style="color:#fbbf24;">${expiry}</strong>.
+              </p>
+              <div style="text-align:center;margin:0 0 28px;">
+                <a href="${inviteUrl}" style="display:inline-block;background:#dc2626;color:white;font-size:15px;font-weight:700;padding:14px 32px;border-radius:10px;text-decoration:none;letter-spacing:0.2px;">Accept Invitation</a>
+              </div>
+              <div style="background:#1c1917;border:1px solid #292524;border-radius:10px;padding:14px 16px;margin:0 0 24px;">
+                <p style="color:#a8a29e;font-size:12px;margin:0;line-height:1.6;">
+                  🔒 <strong style="color:#d6d3d1;">Security note:</strong> This link can only be used once and is locked to this email address. It expires on <strong style="color:#d6d3d1;">${expiry}</strong>.
+                </p>
+              </div>
+              <p style="color:#52525b;font-size:12px;line-height:1.6;margin:0;">
+                If the button doesn't work, copy and paste this link:<br>
+                <span style="color:#71717a;word-break:break-all;">${inviteUrl}</span>
               </p>
             </td>
           </tr>

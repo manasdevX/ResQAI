@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema(
     name:            { type: String,  required: true, trim: true },
     email:           { type: String,  required: true, unique: true, lowercase: true },
     password:        { type: String },
-    role:            { type: String,  enum: ['citizen', 'responder', 'shelter_manager', 'admin'], default: 'citizen' },
+    role:            { type: String,  enum: ['citizen', 'responder', 'admin'], default: 'citizen' },
     isEmailVerified: { type: Boolean, default: false },
     isActive:        { type: Boolean, default: true },
     avatar:          { type: String,  default: '' },

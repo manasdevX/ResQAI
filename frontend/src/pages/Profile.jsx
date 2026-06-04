@@ -5,7 +5,6 @@ import { Camera, Save, Loader2, CheckCircle, AlertTriangle, User, Mail, Phone, S
 const ROLE_BADGE = {
   admin:           { label: 'Admin',           bg: 'bg-red-500/15 text-red-400 border-red-500/30' },
   responder:       { label: 'Responder',       bg: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
-  shelter_manager: { label: 'Shelter Manager', bg: 'bg-purple-500/15 text-purple-400 border-purple-500/30' },
   citizen:         { label: 'Citizen',         bg: 'bg-green-500/15 text-green-400 border-green-500/30' },
 };
 
@@ -239,7 +238,7 @@ const Profile = () => {
             placeholder="+91 98765 43210"
             className="w-full px-3.5 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition"
           />
-          <p className="text-[11px] text-zinc-600 mt-1">Used by responders to contact you during emergencies.</p>
+          <p className="text-[11px] text-zinc-600 mt-1">Emergency teams may use this to reach you if needed.</p>
         </div>
 
         {/* Role (read-only info) */}

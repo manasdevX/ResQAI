@@ -2,13 +2,12 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, roleHome } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { Link } from 'react-router-dom';
-import { Send, Search, MessageCircle, Users, Circle, ArrowLeft, Trash2, Reply, X, Hash } from 'lucide-react';
+import { Send, Search, MessageCircle, Users, Circle, ArrowLeft, Reply, X, Hash } from 'lucide-react';
 
 // ── Role badge ─────────────────────────────────────────────────────────────────
 const ROLE_COLORS = {
   admin:           'bg-red-500/20 text-red-400 border-red-500/30',
   responder:       'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  shelter_manager: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
   citizen:         'bg-blue-500/20 text-blue-400 border-blue-500/30',
 };
 
@@ -38,9 +37,11 @@ const Avatar = ({ name = '?', avatar, size = 'md', isOnline }) => {
 };
 
 // ── Message bubble ─────────────────────────────────────────────────────────────
-const Bubble = ({ msg, isMine, onReply, onDelete, canDelete }) => {
+const Bubble = ({ msg, isMine, onReply }) => {
   const [hover, setHover] = useState(false);
   const isDeleted = msg.content === '[Message deleted]';
+  const isFailed  = !!msg.isFailed;
+  const isPending = typeof msg._id === 'string' && msg._id.startsWith('temp_') && !isFailed;
   const time = new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
@@ -69,32 +70,30 @@ const Bubble = ({ msg, isMine, onReply, onDelete, canDelete }) => {
         <div className={`px-3 py-2 rounded-2xl text-sm leading-relaxed break-words ${
           isDeleted
             ? 'italic text-zinc-500 bg-zinc-800/40 border border-zinc-700/40'
-            : isMine
-              ? 'bg-blue-600 text-white rounded-tr-sm'
-              : 'bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-tl-sm'
+            : isFailed
+              ? 'bg-red-900/40 text-red-200 border border-red-700/50 rounded-tr-sm'
+              : isMine
+                ? `bg-blue-600 text-white rounded-tr-sm ${isPending ? 'opacity-60' : ''}`
+                : 'bg-zinc-800 text-zinc-100 border border-zinc-700/50 rounded-tl-sm'
         }`}>
           {msg.content}
         </div>
 
         <div className={`flex items-center gap-1 px-1 ${isMine ? 'flex-row-reverse' : ''}`}>
           <span className="text-[10px] text-zinc-600">{time}</span>
+          {isPending && <span className="text-[10px] text-zinc-600">Sending…</span>}
+          {isFailed  && <span className="text-[10px] text-red-500 font-semibold">⚠ Failed — not sent</span>}
           {msg.isEdited && <span className="text-[10px] text-zinc-600">(edited)</span>}
         </div>
       </div>
 
-      {/* Action buttons on hover */}
+      {/* Reply button on hover */}
       {!isDeleted && hover && (
         <div className={`flex items-center gap-1 self-center ${isMine ? 'flex-row-reverse' : ''}`}>
           <button onClick={() => onReply(msg)}
             className="p-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition">
             <Reply className="w-3 h-3" />
           </button>
-          {canDelete && (
-            <button onClick={() => onDelete(msg._id)}
-              className="p-1 rounded-lg bg-zinc-800 hover:bg-red-900/50 border border-zinc-700 hover:border-red-800 text-zinc-400 hover:text-red-400 transition">
-              <Trash2 className="w-3 h-3" />
-            </button>
-          )}
         </div>
       )}
     </div>
@@ -127,17 +126,24 @@ const Chat = () => {
   const [activeTab,   setActiveTab]   = useState('people'); // 'people' | 'online'
 
   // Active DM
-  const [activePeer,   setActivePeer]   = useState(null);
-  const [messages,     setMessages]     = useState([]);
-  const [msgLoading,   setMsgLoading]   = useState(false);
-  const [replyTo,      setReplyTo]      = useState(null);
-  const [draft,        setDraft]        = useState('');
-  const [typingPeers,  setTypingPeers]  = useState({});  // { senderId: name }
-  const [sending,      setSending]      = useState(false); // true while awaiting socket echo
+  const [activePeer,    setActivePeer]    = useState(null);
+  // Messages keyed by peer ID — isolates conversations so switching never clears another chat
+  const [messagesMap,   setMessagesMap]   = useState({});
+  const [loadingPeers,  setLoadingPeers]  = useState(new Set());
+  const [replyTo,       setReplyTo]       = useState(null);
+  const [draft,         setDraft]         = useState('');
+  const [typingPeers,   setTypingPeers]   = useState({});
+  const [sending,       setSending]       = useState(false);
 
-  const messagesEndRef  = useRef(null);
-  const inputRef        = useRef(null);
-  const typingTimerRef  = useRef(null);
+  // Derived — messages for the currently open conversation
+  const messages   = messagesMap[activePeer?._id] || [];
+  // Only show the loading spinner when we have NO cached messages yet for this peer.
+  // If we already have messages cached, keep showing them while a background refresh runs.
+  const msgLoading = !!(activePeer && loadingPeers.has(activePeer._id) && !messages.length);
+
+  const messagesEndRef = useRef(null);
+  const inputRef       = useRef(null);
+  const typingTimerRef = useRef(null);
 
   // ── Load users + unread counts ─────────────────────────────────────────────
   useEffect(() => {
@@ -174,24 +180,37 @@ const Chat = () => {
     const handleOnline = (list) => setOnlineUsers(list);
 
     const handleDM = (msg) => {
-      setMessages(prev => {
-        // Replace optimistic temp message if present
+      const myId        = user._id?.toString();
+      const senderId    = msg.sender?._id?.toString();
+      const recipientId = msg.recipient?._id?.toString?.() ?? msg.recipient?.toString?.();
+      // The peer for this message is whoever is NOT me
+      const convPeerId  = senderId === myId ? recipientId : senderId;
+      if (!convPeerId) return;
+
+      setMessagesMap(prev => {
+        const peerMsgs = prev[convPeerId] || [];
+
+        // Replace optimistic temp message
         if (msg.tempId) {
-          const idx = prev.findIndex(m => m._id === msg.tempId);
+          const idx = peerMsgs.findIndex(m => m._id === msg.tempId);
           if (idx !== -1) {
-            const next = [...prev];
-            next[idx] = msg;
-            return next;
+            const updated = [...peerMsgs];
+            updated[idx] = msg;
+            return { ...prev, [convPeerId]: updated };
           }
         }
-        return [...prev, msg];
+
+        // Avoid duplicates (server may emit to both sender and recipient rooms)
+        if (peerMsgs.some(m => m._id === msg._id)) return prev;
+
+        return { ...prev, [convPeerId]: [...peerMsgs, msg] };
       });
 
-      // If not in this conversation → increment unread
-      if (msg.sender?._id !== user._id) {
+      // Increment unread for messages from someone other than the current peer
+      if (senderId && senderId !== myId) {
         setActivePeer(curr => {
-          if (curr?._id !== msg.sender?._id) {
-            setUnread(u => ({ ...u, [msg.sender._id]: (u[msg.sender._id] || 0) + 1 }));
+          if (curr?._id?.toString() !== senderId) {
+            setUnread(u => ({ ...u, [senderId]: (u[senderId] || 0) + 1 }));
           }
           return curr;
         });
@@ -207,43 +226,70 @@ const Chat = () => {
       });
     };
 
-    socket.on('chat:onlineUsers', handleOnline);
-    socket.on('chat:newDM',       handleDM);
-    socket.on('chat:typing',      handleTyping);
+    // Mark failed messages instead of removing them — the user sees what failed
+    const handleMessageFailed = ({ tempId }) => {
+      if (!tempId) return;
+      setMessagesMap(prev => {
+        const updated = { ...prev };
+        for (const peerId of Object.keys(updated)) {
+          if (updated[peerId].some(m => m._id === tempId)) {
+            updated[peerId] = updated[peerId].map(m =>
+              m._id === tempId ? { ...m, isFailed: true } : m
+            );
+          }
+        }
+        return updated;
+      });
+    };
+
+    socket.on('chat:onlineUsers',    handleOnline);
+    socket.on('chat:newDM',          handleDM);
+    socket.on('chat:typing',         handleTyping);
+    socket.on('chat:messageFailed',  handleMessageFailed);
 
     return () => {
-      socket.off('chat:onlineUsers', handleOnline);
-      socket.off('chat:newDM',       handleDM);
-      socket.off('chat:typing',      handleTyping);
+      socket.off('chat:onlineUsers',    handleOnline);
+      socket.off('chat:newDM',          handleDM);
+      socket.off('chat:typing',         handleTyping);
+      socket.off('chat:messageFailed',  handleMessageFailed);
     };
   }, [socket, user]);
 
   // ── Load DM history when peer changes ─────────────────────────────────────
+  // Depend on the peer's ID string (not the object) so reference changes from
+  // re-renders / StrictMode double-invokes don't trigger a spurious re-fetch.
+  const activePeerId = activePeer?._id ?? null;
   useEffect(() => {
-    if (!activePeer) return;
+    if (!activePeerId) return;
+    const peerId = activePeerId;
     let cancelled = false;
 
-    const load = async () => {
-      if (!cancelled) {
-        setMsgLoading(true);
-        setMessages([]);
-      }
-      try {
-        const { data } = await api.get(`/chat/dm/${activePeer._id}`);
-        if (!cancelled) setMessages(data.messages || []);
+    setLoadingPeers(prev => new Set([...prev, peerId]));
 
-        // Mark as read
-        await api.patch(`/chat/dm/${activePeer._id}/read`);
-        if (!cancelled) setUnread(u => { const n = { ...u }; delete n[activePeer._id]; return n; });
+    const load = async () => {
+      try {
+        const { data } = await api.get(`/chat/dm/${peerId}`);
+        if (!cancelled) {
+          setMessagesMap(prev => ({
+            ...prev,
+            // Never overwrite good cached messages with an empty/undefined response.
+            // This guards against 304-related axios quirks in development.
+            [peerId]: data.messages?.length > 0
+              ? data.messages
+              : (prev[peerId]?.length ? prev[peerId] : []),
+          }));
+          await api.patch(`/chat/dm/${peerId}/read`).catch(() => {});
+          setUnread(u => { const n = { ...u }; delete n[peerId]; return n; });
+        }
       } catch (err) {
         console.error('[Chat] history error', err);
       } finally {
-        if (!cancelled) setMsgLoading(false);
+        if (!cancelled) setLoadingPeers(prev => { const n = new Set(prev); n.delete(peerId); return n; });
       }
     };
     load();
     return () => { cancelled = true; };
-  }, [api, activePeer]);
+  }, [api, activePeerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auto-scroll ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -266,7 +312,8 @@ const Chat = () => {
       replyTo,
       tempId,
     };
-    setMessages(prev => [...prev, optimistic]);
+    const peerId = activePeer._id;
+    setMessagesMap(prev => ({ ...prev, [peerId]: [...(prev[peerId] || []), optimistic] }));
     setDraft('');
     setReplyTo(null);
     setSending(true);
@@ -294,17 +341,6 @@ const Chat = () => {
     }, 2000);
   };
 
-  // ── Delete message ─────────────────────────────────────────────────────────
-  const handleDelete = async (msgId) => {
-    try {
-      await api.delete(`/chat/message/${msgId}`);
-      setMessages(prev => prev.map(m =>
-        m._id === msgId ? { ...m, content: '[Message deleted]' } : m
-      ));
-    } catch (err) {
-      console.error('[Chat] delete error', err);
-    }
-  };
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const onlineIds    = new Set(onlineUsers.map(u => u.userId));
@@ -451,8 +487,6 @@ const Chat = () => {
                     msg={msg}
                     isMine={msg.sender?._id?.toString() === user?._id?.toString()}
                     onReply={setReplyTo}
-                    onDelete={handleDelete}
-                    canDelete={msg.sender?._id?.toString() === user?._id?.toString() || user?.role === 'admin'}
                   />
                 ))
               )}
@@ -495,7 +529,7 @@ const Chat = () => {
                   <Send className="w-4 h-4" />
                 </button>
               </div>
-              <p className="text-[10px] text-zinc-600 mt-1.5 text-center">Enter to send · All messages are end-to-end logged for emergency audit</p>
+              <p className="text-[10px] text-zinc-600 mt-1.5 text-center">Press Enter to send · Messages are securely stored</p>
             </div>
           </>
         ) : (
@@ -506,7 +540,7 @@ const Chat = () => {
             </div>
             <div className="text-center">
               <p className="text-zinc-400 font-semibold">Select a person to chat</p>
-              <p className="text-sm mt-1 text-zinc-600">Real-time messages between responders, civilians & admins</p>
+              <p className="text-sm mt-1 text-zinc-600">Live messages with your emergency team</p>
             </div>
             <div className="flex gap-3 mt-2">
               {onlineUsers.filter(u => u.userId !== user?._id).slice(0, 3).map(u => (

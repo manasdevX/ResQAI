@@ -420,8 +420,21 @@ export const googleAuth = async (req, res) => {
     let user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
-      // First-time Google sign-in — create the account
-      const assignedRole = ['citizen', 'responder'].includes(role) ? role : 'citizen';
+      // Brand-new Google user: require an explicit role choice before creating
+      // the account. Without this, every new Google sign-up silently becomes a
+      // citizen — fine as a default but the user never got to choose.
+      const assignedRole = ['citizen', 'responder'].includes(role) ? role : null;
+      if (!assignedRole) {
+        // Tell the frontend to show a role picker and re-call with the selection.
+        return res.status(200).json({
+          requiresRole: true,
+          googleToken:  token,
+          name,
+          email:        normalizedEmail,
+          picture,
+        });
+      }
+
       user = await User.create({
         name,
         email:           normalizedEmail,
@@ -431,12 +444,12 @@ export const googleAuth = async (req, res) => {
         isEmailVerified: true,
       });
     } else {
-      // Returning user — always sync name + avatar from Google (source of truth)
-      // and mark email as verified if it wasn't already.
+      // Returning user — only sync the avatar from Google (the profile photo is
+      // managed by Google). Do NOT overwrite `name`: the user may have updated it
+      // inside the app and that custom name must be preserved.
       let changed = false;
-      if (user.name !== name)       { user.name   = name;    changed = true; }
-      if (user.avatar !== picture)  { user.avatar = picture; changed = true; }
-      if (!user.isEmailVerified)    { user.isEmailVerified = true; changed = true; }
+      if (user.avatar !== picture) { user.avatar = picture; changed = true; }
+      if (!user.isEmailVerified)   { user.isEmailVerified = true; changed = true; }
       if (changed) await user.save();
     }
 

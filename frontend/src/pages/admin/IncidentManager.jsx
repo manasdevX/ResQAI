@@ -32,21 +32,20 @@ const AdminIncidentManager = () => {
   // Debounce ref for filter changes
   const fetchRef = useRef(null);
 
-  const buildQuery = useCallback((pg = page) => {
-    const params = new URLSearchParams();
-    params.set('page',  String(pg));
-    params.set('limit', String(PAGE_LIMIT));
-    if (filterSev    !== 'all') params.set('severity', filterSev);
-    if (filterStatus !== 'all') params.set('status',   filterStatus);
-    if (filterType   !== 'all') params.set('type',     filterType);
-    return `/incidents?${params.toString()}`;
-  }, [page, filterSev, filterStatus, filterType]);
-
-  const fetch = useCallback(async (pg = page) => {
+  const fetchIncidents = useCallback(async (pg = 1) => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.get(buildQuery(pg));
+      // Build query inline so we always use the explicit `pg` arg,
+      // never the stale `page` state that caused an infinite loop.
+      const params = new URLSearchParams();
+      params.set('page',  String(pg));
+      params.set('limit', String(PAGE_LIMIT));
+      if (filterSev    !== 'all') params.set('severity', filterSev);
+      if (filterStatus !== 'all') params.set('status',   filterStatus);
+      if (filterType   !== 'all') params.set('type',     filterType);
+
+      const { data } = await api.get(`/incidents?${params.toString()}`);
       if (data.success) {
         setIncidents(data.incidents || []);
         setTotal(data.total  || 0);
@@ -58,18 +57,20 @@ const AdminIncidentManager = () => {
     } finally {
       setLoading(false);
     }
-  }, [api, buildQuery, page]);
+  // page is intentionally excluded — we pass pg explicitly to avoid stale reads
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, filterSev, filterStatus, filterType]);
 
   // Re-fetch when filters change — reset to page 1
   useEffect(() => {
     clearTimeout(fetchRef.current);
-    fetchRef.current = setTimeout(() => fetch(1), 150);
+    fetchRef.current = setTimeout(() => fetchIncidents(1), 150);
     return () => clearTimeout(fetchRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterSev, filterStatus, filterType, sortBy]);
 
   // Initial load
-  useEffect(() => { fetch(1); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchIncidents(1); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!socket) return;
@@ -90,11 +91,18 @@ const AdminIncidentManager = () => {
           : i
       ));
     };
+    const onDeleted = ({ incidentId }) => {
+      setIncidents(prev => prev.filter(i => i._id !== incidentId));
+      setTotal(prev => Math.max(0, prev - 1));
+      setSelected(prev => (prev?._id === incidentId ? null : prev));
+    };
     socket.on('newIncident',     onNew);
     socket.on('incidentUpdated', onUpdated);
+    socket.on('incidentDeleted', onDeleted);
     return () => {
       socket.off('newIncident',     onNew);
       socket.off('incidentUpdated', onUpdated);
+      socket.off('incidentDeleted', onDeleted);
     };
   }, [socket, filterSev, filterStatus, filterType]);
 
@@ -128,7 +136,7 @@ const AdminIncidentManager = () => {
 
   const goToPage = (pg) => {
     if (pg < 1 || pg > pages || pg === page) return;
-    fetch(pg);
+    fetchIncidents(pg);
   };
 
   return (
@@ -144,7 +152,7 @@ const AdminIncidentManager = () => {
             </p>
           </div>
           <button
-            onClick={() => fetch(page)}
+            onClick={() => fetchIncidents(page)}
             disabled={loading}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-xs font-medium text-zinc-300 transition"
           >

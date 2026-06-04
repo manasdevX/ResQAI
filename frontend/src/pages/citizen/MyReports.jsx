@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { RefreshCw, MapPin, Clock, AlertTriangle, FileText, ChevronRight } from 'lucide-react';
+import { RefreshCw, MapPin, Clock, AlertTriangle, FileText, ChevronRight, Trash2, Loader2, X } from 'lucide-react';
 
 import { SEVERITY_BADGE, TYPE_ICONS, INCIDENT_STATUS } from '../../constants/incident';
 
@@ -27,10 +27,13 @@ const STATUS_LABEL_COLOR = {
 
 const MyReports = () => {
   const { api } = useAuth();
-  const [incidents, setIncidents] = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState(null);
-  const [expanded,  setExpanded]  = useState(null);
+  const [incidents,    setIncidents]    = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState(null);
+  const [expanded,     setExpanded]     = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null); // incident to confirm-delete
+  const [deleting,     setDeleting]     = useState(false);
+  const [deleteError,  setDeleteError]  = useState(null);
 
   const fetchReports = async () => {
     setLoading(true);
@@ -45,9 +48,30 @@ const MyReports = () => {
     }
   };
 
-  useEffect(() => { fetchReports(); }, []);
+  useEffect(() => { fetchReports(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stepIndex = (status) => STATUS_STEPS.indexOf(status);
+
+  // Whether a citizen can delete their own report
+  const canDelete = (inc) => {
+    const ageMs = Date.now() - new Date(inc.createdAt).getTime();
+    return inc.status === 'reported' && ageMs < 24 * 60 * 60_000;
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await api.delete(`/incidents/${deleteTarget._id}`);
+      setIncidents(prev => prev.filter(i => i._id !== deleteTarget._id));
+      setDeleteTarget(null);
+    } catch (err) {
+      setDeleteError(err.response?.data?.message || 'Failed to delete report. Try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
@@ -68,6 +92,45 @@ const MyReports = () => {
       {error && (
         <div className="flex items-center gap-2 p-4 bg-red-950/40 border border-red-800/40 rounded-xl text-red-400 text-sm">
           <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
+        </div>
+      )}
+
+      {/* ── Delete confirmation modal ───────────────────────────────────────── */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <p className="font-bold text-zinc-100">Delete report?</p>
+                <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                  "<span className="text-zinc-200">{deleteTarget.title}</span>" will be permanently removed. This cannot be undone.
+                </p>
+              </div>
+            </div>
+            {deleteError && (
+              <p className="text-xs text-red-400 mb-3 p-2 bg-red-950/40 border border-red-800/30 rounded-lg">{deleteError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-70 text-white text-sm font-bold rounded-xl transition"
+              >
+                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+              <button
+                onClick={() => { setDeleteTarget(null); setDeleteError(null); }}
+                disabled={deleting}
+                className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-70 text-zinc-300 text-sm font-medium rounded-xl border border-zinc-700 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -94,6 +157,7 @@ const MyReports = () => {
             const currentStep = stepIndex(inc.status);
             const isResolved  = ['resolved', 'closed', 'false_alarm'].includes(inc.status);
             const isExpanded  = expanded === inc._id;
+            const deletable   = canDelete(inc);
 
             return (
               <div key={inc._id} className="bg-zinc-900/80 border border-zinc-800/80 rounded-2xl overflow-hidden hover:border-zinc-700 transition-all">
@@ -128,7 +192,6 @@ const MyReports = () => {
                               <div className={`h-1.5 flex-1 rounded-full transition-all ${
                                 i <= currentStep ? 'bg-blue-500' : 'bg-zinc-700'
                               }`} />
-                              {i < STATUS_STEPS.length - 1 && null}
                             </div>
                           ))}
                         </div>
@@ -143,14 +206,25 @@ const MyReports = () => {
                   </div>
                 </button>
 
-                {/* View details link */}
-                <Link
-                  to={`/incidents/${inc._id}`}
-                  className="flex items-center justify-between px-4 py-2.5 border-t border-zinc-800 text-xs text-zinc-500 hover:text-blue-400 hover:bg-zinc-800/40 transition group"
-                >
-                  <span>View full details, AI triage & timeline</span>
-                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                </Link>
+                {/* Actions row */}
+                <div className="flex items-center border-t border-zinc-800">
+                  <Link
+                    to={`/incidents/${inc._id}`}
+                    className="flex-1 flex items-center justify-between px-4 py-2.5 text-xs text-zinc-500 hover:text-blue-400 hover:bg-zinc-800/40 transition group"
+                  >
+                    <span>View full details, AI triage & timeline</span>
+                    <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                  {deletable && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(inc); setDeleteError(null); }}
+                      className="shrink-0 px-3 py-2.5 text-zinc-600 hover:text-red-400 hover:bg-red-950/30 border-l border-zinc-800 transition"
+                      title="Delete this report"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
 
                 {isExpanded && (
                   <div className="px-4 pb-4 space-y-3 border-t border-zinc-800 pt-3">

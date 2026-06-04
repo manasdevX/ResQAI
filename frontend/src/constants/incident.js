@@ -23,6 +23,7 @@ export const TYPE_ICONS = {
   building_collapse:  '🏚️',
   chemical_spill:     '☣️',
   riot:               '⚠️',
+  sos:                '🆘',
   other:              '📍',
 };
 

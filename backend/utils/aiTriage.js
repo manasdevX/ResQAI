@@ -21,20 +21,19 @@ const getGenAI = () => {
  * Model priority list — ordered from best free-tier availability to worst.
  *
  * Free-tier quotas (Google AI Studio, as of June 2025):
- *   gemini-2.5-flash        → 10 RPM,  500 RPD  (works in tests ✓)
+ *   gemini-2.5-flash        → 10 RPM,  500 RPD
  *   gemini-2.0-flash        → 15 RPM, 1500 RPD
  *   gemini-2.0-flash-lite   → 30 RPM, 1500 RPD
- *   gemini-1.5-flash-8b     → 15 RPM, 1500 RPD  (last-resort fallback)
+ *   gemini-1.5-flash        → 15 RPM, 1500 RPD  (last-resort fallback)
  *
- * gemini-1.5-flash is REMOVED — deprecated by Google, returns 404.
- * gemini-2.5-flash is FIRST because empirical testing shows it's least
- * likely to be rate-limited in this project's usage pattern.
+ * gemini-1.5-flash-8b is excluded — deprecated by Google.
+ * The list tries each model in order, skipping deprecated/unavailable ones.
  */
 const MODELS = [
   'gemini-2.5-flash',
   'gemini-2.0-flash',
   'gemini-2.0-flash-lite',
-  'gemini-1.5-flash-8b',
+  'gemini-1.5-flash',
 ];
 
 /** Race a promise against a hard timeout. */

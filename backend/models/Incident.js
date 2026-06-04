@@ -48,7 +48,7 @@ const AiTriageSchema = new Schema(
     estimatedAffected: { type: Number },      // AI estimate of affected people
     riskScore: { type: Number, min: 0, max: 100 }, // 0–100 risk score
     processedAt: { type: Date },
-    modelUsed: { type: String, default: 'gemini-1.5-flash' },
+    modelUsed: { type: String, default: 'gemini-2.0-flash' },
   },
   { _id: false }
 );
@@ -103,6 +103,7 @@ const IncidentSchema = new Schema(
         'building_collapse',
         'chemical_spill',
         'riot',
+        'sos',
         'other',
       ],
     },

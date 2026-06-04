@@ -5,25 +5,34 @@ import { useSocket } from '../../context/SocketContext';
 import SOSButton from '../../components/SOSButton';
 import WeatherWidget from '../../components/WeatherWidget';
 import ResourceRequestModal from '../../components/ResourceRequestModal';
-import { AlertOctagon, Building2, Package, MessageCircle, FileText, CheckCircle, MapPin, Zap, X } from 'lucide-react';
+import { AlertOctagon, Building2, Package, MessageCircle, FileText, CheckCircle, MapPin, Zap, X, Phone } from 'lucide-react';
 
 import { SEVERITY_BADGE, TYPE_ICONS } from '../../constants/incident';
+
+const EMERGENCY_CONTACTS = [
+  { label: 'National Emergency', number: '112',  icon: '🆘', color: 'border-red-500/30 bg-red-500/8 hover:bg-red-500/15 text-red-300' },
+  { label: 'Police',             number: '100',  icon: '👮', color: 'border-blue-500/30 bg-blue-500/8 hover:bg-blue-500/15 text-blue-300' },
+  { label: 'Ambulance',          number: '108',  icon: '🚑', color: 'border-green-500/30 bg-green-500/8 hover:bg-green-500/15 text-green-300' },
+  { label: 'Fire Brigade',       number: '101',  icon: '🔥', color: 'border-orange-500/30 bg-orange-500/8 hover:bg-orange-500/15 text-orange-300' },
+  { label: 'Disaster Mgmt',      number: '1078', icon: '🏚️', color: 'border-purple-500/30 bg-purple-500/8 hover:bg-purple-500/15 text-purple-300' },
+  { label: 'Women Helpline',     number: '1091', icon: '🤝', color: 'border-pink-500/30 bg-pink-500/8 hover:bg-pink-500/15 text-pink-300' },
+];
 
 const QUICK_ACTIONS = [
   { to: '/report',     icon: AlertOctagon,  label: 'Report Emergency', desc: 'Submit an incident with photos', color: 'border-red-600/30 hover:border-red-500/50 hover:bg-red-950/20' },
   { to: '/shelters',   icon: Building2,     label: 'Find Shelter',     desc: 'Hospitals & relief camps nearby', color: 'border-blue-600/30 hover:border-blue-500/50 hover:bg-blue-950/20' },
   { to: '/my-reports', icon: FileText,      label: 'My Reports',       desc: 'Track your incident reports', color: 'border-purple-600/30 hover:border-purple-500/50 hover:bg-purple-950/20' },
-  { to: '/chat',       icon: MessageCircle, label: 'Chat',             desc: 'Talk to responders', color: 'border-green-600/30 hover:border-green-500/50 hover:bg-green-950/20' },
+  { to: '/chat',       icon: MessageCircle, label: 'Chat',             desc: 'Talk to emergency teams', color: 'border-green-600/30 hover:border-green-500/50 hover:bg-green-950/20' },
 ];
 
 const CitizenHome = () => {
-  const { user, api, updateUser } = useAuth();
+  const { user, api } = useAuth();
   const socket = useSocket();
 
   const [nearbyIncidents,  setNearbyIncidents]  = useState([]);
   const [location,         setLocation]         = useState(null);
   const [locationError,    setLocationError]    = useState(null);
-  const [markingSafe,      setMarkingSafe]       = useState(false);
+  const [showContacts,     setShowContacts]      = useState(false);
   const [showResources,    setShowResources]     = useState(false);
   const [sosAlert,         setSOSAlert]          = useState(null);
   const [sosAcknowledged,  setSOSAcknowledged]   = useState(null);
@@ -59,37 +68,23 @@ const CitizenHome = () => {
       setTimeout(() => setSOSAlert(null), 10000);
     };
     const onNew = (incident) => setNearbyIncidents(prev => [incident, ...prev].slice(0, 5));
-    // Fired when a responder accepts OUR SOS — only reaches this user's socket room
     const onAck = (payload) => {
       setSOSAcknowledged(payload);
       setTimeout(() => setSOSAcknowledged(null), 20000);
     };
 
-    socket.on('sosAlert',       onSOS);
-    socket.on('newIncident',    onNew);
+    socket.on('sosAlert',        onSOS);
+    socket.on('newIncident',     onNew);
     socket.on('sosAcknowledged', onAck);
     return () => {
-      socket.off('sosAlert',       onSOS);
-      socket.off('newIncident',    onNew);
+      socket.off('sosAlert',        onSOS);
+      socket.off('newIncident',     onNew);
       socket.off('sosAcknowledged', onAck);
     };
   }, [socket]);
 
-  // Two-way safety toggle: Safe ⇄ Need Help. Sends the desired state so a
-  // citizen can both confirm they're safe and flag that they need help.
-  const handleToggleSafe = async () => {
-    const next = !user?.isSafe;
-    setMarkingSafe(true);
-    try {
-      const { data } = await api.patch('/users/safe', { isSafe: next });
-      updateUser({ isSafe: typeof data?.isSafe === 'boolean' ? data.isSafe : next });
-    } catch { /* silent */ } finally {
-      setMarkingSafe(false);
-    }
-  };
-
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+    <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
 
       {/* SOS Acknowledged banner */}
       {sosAcknowledged && (
@@ -130,15 +125,15 @@ const CitizenHome = () => {
       )}
 
       {/* Greeting */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pb-2 border-b border-zinc-800/60">
         <div>
-          <h1 className="text-xl font-black text-zinc-100 tracking-tight">
+          <h1 className="text-2xl font-black text-zinc-100 tracking-tight">
             Hi, {user?.name?.split(' ')[0]} 👋
           </h1>
-          <p className="text-sm text-zinc-500 mt-0.5">Stay safe. Help is always nearby.</p>
+          <p className="text-sm text-zinc-500 mt-1">Stay safe. Help is always nearby.</p>
         </div>
         {location && (
-          <div className="flex items-center gap-1.5 text-[11px] text-green-400/80 font-medium bg-green-950/30 border border-green-800/30 rounded-lg px-2.5 py-1.5">
+          <div className="flex items-center gap-1.5 text-[11px] text-green-400 font-bold bg-green-500/10 border border-green-500/20 rounded-xl px-3 py-1.5 shadow-inner">
             <MapPin className="w-3 h-3 shrink-0" />
             <span>Location active</span>
           </div>
@@ -152,41 +147,95 @@ const CitizenHome = () => {
         </div>
       )}
 
-      {/* SOS + Mark Safe */}
+      {/* SOS + Action Cards */}
       <div className="space-y-2.5">
         <SOSButton />
 
         <div className="grid grid-cols-2 gap-2.5">
-          {/* Safety status — two-way toggle (Safe ⇄ Need Help) */}
+          {/* ── Emergency Contacts ── */}
           <button
-            onClick={handleToggleSafe}
-            disabled={markingSafe}
-            aria-pressed={!!user?.isSafe}
-            title={user?.isSafe
-              ? "You're marked safe — tap if you need help"
-              : 'Tap to mark yourself safe'}
-            className={`flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-semibold transition-all disabled:opacity-60 ${
-              user?.isSafe
-                ? 'bg-green-700/15 hover:bg-green-700/25 border border-green-600/35 text-green-400'
-                : 'bg-amber-700/15 hover:bg-amber-700/25 border border-amber-600/40 text-amber-400'
-            }`}
+            onClick={() => setShowContacts(true)}
+            className="group flex flex-col gap-2 p-4 bg-red-500/8 hover:bg-red-500/15 border border-red-500/30 rounded-2xl text-left transition-all duration-300"
           >
-            {user?.isSafe
-              ? <CheckCircle className="w-4 h-4 shrink-0" />
-              : <AlertOctagon className="w-4 h-4 shrink-0" />}
-            {markingSafe ? 'Updating…' : (user?.isSafe ? "You're Safe" : 'Mark Safe')}
+            <div className="flex items-center justify-between">
+              <div className="w-8 h-8 rounded-xl bg-red-500/15 flex items-center justify-center">
+                <Phone className="w-4 h-4 text-red-400" />
+              </div>
+              <span className="text-[9px] font-black text-red-500/60 uppercase tracking-wider">Quick Dial</span>
+            </div>
+            <div>
+              <p className="text-[13px] font-bold text-red-300 leading-tight">Emergency Contacts</p>
+              <p className="text-[10px] text-red-500/60 mt-0.5 leading-snug">Police, ambulance, fire & more</p>
+            </div>
           </button>
 
-          {/* Request Resources */}
+          {/* ── Request Resources ── */}
           <button
             onClick={() => setShowResources(true)}
-            className="flex items-center justify-center gap-2 py-3 bg-orange-700/12 hover:bg-orange-700/22 border border-orange-600/25 rounded-xl text-orange-400 text-xs font-semibold transition-all"
+            className="group flex flex-col gap-2 p-4 bg-orange-500/8 hover:bg-orange-500/15 border border-orange-500/30 rounded-2xl text-left transition-all duration-300"
           >
-            <Package className="w-4 h-4 shrink-0" />
-            Request Help
+            <div className="w-8 h-8 rounded-xl bg-orange-500/15 flex items-center justify-center">
+              <Package className="w-4 h-4 text-orange-400" />
+            </div>
+            <div>
+              <p className="text-[13px] font-bold text-orange-300 leading-tight">Request Help</p>
+              <p className="text-[10px] text-orange-500/60 mt-0.5 leading-snug">Food, water, medical & rescue</p>
+            </div>
           </button>
         </div>
       </div>
+
+      {/* Emergency Contacts modal */}
+      {showContacts && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => setShowContacts(false)}
+        >
+          <div
+            className="w-full max-w-sm bg-zinc-900 border border-zinc-700/80 rounded-2xl p-5 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-red-500/15 flex items-center justify-center">
+                  <Phone className="w-4 h-4 text-red-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-zinc-100">Emergency Contacts</p>
+                  <p className="text-[10px] text-zinc-500">Tap a number to call instantly</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowContacts(false)}
+                className="p-1.5 rounded-lg hover:bg-zinc-800 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4 text-zinc-500" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {EMERGENCY_CONTACTS.map(({ label, number, icon, color }) => (
+                <a
+                  key={number}
+                  href={`tel:${number}`}
+                  className={`flex items-center gap-2.5 p-3 rounded-xl border transition-all duration-200 ${color}`}
+                >
+                  <span className="text-lg leading-none shrink-0">{icon}</span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-zinc-400 truncate">{label}</p>
+                    <p className="text-base font-black tabular-nums leading-tight">{number}</p>
+                  </div>
+                </a>
+              ))}
+            </div>
+
+            <p className="text-[10px] text-zinc-600 text-center mt-4">
+              These are India's national emergency helplines
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Weather */}
       <WeatherWidget />
@@ -199,14 +248,14 @@ const CitizenHome = () => {
             <Link
               key={to}
               to={to}
-              className={`flex flex-col gap-2.5 p-4 bg-zinc-900/80 border rounded-2xl transition-all duration-200 group card-hover ${color}`}
+              className={`flex flex-col gap-3 p-5 bg-zinc-900/40 backdrop-blur-md border rounded-2xl transition-all duration-300 group card-hover ${color}`}
             >
-              <div className="w-8 h-8 rounded-lg bg-zinc-800/80 flex items-center justify-center group-hover:bg-zinc-700/60 transition-colors">
-                <Icon className="w-4 h-4 text-zinc-400 group-hover:text-zinc-200 transition-colors" />
+              <div className="w-10 h-10 rounded-xl bg-zinc-800/80 flex items-center justify-center group-hover:bg-zinc-700/80 transition-colors shadow-sm">
+                <Icon className="w-5 h-5 text-zinc-400 group-hover:text-zinc-100 transition-colors" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-zinc-200 leading-tight">{label}</p>
-                <p className="text-xs text-zinc-500 mt-0.5 leading-snug">{desc}</p>
+                <p className="text-[15px] font-bold text-zinc-200 leading-tight group-hover:text-white transition-colors">{label}</p>
+                <p className="text-xs text-zinc-500 mt-1 leading-snug">{desc}</p>
               </div>
             </Link>
           ))}
@@ -227,29 +276,35 @@ const CitizenHome = () => {
             </span>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             {nearbyIncidents.map(inc => (
-              <div key={inc._id} className="flex items-start gap-3 p-3.5 bg-zinc-900/80 border border-zinc-800/80 rounded-xl card-hover cursor-default">
-                <span className="text-xl shrink-0 mt-0.5">{TYPE_ICONS[inc.type] || '📍'}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-zinc-200 truncate">{inc.title}</p>
-                    <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${SEVERITY_BADGE[inc.severity]}`}>
-                      {inc.severity?.toUpperCase()}
-                    </span>
+              <Link key={inc._id} to={`/incidents/${inc._id}`} className="block">
+                <div className="flex items-start gap-4 p-4 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/80 rounded-2xl card-hover transition-colors hover:bg-zinc-800/60">
+                  <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center shrink-0 shadow-inner text-xl">
+                    {TYPE_ICONS[inc.type] || '📍'}
                   </div>
-                  <p className="text-xs text-zinc-500 mt-0.5 truncate flex items-center gap-1">
-                    <MapPin className="w-2.5 h-2.5 shrink-0" />
-                    {inc.location?.address || 'Nearby'}
-                  </p>
-                  {inc.aiTriage?.recommendedActions?.[0] && (
-                    <p className="text-[11px] text-blue-400/80 mt-1 flex items-center gap-1 leading-snug">
-                      <Zap className="w-2.5 h-2.5 shrink-0" />
-                      {inc.aiTriage.recommendedActions[0]}
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[15px] font-bold text-zinc-100 truncate">{inc.title}</p>
+                      <span className={`shrink-0 text-[10px] font-black tracking-wider uppercase px-2 py-0.5 rounded-full border ${SEVERITY_BADGE[inc.severity]}`}>
+                        {inc.severity}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-1 truncate flex items-center gap-1.5 font-medium">
+                      <MapPin className="w-3 h-3 shrink-0 text-zinc-600" />
+                      {inc.location?.address || 'Nearby'}
                     </p>
-                  )}
+                    {inc.aiTriage?.recommendedActions?.[0] && (
+                      <div className="mt-2.5 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                        <p className="text-[11px] text-blue-300 flex items-center gap-1.5 font-medium leading-snug">
+                          <Zap className="w-3 h-3 shrink-0 text-blue-400" />
+                          {inc.aiTriage.recommendedActions[0]}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

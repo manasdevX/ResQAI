@@ -35,23 +35,38 @@ export const toggleAvailability = async (req, res) => {
   }
 };
 
-// @desc   Update the current user's safety status (Safe ⇄ Need Help)
+// @desc   Safety check-in — citizen confirms they are safe (or flags they need help)
 // @route  PATCH /api/users/safe
 // @access Private
 export const markSafe = async (req, res) => {
   try {
-    // Accept an explicit desired state so the control works as a two-way toggle.
-    // Defaults to `true` (mark safe) for backward compatibility.
     const desired = typeof req.body?.isSafe === 'boolean' ? req.body.isSafe : true;
 
-    await User.findByIdAndUpdate(req.user._id, { isSafe: desired });
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { isSafe: desired },
+      { returnDocument: 'after' }
+    ).select('name email avatar role location');
+
+    if (desired) {
+      // Citizen is safe — notify all admins so they can track accountability
+      const admins = await User.find({ role: 'admin', isActive: true }).select('_id');
+      const payload = {
+        userId:   user._id,
+        name:     user.name,
+        avatar:   user.avatar,
+        role:     user.role,
+        markedAt: new Date(),
+      };
+      admins.forEach(a => io.to(`user:${a._id}`).emit('citizenMarkedSafe', payload));
+    }
 
     return res.json({
       success: true,
       isSafe:  desired,
       message: desired
-        ? 'You have been marked as safe'
-        : 'Status updated — you have flagged that you need help',
+        ? 'Safety check-in confirmed — admins have been notified'
+        : 'Status updated',
     });
   } catch (error) {
     console.error('[markSafe]', error);
@@ -93,8 +108,11 @@ export const updateSkills = async (req, res) => {
 // @access Private (admin)
 export const getAvailableResponders = async (req, res) => {
   try {
+    // Only 'responder' role users appear in the assignment dropdown.
+    // Admins are excluded: they manage incidents but are not field responders,
+    // and including 'admin' caused the logged-in admin to see themselves twice.
     const responders = await User.find({
-      role:        { $in: ['responder', 'admin'] },
+      role:        'responder',
       isAvailable: true,
     }).select('name email avatar skills isAvailable location');
 
@@ -160,29 +178,17 @@ export const uploadAvatar = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No image file provided' });
     }
     
-    console.log(`[userController] req.file inspect:`, { 
-      originalname: req.file.originalname, 
-      mimetype: req.file.mimetype, 
-      size: req.file.size, 
-      buffer_len: req.file.buffer?.length 
-    });
-    console.log(`[userController] BEFORE UPLOAD: file path: ${req.file.path ? req.file.path : 'Missing (buffer mode)'}`);
-    console.log(`[userController] file originalname: ${req.file.originalname}`);
-    console.log(`[userController] file mimetype: ${req.file.mimetype}`);
-    console.log(`[userController] file size: ${req.file.size} buffer length: ${req.file.buffer?.length}`);
-
     let avatarUrl;
     try {
       const result = await uploadToCloudinary(req.file.buffer, req.file.mimetype, {
-        folder:          'resqai_avatars',
-        resource_type:   'image',
-        public_id:       `avatar_${req.user._id}_${Date.now()}`,
-        // In case transformations cause issues with strict settings, we keep it but it's supervised now.
-        transformation:  [{ width: 300, height: 300, crop: 'fill', gravity: 'face', quality: 'auto' }],
+        folder:         'resqai_avatars',
+        resource_type:  'image',
+        public_id:      `avatar_${req.user._id}_${Date.now()}`,
+        transformation: [{ width: 300, height: 300, crop: 'fill', gravity: 'face', quality: 'auto' }],
       });
       avatarUrl = result.secure_url;
     } catch (uploadErr) {
-      console.error('[uploadAvatar] Full Cloudinary error object:', JSON.stringify(uploadErr, null, 2));
+      console.error('[uploadAvatar] Cloudinary error — http_code:', uploadErr.http_code, '| message:', uploadErr.message);
       return res.status(503).json({ success: false, message: 'Avatar upload is temporarily unavailable. Please try again later.' });
     }
 
@@ -309,7 +315,7 @@ export const updateUserRole = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid user ID' });
     }
 
-    const VALID_ROLES = ['citizen', 'responder', 'shelter_manager'];
+    const VALID_ROLES = ['citizen', 'responder'];
     if (!VALID_ROLES.includes(role)) {
       return res.status(400).json({ success: false, message: `Role must be one of: ${VALID_ROLES.join(', ')}` });
     }

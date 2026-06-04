@@ -2,19 +2,17 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Search, RefreshCw, AlertTriangle, ChevronLeft, ChevronRight, Shield, CheckCircle, XCircle, ChevronDown } from 'lucide-react';
 
-const ROLES = ['all', 'citizen', 'responder', 'shelter_manager', 'admin'];
+const ROLES = ['all', 'citizen', 'responder', 'admin'];
 
 const ROLE_BADGE = {
-  admin:           { label: 'Admin',           bg: 'bg-red-500/15 text-red-400 border-red-500/30' },
-  responder:       { label: 'Responder',       bg: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
-  shelter_manager: { label: 'Shelter Mgr',    bg: 'bg-purple-500/15 text-purple-400 border-purple-500/30' },
-  citizen:         { label: 'Citizen',         bg: 'bg-green-500/15 text-green-400 border-green-500/30' },
+  admin:     { label: 'Admin',     bg: 'bg-red-500/15 text-red-400 border-red-500/30'   },
+  responder: { label: 'Responder', bg: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
+  citizen:   { label: 'Citizen',   bg: 'bg-green-500/15 text-green-400 border-green-500/30' },
 };
 
 const ASSIGNABLE_ROLES = [
-  { value: 'citizen',         label: 'Citizen' },
-  { value: 'responder',       label: 'Responder' },
-  { value: 'shelter_manager', label: 'Shelter Manager' },
+  { value: 'citizen',   label: 'Citizen'   },
+  { value: 'responder', label: 'Responder' },
 ];
 
 const PAGE_LIMIT = 20;
@@ -38,7 +36,7 @@ const AdminUserManager = () => {
 
   const searchDebounce = useRef(null);
 
-  const fetch = useCallback(async (pg = 1, q = search, role = roleFilter) => {
+  const fetchUsers = useCallback(async (pg = 1, q = search, role = roleFilter) => {
     setLoading(true);
     setError(null);
     try {
@@ -63,7 +61,7 @@ const AdminUserManager = () => {
   // Debounce search
   useEffect(() => {
     clearTimeout(searchDebounce.current);
-    searchDebounce.current = setTimeout(() => fetch(1, search, roleFilter), 300);
+    searchDebounce.current = setTimeout(() => fetchUsers(1, search, roleFilter), 300);
     return () => clearTimeout(searchDebounce.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, roleFilter]);
@@ -100,7 +98,7 @@ const AdminUserManager = () => {
     }
   };
 
-  const goToPage = (pg) => { if (pg >= 1 && pg <= pages && pg !== page) fetch(pg); };
+  const goToPage = (pg) => { if (pg >= 1 && pg <= pages && pg !== page) fetchUsers(pg); };
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -112,7 +110,7 @@ const AdminUserManager = () => {
           <p className="text-xs text-zinc-500 mt-0.5">{total} total users — manage roles and account status</p>
         </div>
         <button
-          onClick={() => fetch(page)}
+          onClick={() => fetchUsers(page)}
           disabled={loading}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-xs font-medium text-zinc-300 transition"
         >

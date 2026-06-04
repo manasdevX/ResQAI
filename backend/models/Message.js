@@ -119,7 +119,7 @@ const MessageSchema = new Schema(
 
     // For broadcast messages — target audience filter
     broadcastTarget: {
-      roles: [{ type: String, enum: ['citizen', 'responder', 'admin', 'shelter_manager'] }],
+      roles: [{ type: String, enum: ['citizen', 'responder', 'admin'] }],
       incidentTypes: [{ type: String }],
       region: { type: String, trim: true },
     },
@@ -160,7 +160,7 @@ const MessageSchema = new Schema(
 
 // ─── Validation: non-whitespace content OR attachments required ───────────────
 
-MessageSchema.pre('validate', function (next) {
+MessageSchema.pre('validate', async function () {
   // Normalise content before any checks so "   " is treated as empty
   if (this.content != null) this.content = this.content.trim();
 
@@ -168,9 +168,8 @@ MessageSchema.pre('validate', function (next) {
   const hasAttachments = this.attachments && this.attachments.length > 0;
 
   if (!hasContent && !hasAttachments) {
-    return next(new Error('A message must have either content or at least one attachment.'));
+    throw new Error('A message must have either content or at least one attachment.');
   }
-  next();
 });
 
 // ─── Indexes ──────────────────────────────────────────────────────────────────

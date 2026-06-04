@@ -12,6 +12,51 @@ const safeParse = (value, fallback) => {
 // ── Controllers ────────────────────────────────────────────────────────────────
 
 /**
+ * @desc  Get aggregate shelter statistics (total, capacity, occupancy)
+ * @route GET /api/shelters/stats
+ * @access Private (admin)
+ * Note: This uses a MongoDB aggregation over ALL shelters so the numbers are
+ * always accurate regardless of the pagination limit on the list endpoint.
+ */
+export const getShelterStats = async (req, res) => {
+  try {
+    const [agg] = await Shelter.aggregate([
+      {
+        $group: {
+          _id:             null,
+          totalShelters:   { $sum: 1 },
+          activeShelters:  { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } },
+          preparingShelters: { $sum: { $cond: [{ $eq: ['$status', 'preparing'] }, 1, 0] } },
+          fullShelters:    { $sum: { $cond: [{ $eq: ['$status', 'full'] }, 1, 0] } },
+          closedShelters:  { $sum: { $cond: [{ $eq: ['$status', 'closed'] }, 1, 0] } },
+          totalCapacity:   { $sum: '$totalCapacity' },
+          totalOccupancy:  { $sum: '$currentOccupancy' },
+        },
+      },
+    ]);
+
+    const stats = agg ?? {
+      totalShelters: 0, activeShelters: 0, preparingShelters: 0,
+      fullShelters: 0, closedShelters: 0, totalCapacity: 0, totalOccupancy: 0,
+    };
+
+    return res.json({
+      success: true,
+      stats: {
+        ...stats,
+        utilizationRate: stats.totalCapacity > 0
+          ? Math.round((stats.totalOccupancy / stats.totalCapacity) * 100)
+          : 0,
+      },
+    });
+  } catch (error) {
+    console.error('[getShelterStats]', error);
+    return res.status(500).json({ success: false, message: 'Failed to compute shelter stats' });
+  }
+};
+
+
+/**
  * @desc  Get all shelters (with optional status / type filters)
  * @route GET /api/shelters
  * @access Private
@@ -134,7 +179,7 @@ export const getNearbyShelters = async (req, res) => {
 /**
  * @desc  Create a new shelter
  * @route POST /api/shelters
- * @access Private (admin / shelter_manager)
+ * @access Private (admin)
  */
 export const createShelter = async (req, res) => {
   try {
@@ -175,7 +220,7 @@ export const createShelter = async (req, res) => {
 /**
  * @desc  Update shelter occupancy (check-in / check-out)
  * @route PATCH /api/shelters/:id/occupancy
- * @access Private (admin / shelter_manager — own shelter only)
+ * @access Private (admin)
  */
 export const updateOccupancy = async (req, res) => {
   try {
@@ -188,14 +233,6 @@ export const updateOccupancy = async (req, res) => {
 
     const shelter = await Shelter.findById(req.params.id);
     if (!shelter) return res.status(404).json({ success: false, message: 'Shelter not found' });
-
-    // Shelter managers can only update shelters they manage
-    if (
-      req.user.role === 'shelter_manager' &&
-      shelter.managedBy?.toString() !== req.user._id.toString()
-    ) {
-      return res.status(403).json({ success: false, message: 'You can only manage your own shelter' });
-    }
 
     const newOccupancy = absoluteOcc !== undefined
       ? Number(absoluteOcc)
@@ -230,7 +267,7 @@ export const updateOccupancy = async (req, res) => {
 /**
  * @desc  Update shelter status
  * @route PATCH /api/shelters/:id/status
- * @access Private (admin / shelter_manager — own shelter only)
+ * @access Private (admin)
  */
 export const updateShelterStatus = async (req, res) => {
   try {
@@ -238,17 +275,6 @@ export const updateShelterStatus = async (req, res) => {
     const VALID = ['active', 'full', 'closed', 'preparing'];
     if (!VALID.includes(status)) {
       return res.status(400).json({ success: false, message: `Status must be one of: ${VALID.join(', ')}` });
-    }
-
-    // Fetch first so we can apply the ownership check
-    const existing = await Shelter.findById(req.params.id);
-    if (!existing) return res.status(404).json({ success: false, message: 'Shelter not found' });
-
-    if (
-      req.user.role === 'shelter_manager' &&
-      existing.managedBy?.toString() !== req.user._id.toString()
-    ) {
-      return res.status(403).json({ success: false, message: 'You can only manage your own shelter' });
     }
 
     const shelter = await Shelter.findByIdAndUpdate(
@@ -265,6 +291,24 @@ export const updateShelterStatus = async (req, res) => {
     console.error('[updateShelterStatus]', error);
     return res.status(500).json({ success: false, message: 'Failed to update status' });
   }
+};
+
+// Overpass API mirrors tried in order — first success wins
+const OVERPASS_MIRRORS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.openstreetmap.ru/api/interpreter',
+];
+
+const OSM_TAG_MAP = {
+  hospital:       '["amenity"="hospital"]',
+  clinic:         '["amenity"="clinic"]',
+  pharmacy:       '["amenity"="pharmacy"]',
+  fire_station:   '["amenity"="fire_station"]',
+  police:         '["amenity"="police"]',
+  shelter:        '["social_facility"="shelter"]',
+  school:         '["amenity"="school"]',
+  community_hall: '["amenity"="community_hall"]',
 };
 
 /**
@@ -285,46 +329,60 @@ export const getNearbyPlaces = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid coordinates' });
     }
 
-    const radiusMetres = Math.min(parseInt(radius) || 5000, 50000);
-
-    // Map our type aliases → OSM amenity/healthcare tags
-    const OSM_TAG_MAP = {
-      hospital:       '["amenity"="hospital"]',
-      clinic:         '["amenity"="clinic"]',
-      pharmacy:       '["amenity"="pharmacy"]',
-      fire_station:   '["amenity"="fire_station"]',
-      police:         '["amenity"="police"]',
-      shelter:        '["social_facility"="shelter"]',
-      school:         '["amenity"="school"]',
-      community_hall: '["amenity"="community_hall"]',
-    };
+    const radiusMetres = Math.min(parseInt(radius) || 5000, 100000); // cap 100 km
 
     const osmFilter = OSM_TAG_MAP[type] || `["amenity"="${type}"]`;
 
     // Overpass QL — fetch nodes + ways near the user
     const query = `
-      [out:json][timeout:15];
+      [out:json][timeout:20];
       (
         node${osmFilter}(around:${radiusMetres},${parsedLat},${parsedLng});
         way${osmFilter}(around:${radiusMetres},${parsedLat},${parsedLng});
       );
-      out center tags 20;
+      out center tags 30;
     `;
 
-    const response = await fetch('https://overpass-api.de/api/interpreter', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    `data=${encodeURIComponent(query)}`,
-      signal:  AbortSignal.timeout(18000),
-    });
+    // Try each mirror in order; stop at first 2xx response
+    let rawData  = null;
+    let lastErr  = 'unknown';
+    for (const endpoint of OVERPASS_MIRRORS) {
+      try {
+        const response = await fetch(endpoint, {
+          method:  'POST',
+          // Do NOT send Accept:application/json — Overpass returns 406 for that header.
+          // The [out:json] directive in the query controls the response format instead.
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent':   'ResQAI/1.0 (emergency-response-platform)',
+          },
+          body:   `data=${encodeURIComponent(query)}`,
+          signal: AbortSignal.timeout(22000),
+        });
 
-    if (!response.ok) {
-      console.warn('[getNearbyPlaces] Overpass error:', response.status);
-      return res.json({ success: true, places: [], source: 'overpass' });
+        if (!response.ok) {
+          lastErr = `HTTP ${response.status} from ${endpoint}`;
+          console.warn(`[getNearbyPlaces] ${lastErr}`);
+          continue;
+        }
+
+        rawData = await response.json();
+        break;
+      } catch (err) {
+        lastErr = `${err.message} (${endpoint})`;
+        console.warn('[getNearbyPlaces] mirror failed:', lastErr);
+      }
     }
 
-    const data     = await response.json();
-    const elements = data.elements || [];
+    if (!rawData) {
+      console.error('[getNearbyPlaces] all mirrors failed. Last error:', lastErr);
+      return res.status(503).json({
+        success: false,
+        message: 'Nearby places service is temporarily unavailable. Please try again shortly.',
+      });
+    }
+
+    const elements = rawData.elements || [];
 
     const places = elements
       .map((el) => {
@@ -348,7 +406,7 @@ export const getNearbyPlaces = async (req, res) => {
         const distanceM = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
         return {
-          placeId:    `osm:${el.type}:${el.id}`,
+          place_id:   `osm:${el.type}:${el.id}`,  // snake_case matches frontend usage
           name,
           vicinity:   [tags['addr:street'], tags['addr:housenumber'], tags['addr:city']].filter(Boolean).join(', ') || tags['addr:full'] || '',
           location:   { type: 'Point', coordinates: [elLon, elLat] },
@@ -367,15 +425,14 @@ export const getNearbyPlaces = async (req, res) => {
     return res.json({ success: true, count: places.length, places, source: 'overpass' });
   } catch (error) {
     console.error('[getNearbyPlaces]', error);
-    // Return empty gracefully — never crash the shelter page
-    return res.json({ success: true, places: [], source: 'overpass' });
+    return res.status(500).json({ success: false, message: 'Failed to fetch nearby places' });
   }
 };
 
 /**
  * @desc  Update shelter details
  * @route PUT /api/shelters/:id
- * @access Private (admin / shelter_manager — own shelter only)
+ * @access Private (admin)
  */
 export const updateShelter = async (req, res) => {
   try {
@@ -385,16 +442,8 @@ export const updateShelter = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Shelter name cannot be empty' });
     }
 
-    // Ownership check: fetch shelter before updating
     const existing = await Shelter.findById(req.params.id);
     if (!existing) return res.status(404).json({ success: false, message: 'Shelter not found' });
-
-    if (
-      req.user.role === 'shelter_manager' &&
-      existing.managedBy?.toString() !== req.user._id.toString()
-    ) {
-      return res.status(403).json({ success: false, message: 'You can only manage your own shelter' });
-    }
 
     location  = location  ? safeParse(location,  null) : undefined;
     amenities = amenities ? safeParse(amenities, {})   : undefined;
@@ -497,7 +546,7 @@ export const checkInShelter = async (req, res) => {
     // Auto-mark full if at capacity after this check-in
     if (shelter.autoCloseWhenFull && shelter.currentOccupancy >= shelter.totalCapacity && shelter.status === 'active') {
       shelter.status = 'full';
-      await shelter.save();
+      await shelter.save({ validateModifiedOnly: true });
     }
 
     io.emit('shelterOccupancyUpdated', {
@@ -533,7 +582,8 @@ export const checkOutShelter = async (req, res) => {
     shelter.registeredOccupants = shelter.registeredOccupants.filter(uid => !uid.equals(userId));
     shelter.currentOccupancy    = shelter.registeredOccupants.length;
     if (shelter.status === 'full') shelter.status = 'active';
-    await shelter.save();
+    // validateModifiedOnly prevents failing on pre-existing empty required fields (e.g. location.address)
+    await shelter.save({ validateModifiedOnly: true });
 
     io.emit('shelterOccupancyUpdated', {
       shelterId:        id,
@@ -548,68 +598,4 @@ export const checkOutShelter = async (req, res) => {
   }
 };
 
-/**
- * @desc  Get the shelter managed by the current user
- * @route GET /api/shelters/mine
- * @access Private (shelter_manager)
- */
-export const getMyShelter = async (req, res) => {
-  try {
-    const shelter = await Shelter.findOne({ managedBy: req.user._id })
-      .populate('managedBy', 'name email phone')
-      .populate('registeredOccupants', 'name email avatar');
-
-    if (!shelter) {
-      return res.json({ success: true, shelter: null, message: 'No shelter assigned to you yet. Ask an admin to assign one.' });
-    }
-
-    return res.json({ success: true, shelter });
-  } catch (error) {
-    console.error('[getMyShelter]', error);
-    return res.status(500).json({ success: false, message: 'Failed to fetch your shelter' });
-  }
-};
-
-/**
- * @desc  Assign (or unassign) a shelter_manager to a shelter
- * @route PATCH /api/shelters/:id/assign-manager
- * @access Private (admin only)
- */
-export const assignShelterManager = async (req, res) => {
-  try {
-    const { managerId } = req.body; // null to unassign
-
-    const shelter = await Shelter.findById(req.params.id);
-    if (!shelter) return res.status(404).json({ success: false, message: 'Shelter not found' });
-
-    if (managerId) {
-      // Validate the user exists and has the right role
-      const manager = await User.findById(managerId).select('name email role');
-      if (!manager) return res.status(404).json({ success: false, message: 'User not found' });
-      if (manager.role !== 'shelter_manager') {
-        return res.status(400).json({ success: false, message: 'User must have the shelter_manager role' });
-      }
-
-      // Remove this manager from any other shelter they were previously managing
-      await Shelter.updateMany(
-        { managedBy: managerId, _id: { $ne: shelter._id } },
-        { $unset: { managedBy: '' } }
-      );
-
-      shelter.managedBy = managerId;
-    } else {
-      shelter.managedBy = undefined;
-    }
-
-    await shelter.save();
-
-    const updated = await Shelter.findById(shelter._id).populate('managedBy', 'name email phone');
-    io.emit('shelterUpdated', { shelterId: updated._id, managedBy: updated.managedBy });
-
-    return res.json({ success: true, message: managerId ? 'Manager assigned' : 'Manager unassigned', shelter: updated });
-  } catch (error) {
-    console.error('[assignShelterManager]', error);
-    return res.status(500).json({ success: false, message: 'Failed to assign manager' });
-  }
-};
 

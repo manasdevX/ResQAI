@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
@@ -6,7 +6,7 @@ import {
   ArrowLeft, MapPin, Clock, AlertTriangle, RefreshCw,
   Users, Zap, FileText, Image,
   ChevronDown, ChevronUp, ExternalLink, Shield,
-  Activity, Navigation, Loader2,
+  Activity, Navigation, Loader2, Copy, CheckCheck,
 } from 'lucide-react';
 import {
   TYPE_ICONS, SEVERITY_BADGE, SEVERITY_DOT, INCIDENT_STATUS,
@@ -99,15 +99,19 @@ const MediaCard = ({ item }) => {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 const IncidentDetail = () => {
-  const { id }      = useParams();
-  const { api }     = useAuth();
-  const socket      = useSocket();
+  const { id }         = useParams();
+  const { api, user }  = useAuth();
+  const socket         = useSocket();
   const navigate    = useNavigate();
 
   const [incident,       setIncident]       = useState(null);
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState(null);
   const [aiTriageDone,   setAiTriageDone]   = useState(false);
+  const [retryingAI,     setRetryingAI]     = useState(false);
+  const [retryMsg,       setRetryMsg]       = useState('');
+  const [copied,         setCopied]         = useState(false);
+  const aiPendingRef                        = useRef(false);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchIncident = useCallback(async () => {
@@ -134,6 +138,43 @@ const IncidentDetail = () => {
   }, [api, id]);
 
   useEffect(() => { fetchIncident(); }, [fetchIncident]);
+
+  // ── Auto-refetch fallback for missed socket events ─────────────────────────
+  // If the incidentUpdated socket event was emitted before the user arrived on
+  // this page (e.g. they opened the link later), the spinner will be stuck
+  // forever. We rescue by re-fetching the full incident after 65 s — by then
+  // Gemini has either finished or given up, and the DB has the final state.
+  useEffect(() => {
+    aiPendingRef.current = !aiTriageDone;
+  }, [aiTriageDone]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (aiPendingRef.current) {
+        // Re-fetch silently — fetchIncident will call setAiTriageDone(true)
+        // because ageMs will be > 30 000 by the time this fires.
+        fetchIncident();
+      }
+    }, 65_000);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]); // Run once per incident page mount
+
+  // ── Retry AI triage (admin / responder only) ───────────────────────────────
+  const handleRetryAI = async () => {
+    setRetryingAI(true);
+    setRetryMsg('');
+    setAiTriageDone(false); // show spinner while waiting for socket update
+    try {
+      await api.post(`/incidents/${id}/triage`);
+      setRetryMsg('AI analysis queued — results will appear automatically.');
+    } catch (err) {
+      setAiTriageDone(true); // revert spinner to error state
+      setRetryMsg(err.response?.data?.message || 'Failed to queue AI analysis. Try again.');
+    } finally {
+      setRetryingAI(false);
+    }
+  };
 
   // ── Real-time status sync ──────────────────────────────────────────────────
   useEffect(() => {
@@ -309,7 +350,7 @@ const IncidentDetail = () => {
           <div className="space-y-3">
             <div className="flex items-start gap-2.5 p-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl">
               <MapPin className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-sm text-zinc-200">
                   {incident.location?.address || `${lat?.toFixed(5)}, ${lng?.toFixed(5)}`}
                 </p>
@@ -323,6 +364,18 @@ const IncidentDetail = () => {
                   {lat?.toFixed(6)}, {lng?.toFixed(6)}
                 </p>
               </div>
+              {/* Copy coordinates */}
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${lat?.toFixed(6)}, ${lng?.toFixed(6)}`);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="shrink-0 p-1.5 rounded-lg hover:bg-zinc-700 transition text-zinc-500 hover:text-zinc-300"
+                title="Copy coordinates"
+              >
+                {copied ? <CheckCheck className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
             </div>
             {lat && lng && (
               <a
@@ -351,13 +404,40 @@ const IncidentDetail = () => {
             </div>
           </Section>
         ) : aiUnavailable ? (
-          <Section title="AI Triage Analysis" icon={Zap} iconClass="text-zinc-600" defaultOpen={false}>
-            <div className="flex items-center gap-3 p-4 bg-zinc-800/40 border border-zinc-700/40 rounded-xl">
-              <AlertTriangle className="w-4 h-4 text-zinc-500 shrink-0" />
-              <div>
-                <p className="text-sm text-zinc-400 font-medium">AI analysis unavailable</p>
-                <p className="text-xs text-zinc-600 mt-0.5">Gemini API key not configured on the server. Manual review required.</p>
+          <Section title="AI Triage Analysis" icon={Zap} iconClass="text-zinc-600" defaultOpen={true}>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-4 bg-zinc-800/40 border border-zinc-700/40 rounded-xl">
+                <AlertTriangle className="w-4 h-4 text-amber-500/70 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-zinc-300 font-semibold">AI analysis could not be completed</p>
+                  <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                    The AI service was temporarily unavailable when this incident was submitted (rate limit or quota exceeded). Manual review is recommended.
+                  </p>
+                  {user?.role === 'citizen' && (
+                    <p className="text-xs text-zinc-600 mt-1.5 italic">
+                      Emergency teams can manually trigger a re-analysis.
+                    </p>
+                  )}
+                </div>
               </div>
+              {/* Retry button — admin / responder only */}
+              {(user?.role === 'admin' || user?.role === 'responder') && (
+                <div className="space-y-2">
+                  <button
+                    onClick={handleRetryAI}
+                    disabled={retryingAI}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-600/30 text-blue-400 rounded-xl text-sm font-semibold transition-all disabled:opacity-60"
+                  >
+                    {retryingAI
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Zap className="w-3.5 h-3.5" />}
+                    {retryingAI ? 'Queuing analysis…' : 'Retry AI Analysis'}
+                  </button>
+                  {retryMsg && (
+                    <p className="text-xs text-zinc-400 px-1">{retryMsg}</p>
+                  )}
+                </div>
+              )}
             </div>
           </Section>
         ) : hasRealAi ? (
@@ -424,7 +504,7 @@ const IncidentDetail = () => {
 
         {/* ── Assigned Responders ─────────────────────────────────────────── */}
         {hasAssigned && (
-          <Section title={`Assigned Responders (${incident.assignedResponders.length})`} icon={Users} iconClass="text-green-400">
+          <Section title={`Assigned Volunteers (${incident.assignedResponders.length})`} icon={Users} iconClass="text-green-400">
             <div className="space-y-2">
               {incident.assignedResponders.map(r => (
                 <div key={r._id} className="flex items-center gap-3 p-2.5 bg-zinc-800/50 border border-zinc-700/40 rounded-xl">

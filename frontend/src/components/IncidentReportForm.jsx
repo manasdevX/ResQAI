@@ -367,13 +367,13 @@ const IncidentReportForm = ({ onSuccess }) => {
   // ── Success screen ────────────────────────────────────────────────────────────
   if (submitted) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 px-6 text-center space-y-5">
+      <div className="flex flex-col items-center justify-center py-20 px-6 text-center space-y-6 animate-fade-in">
         {/* Animated check */}
         <div className="relative">
-          <div className="w-24 h-24 rounded-full bg-green-500/10 border-2 border-green-500/30 flex items-center justify-center">
-            <CheckCircle2 className="w-12 h-12 text-green-400" />
+          <div className="w-28 h-28 rounded-full bg-green-500/10 border-2 border-green-500/30 flex items-center justify-center backdrop-blur-sm shadow-[0_0_30px_rgba(34,197,94,0.2)]">
+            <CheckCircle2 className="w-14 h-14 text-green-400 animate-badge-pop" />
           </div>
-          <div className="absolute inset-0 rounded-full bg-green-500/5 animate-ping" />
+          <div className="absolute inset-0 rounded-full bg-green-500/20 animate-ping" style={{ animationDuration: '2s' }} />
         </div>
 
         <div className="space-y-2">
@@ -479,10 +479,10 @@ const IncidentReportForm = ({ onSuccess }) => {
                     key={value}
                     type="button"
                     onClick={() => { setType(value); setStep1Errors(p => ({ ...p, type: '' })); }}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all ${
+                    className={`flex flex-col items-center gap-2 p-3 rounded-2xl border text-center transition-all duration-300 ${
                       isSelected
-                        ? 'bg-red-600/20 border-red-500/60 text-red-300 ring-1 ring-red-500/30'
-                        : 'bg-zinc-800/60 border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-200'
+                        ? 'bg-red-500/10 border-red-500/50 text-red-300 shadow-[0_0_15px_rgba(239,68,68,0.15)] scale-[0.98]'
+                        : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600 hover:bg-zinc-800/80 text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
                     <span className="text-xl leading-none">{icon}</span>
@@ -541,7 +541,7 @@ const IncidentReportForm = ({ onSuccess }) => {
             )}
 
             {/* Leaflet Map */}
-            <div className="rounded-xl overflow-hidden border border-zinc-700" style={{ height: '280px' }}>
+            <div className="rounded-2xl overflow-hidden border-2 border-zinc-800 shadow-inner relative group" style={{ height: '280px' }}>
               <MapContainer
                 center={mapCenter}
                 zoom={lat ? 13 : 5}
@@ -587,12 +587,12 @@ const IncidentReportForm = ({ onSuccess }) => {
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={e => { e.preventDefault(); setDragOver(false); validateAndAddFiles(e.dataTransfer.files); }}
-              className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
+              className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 cursor-pointer ${
                 dragOver
-                  ? 'border-blue-500 bg-blue-500/10'
+                  ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_20px_rgba(59,130,246,0.1)]'
                   : mediaFiles.length > 0
-                    ? 'border-zinc-600 bg-zinc-800/20'
-                    : 'border-zinc-700 bg-zinc-800/20 hover:border-zinc-500 hover:bg-zinc-800/40'
+                    ? 'border-zinc-600 bg-zinc-900/60'
+                    : 'border-zinc-700/80 bg-zinc-900/40 hover:border-zinc-500 hover:bg-zinc-800/60'
               }`}
             >
               <label className="absolute inset-0 cursor-pointer">

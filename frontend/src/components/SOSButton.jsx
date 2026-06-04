@@ -66,7 +66,7 @@ const SOSButton = () => {
       setPhase('error');
       scheduleReset(5000);
     }
-  }, [api]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [api, updateUser]);
 
   if (phase === 'done') {
     return (

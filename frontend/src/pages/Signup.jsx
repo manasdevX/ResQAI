@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
+import GoogleRolePicker from '../components/GoogleRolePicker';
 
 const _rawApi = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const API = _rawApi.startsWith('http://') || _rawApi.startsWith('https://')
@@ -170,6 +171,8 @@ const Signup = () => {
   }, []);
 
   // ── Google ───────────────────────────────────────────────────────────────────
+  const [pendingGoogleToken, setPendingGoogleToken] = useState(null);
+
   const handleGoogleSuccess = async (tokenResponse) => {
     if (!tokenResponse?.access_token) {
       setError('Google Sign-Up was blocked. Try disabling any popup blockers and retry.');
@@ -178,10 +181,32 @@ const Signup = () => {
     setSubmitting(true);
     setError('');
     try {
-      const data = await googleLogin(tokenResponse.access_token, inviteData?.role || role);
+      // If we already know the role (invite or the user selected one), pass it directly.
+      // Otherwise let the backend decide — it will tell us requiresRole if the user is new.
+      const knownRole = inviteData?.role;
+      const data = await googleLogin(tokenResponse.access_token, knownRole);
+      if (data?.requiresRole) {
+        setPendingGoogleToken(tokenResponse.access_token);
+        setSubmitting(false);
+        return;
+      }
       redirect(data.role);
     } catch (err) {
       setError(err.response?.data?.message || 'Google Sign-Up failed. Please try again.');
+      setSubmitting(false);
+    }
+  };
+
+  const handleGoogleRoleSelect = async (selectedRole) => {
+    setSubmitting(true);
+    setError('');
+    try {
+      const data = await googleLogin(pendingGoogleToken, selectedRole);
+      setPendingGoogleToken(null);
+      redirect(data.role);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Google Sign-Up failed. Please try again.');
+      setPendingGoogleToken(null);
       setSubmitting(false);
     }
   };
@@ -427,6 +452,14 @@ const Signup = () => {
   const strengthCfg = pwdScore > 0 ? STRENGTH_CONFIG[pwdScore] : null;
 
   return (
+    <>
+    {pendingGoogleToken && (
+      <GoogleRolePicker
+        onSelect={handleGoogleRoleSelect}
+        onCancel={() => { setPendingGoogleToken(null); setSubmitting(false); }}
+        isSubmitting={submitting}
+      />
+    )}
     <div className="flex min-h-screen bg-zinc-950 text-zinc-100">
 
       {/* Left hero */}
@@ -702,6 +735,7 @@ const Signup = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

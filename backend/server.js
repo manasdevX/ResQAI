@@ -113,6 +113,72 @@ app.use('/api/auth/reset-password',  authLimiter);
 app.get('/', (req, res) => res.send('ResQAI API is running...'));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
+// ── Weather proxy ─────────────────────────────────────────────────────────────
+// Proxied server-side so browser CORS / Brave Shields cannot block it.
+// Tries open-meteo first; falls back to wttr.in if unreachable.
+app.get('/api/weather', async (req, res) => {
+  const { lat, lon } = req.query;
+  if (!lat || !lon) return res.status(400).json({ message: 'lat and lon required' });
+  try {
+    let current_weather = null;
+    let city = null;
+
+    // ── Attempt 1: open-meteo ───────────────────────────────────────────────
+    try {
+      const wmRes = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`,
+        { signal: AbortSignal.timeout(6000) }
+      );
+      if (wmRes.ok) {
+        const d = await wmRes.json();
+        current_weather = d.current_weather;
+      }
+    } catch { /* fall through to wttr.in */ }
+
+    // ── Attempt 2: wttr.in fallback ─────────────────────────────────────────
+    if (!current_weather) {
+      const wtRes = await fetch(
+        `https://wttr.in/${lat},${lon}?format=j1`,
+        { headers: { 'User-Agent': 'ResQAI/1.0' }, signal: AbortSignal.timeout(8000) }
+      );
+      if (wtRes.ok) {
+        const d = await wtRes.json();
+        const cc = d.current_condition?.[0];
+        current_weather = {
+          temperature:  parseFloat(cc?.temp_C  ?? cc?.temp_F ?? 0),
+          windspeed:    parseFloat(cc?.windspeedKmph ?? 0),
+          weathercode:  parseInt(cc?.weatherCode ?? 0),
+          is_day:       cc?.is_day === 'yes' ? 1 : 0,
+        };
+        city = d.nearest_area?.[0]?.areaName?.[0]?.value || null;
+      }
+    }
+
+    if (!current_weather) return res.status(503).json({ message: 'Weather service unavailable' });
+
+    // ── Nominatim reverse-geocode for city name ─────────────────────────────
+    if (!city) {
+      try {
+        const geoRes = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
+          { headers: { 'User-Agent': 'ResQAI/1.0' }, signal: AbortSignal.timeout(5000) }
+        );
+        if (geoRes.ok) {
+          const geo  = await geoRes.json();
+          const addr = geo.address || {};
+          city = addr.city || addr.town || addr.district || addr.county || addr.suburb || null;
+        }
+      } catch { /* city stays null */ }
+    }
+
+    res.set('Cache-Control', 'private, max-age=300');
+    res.json({ current_weather, city });
+  } catch (err) {
+    console.error('[weather proxy]', err.message);
+    res.status(503).json({ message: 'Weather service unavailable' });
+  }
+});
+
 // ── Debug endpoints ───────────────────────────────────────────────────────────
 // Admin-only: these reveal credential status and actively call Gemini/Cloudinary,
 // so they must not be reachable anonymously (quota-burn / info-leak vector).

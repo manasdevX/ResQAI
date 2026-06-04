@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
   RefreshCw, Plus, AlertTriangle, Building2, MapPin, Phone,
-  Users, Edit2, Trash2, X, CheckCircle, Save, UserCheck, ChevronDown,
+  Users, Edit2, Trash2, X, CheckCircle, Save, UserCheck,
 } from 'lucide-react';
 import { SHELTER_TYPE_OPTIONS, SHELTER_STATUS_OPTIONS, SHELTER_TYPE_META, SHELTER_STATUS_BADGE, AMENITIES } from '../../constants/shelter';
 
@@ -187,18 +187,23 @@ const AdminShelterManager = () => {
   const [filterStatus,   setFilterStatus]   = useState('all');
   const [updatingOcc,    setUpdatingOcc]    = useState(null);
 
-  // Assign manager state
-  const [managers,       setManagers]       = useState([]);  // shelter_manager users
-  const [loadingMgrs,    setLoadingMgrs]    = useState(false);
-  const [assigningMgr,   setAssigningMgr]   = useState(null); // shelterId being assigned
-  const [selectedMgrId,  setSelectedMgrId]  = useState('');
+  // Aggregate stats fetched independently so they cover ALL shelters (not just the paginated list)
+  const [stats,          setStats]          = useState(null);
+
 
   const fetch = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.get('/shelters?limit=100');
-      setShelters(data.shelters || []);
+      // Fetch paginated list (for display) + aggregate stats (for header numbers) in parallel.
+      // The stats endpoint runs a MongoDB aggregation over ALL shelters, so the capacity
+      // and occupancy totals are always accurate regardless of pagination limit.
+      const [listRes, statsRes] = await Promise.all([
+        api.get('/shelters?limit=100'),
+        api.get('/shelters/stats'),
+      ]);
+      setShelters(listRes.data.shelters || []);
+      if (statsRes.data.success) setStats(statsRes.data.stats);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load shelters');
     } finally {
@@ -206,18 +211,7 @@ const AdminShelterManager = () => {
     }
   }, [api]);
 
-  // Fetch shelter_manager users for the assign dropdown
-  const fetchManagers = useCallback(async () => {
-    setLoadingMgrs(true);
-    try {
-      const { data } = await api.get('/users/all?role=shelter_manager&limit=100');
-      setManagers(data.users || []);
-    } catch { /* silent */ } finally {
-      setLoadingMgrs(false);
-    }
-  }, [api]);
-
-  useEffect(() => { fetch(); fetchManagers(); }, [fetch, fetchManagers]);
+  useEffect(() => { fetch(); }, [fetch]);
 
   const showSuccess = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(''), 3500); };
 
@@ -271,28 +265,15 @@ const AdminShelterManager = () => {
     }
   };
 
-  const handleAssignManager = async (shelterId, managerId) => {
-    setAssigningMgr(shelterId);
-    setError(null);
-    try {
-      const { data } = await api.patch(`/shelters/${shelterId}/assign-manager`, { managerId: managerId || null });
-      setShelters(prev => prev.map(s => s._id === shelterId ? data.shelter : s));
-      // Also update editing if it's the same shelter
-      if (editing?._id === shelterId) setEditing(data.shelter);
-      showSuccess(managerId ? 'Manager assigned successfully.' : 'Manager unassigned.');
-      setSelectedMgrId('');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to assign manager');
-    } finally {
-      setAssigningMgr(null);
-    }
-  };
 
   const displayed = filterStatus === 'all' ? shelters : shelters.filter(s => s.status === filterStatus);
 
-  const totalCapacity   = shelters.reduce((a, s) => a + (s.totalCapacity || 0), 0);
-  const totalOccupancy  = shelters.reduce((a, s) => a + (s.currentOccupancy || 0), 0);
-  const activeCount     = shelters.filter(s => s.status === 'active').length;
+  // Use server-side aggregate stats for header summary cards (covers ALL shelters).
+  // Fall back to client-side computation if the stats endpoint hasn't resolved yet.
+  const totalCapacity  = stats?.totalCapacity  ?? shelters.reduce((a, s) => a + (s.totalCapacity  || 0), 0);
+  const totalOccupancy = stats?.totalOccupancy ?? shelters.reduce((a, s) => a + (s.currentOccupancy || 0), 0);
+  const totalCount     = stats?.totalShelters  ?? shelters.length;
+  const activeCount    = stats?.activeShelters ?? shelters.filter(s => s.status === 'active').length;
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -300,7 +281,7 @@ const AdminShelterManager = () => {
       <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-900/50 shrink-0">
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
-            <h1 className="text-lg font-black text-zinc-100">Shelter Manager</h1>
+            <h1 className="text-lg font-black text-zinc-100">Shelter Management</h1>
             <p className="text-xs text-zinc-500 mt-0.5">Create, edit and track shelter occupancy</p>
           </div>
           <div className="flex gap-2">
@@ -318,8 +299,8 @@ const AdminShelterManager = () => {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'Total Shelters', value: shelters.length, sub: `${activeCount} active` },
-            { label: 'Total Capacity', value: totalCapacity.toLocaleString(), sub: 'beds/spaces' },
+            { label: 'Total Shelters',    value: totalCount.toLocaleString(),    sub: `${activeCount} active` },
+            { label: 'Total Capacity',    value: totalCapacity.toLocaleString(), sub: 'beds/spaces (all shelters)' },
             { label: 'Current Occupancy', value: `${totalCapacity ? Math.round((totalOccupancy/totalCapacity)*100) : 0}%`, sub: `${totalOccupancy.toLocaleString()} people` },
           ].map(({ label, value, sub }) => (
             <div key={label} className="bg-zinc-800/60 border border-zinc-700/50 rounded-xl p-3">
@@ -474,64 +455,6 @@ const AdminShelterManager = () => {
               saving={saving}
             />
 
-            {/* ── Assign Manager section (edit mode only) ─────────── */}
-            {mode === 'edit' && editing && (
-              <div className="mt-6 pt-6 border-t border-zinc-800">
-                <div className="flex items-center gap-2 mb-3">
-                  <UserCheck className="w-4 h-4 text-purple-400" />
-                  <h3 className="text-sm font-bold text-zinc-100">Assign Shelter Manager</h3>
-                </div>
-
-                {editing.managedBy && (
-                  <div className="flex items-center justify-between mb-3 p-2.5 bg-purple-950/30 border border-purple-800/30 rounded-xl">
-                    <div>
-                      <p className="text-xs font-semibold text-purple-300">{editing.managedBy.name}</p>
-                      <p className="text-[10px] text-purple-400/70">{editing.managedBy.email}</p>
-                    </div>
-                    <button
-                      onClick={() => handleAssignManager(editing._id, null)}
-                      disabled={assigningMgr === editing._id}
-                      className="text-[10px] text-red-400 hover:text-red-300 border border-red-800/40 px-2 py-1 rounded-lg transition"
-                    >
-                      {assigningMgr === editing._id ? <RefreshCw className="w-3 h-3 animate-spin" /> : 'Unassign'}
-                    </button>
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <select
-                      value={selectedMgrId}
-                      onChange={e => setSelectedMgrId(e.target.value)}
-                      className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 focus:outline-none focus:border-purple-500 transition appearance-none"
-                    >
-                      <option value="">Select a manager…</option>
-                      {loadingMgrs && <option disabled>Loading…</option>}
-                      {managers.map(m => (
-                        <option key={m._id} value={m._id}>
-                          {m.name} — {m.email}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
-                  </div>
-                  <button
-                    onClick={() => selectedMgrId && handleAssignManager(editing._id, selectedMgrId)}
-                    disabled={!selectedMgrId || assigningMgr === editing._id}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white rounded-lg text-xs font-semibold transition"
-                  >
-                    {assigningMgr === editing._id
-                      ? <RefreshCw className="w-3 h-3 animate-spin" />
-                      : <UserCheck className="w-3 h-3" />
-                    }
-                    Assign
-                  </button>
-                </div>
-                {managers.length === 0 && !loadingMgrs && (
-                  <p className="text-[10px] text-zinc-600 mt-2">No shelter_manager users found. Promote a user in User Manager first.</p>
-                )}
-              </div>
-            )}
           </div>
         )}
       </div>

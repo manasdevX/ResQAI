@@ -43,38 +43,38 @@
   }
 
   .dark {
-    --background: oklch(0.145 0 0);
+    --background: oklch(0.13 0 0); /* zinc-950 equivalent */
     --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
+    --card: oklch(0.18 0 0); /* zinc-900 equivalent */
     --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
+    --popover: oklch(0.18 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
+    --primary: oklch(0.985 0 0);
+    --primary-foreground: oklch(0.13 0 0);
+    --secondary: oklch(0.25 0 0); /* zinc-800 equivalent */
     --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
+    --muted: oklch(0.25 0 0);
+    --muted-foreground: oklch(0.7 0 0); /* zinc-400 */
+    --accent: oklch(0.25 0 0);
     --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --destructive-foreground: 210 40% 98%;
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
+    --destructive: oklch(0.6 0.2 25); /* red-500 equivalent */
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(0.25 0 0);
+    --input: oklch(0.25 0 0);
+    --ring: oklch(0.6 0.15 250); /* blue-500 focus ring */
+    --chart-1: oklch(0.6 0.15 250);
+    --chart-2: oklch(0.6 0.2 25);
+    --chart-3: oklch(0.7 0.15 150); /* green-500 */
+    --chart-4: oklch(0.65 0.18 60); /* orange-500 */
+    --chart-5: oklch(0.7 0.15 300); /* purple-500 */
+    --sidebar: oklch(0.15 0 0);
     --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary: oklch(0.6 0.15 250);
     --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent: oklch(0.25 0 0);
     --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --sidebar-border: oklch(0.25 0 0);
+    --sidebar-ring: oklch(0.6 0.15 250);
   }
 
   .theme {
@@ -111,14 +111,20 @@
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 
 /* ── Custom scrollbar ───────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.10);
-  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
-* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.10) transparent; }
+::-webkit-scrollbar-thumb:hover { 
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+* { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.15) transparent; }
 
 /* ── Keyframe animations ────────────────────────────────────────────────────── */
 @keyframes fadeUp    { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
@@ -181,9 +187,10 @@
 
 /* ── Focus ring ─────────────────────────────────────────────────────────────── */
 *:focus-visible {
-  outline: 2px solid rgba(59,130,246,0.7);
+  outline: 2px solid rgba(59, 130, 246, 0.8);
   outline-offset: 2px;
   border-radius: 6px;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
 }
 
 /* ── Button press microinteraction ──────────────────────────────────────────── */
@@ -195,11 +202,12 @@ button:active:not(:disabled),
 
 /* ── Card hover lift ─────────────────────────────────────────────────────────── */
 .card-hover {
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s cubic-bezier(0.16,1,0.3,1), border-color 0.25s cubic-bezier(0.16,1,0.3,1), background-color 0.25s ease;
 }
 .card-hover:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px -10px rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 /* ── Gradient text ───────────────────────────────────────────────────────────── */

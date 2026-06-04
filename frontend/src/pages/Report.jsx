@@ -5,7 +5,7 @@ import IncidentReportForm from '../components/IncidentReportForm';
 // ── Info chips shown at the top of the page ────────────────────────────────────
 const chips = [
   { icon: Zap,           text: 'AI-triaged instantly',       color: 'text-blue-400  bg-blue-500/10  border-blue-500/20'  },
-  { icon: Shield,        text: 'Dispatches responders',      color: 'text-green-400 bg-green-500/10 border-green-500/20' },
+  { icon: Shield,        text: 'Alerts nearby volunteers',    color: 'text-green-400 bg-green-500/10 border-green-500/20' },
   { icon: Clock,         text: 'Live status updates',        color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
 ];
 
@@ -59,7 +59,7 @@ const Report = () => (
               Report an Emergency
             </h1>
             <p className="text-sm text-zinc-400 mt-1 leading-relaxed">
-              Describe the situation and set the location. Our AI will triage your report and dispatch the nearest available responders.
+              Describe the situation and set the location. Our AI will analyse your report and alert the nearest available volunteers.
             </p>
           </div>
         </div>

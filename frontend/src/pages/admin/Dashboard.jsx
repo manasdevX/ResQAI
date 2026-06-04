@@ -18,7 +18,6 @@ const AdminDashboard = () => {
   const [latestIncidentId,   setLatestIncidentId]   = useState(null);
   const [toasts,             setToasts]             = useState([]);
   const [newIds,             setNewIds]             = useState(new Set());
-  const [globalAlert,        setGlobalAlert]        = useState(null);
   const [sosAlerts,          setSOSAlerts]          = useState([]);
   const [escalations,        setEscalations]        = useState([]);
   const [availableResponders, setAvailableResponders] = useState(null);
@@ -56,17 +55,21 @@ const AdminDashboard = () => {
       setTimeout(() => sidebarRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 100);
     };
 
-    const handleUpdated = ({ incidentId, status, severity, assignedResponders }) => {
-      setIncidents(prev => prev.map(inc =>
-        inc._id === incidentId
-          ? { ...inc, ...(status && { status }), ...(severity && { severity }), ...(assignedResponders && { assignedResponders }) }
-          : inc
-      ));
+    const handleUpdated = ({ incidentId, status, severity, assignedResponders, aiTriage, aiTriageDone }) => {
+      setIncidents(prev => prev.map(inc => {
+        if (inc._id !== incidentId) return inc;
+        return {
+          ...inc,
+          ...(status            && { status }),
+          ...(severity          && { severity }),
+          ...(assignedResponders && { assignedResponders }),
+          ...(aiTriageDone && aiTriage && { aiTriage }),
+        };
+      }));
     };
 
-    const handleAlert = (alert) => {
-      setGlobalAlert(alert);
-      setTimeout(() => setGlobalAlert(null), 12000);
+    const handleDeleted = ({ incidentId }) => {
+      setIncidents(prev => prev.filter(inc => inc._id !== incidentId));
     };
 
     const handleSOS = (payload) => {
@@ -85,7 +88,7 @@ const AdminDashboard = () => {
       setToasts(prev => [...prev, {
         id: toastId,
         incident: {
-          title:       `⚠️ No responder: ${payload.title}`,
+          title:       `⚠️ Unassigned: ${payload.title}`,
           description: payload.message,
           severity:    payload.severity,
           type:        payload.type,
@@ -99,19 +102,19 @@ const AdminDashboard = () => {
       setAvailableResponders(prev => prev !== null ? Math.max(0, prev + (isAvailable ? 1 : -1)) : prev);
     };
 
-    socket.on('newIncident',                 handleNew);
-    socket.on('incidentUpdated',             handleUpdated);
-    socket.on('alertBroadcast',             handleAlert);
-    socket.on('sosAlert',                   handleSOS);
-    socket.on('incidentEscalated',          handleEscalated);
+    socket.on('newIncident',                  handleNew);
+    socket.on('incidentUpdated',              handleUpdated);
+    socket.on('incidentDeleted',              handleDeleted);
+    socket.on('sosAlert',                    handleSOS);
+    socket.on('incidentEscalated',           handleEscalated);
     socket.on('responderAvailabilityChanged', handleAvailability);
 
     return () => {
-      socket.off('newIncident',                 handleNew);
-      socket.off('incidentUpdated',             handleUpdated);
-      socket.off('alertBroadcast',             handleAlert);
-      socket.off('sosAlert',                   handleSOS);
-      socket.off('incidentEscalated',          handleEscalated);
+      socket.off('newIncident',                  handleNew);
+      socket.off('incidentUpdated',              handleUpdated);
+      socket.off('incidentDeleted',              handleDeleted);
+      socket.off('sosAlert',                    handleSOS);
+      socket.off('incidentEscalated',           handleEscalated);
       socket.off('responderAvailabilityChanged', handleAvailability);
     };
   }, [socket]);
@@ -121,10 +124,14 @@ const AdminDashboard = () => {
     setSelectedPanel(updated);
   }, []);
 
-  const activeCount   = incidents.filter(i => !['resolved', 'closed'].includes(i.status)).length;
-  const criticalCount = incidents.filter(i => i.severity === 'critical').length;
+  // Only show non-resolved/closed/false_alarm incidents on the live map and feed
+  const INACTIVE = ['resolved', 'closed', 'false_alarm'];
+  const liveIncidents = incidents.filter(i => !INACTIVE.includes(i.status));
+
+  const activeCount   = liveIncidents.length;
+  const criticalCount = liveIncidents.filter(i => i.severity === 'critical').length;
   const resolvedCount = incidents.filter(i => i.status === 'resolved').length;
-  const sosCount      = incidents.filter(i => i.isSOS && !['resolved', 'closed'].includes(i.status)).length;
+  const sosCount      = liveIncidents.filter(i => i.isSOS).length;
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -140,7 +147,7 @@ const AdminDashboard = () => {
 
       {/* SOS alerts strip */}
       {sosCount > 0 && (
-        <div className="flex items-center gap-3 px-5 py-2.5 bg-red-950/90 border-b border-red-800 shrink-0 animate-pulse">
+        <div className="flex items-center gap-3 px-5 py-3 bg-red-950/80 backdrop-blur-md border-b border-red-900/50 shrink-0 animate-pulse shadow-[0_4px_20px_rgba(239,68,68,0.1)]">
           <span className="text-lg">🚨</span>
           <span className="text-sm font-bold text-red-300">{sosCount} active SOS emergenc{sosCount !== 1 ? 'ies' : 'y'}</span>
           <span className="text-xs text-red-400/70">— SOS incidents are highlighted in the feed below</span>
@@ -151,7 +158,7 @@ const AdminDashboard = () => {
       {escalations.map(esc => (
         <div
           key={esc.incidentId?.toString()}
-          className="flex items-center gap-3 px-5 py-2.5 bg-orange-950/90 border-b border-orange-800 shrink-0"
+          className="flex items-center gap-3 px-5 py-3 bg-orange-950/80 backdrop-blur-md border-b border-orange-900/50 shrink-0 shadow-[0_4px_20px_rgba(249,115,22,0.1)]"
         >
           <span className="text-lg shrink-0">⚠️</span>
           <div className="flex-1 min-w-0">
@@ -161,7 +168,7 @@ const AdminDashboard = () => {
           </div>
           <button
             onClick={() => setEscalations(prev => prev.filter(e => e.incidentId?.toString() !== esc.incidentId?.toString()))}
-            className="text-orange-400 hover:text-orange-200 transition-colors shrink-0 text-lg leading-none"
+            className="text-orange-400 hover:text-orange-200 transition-colors shrink-0 text-lg leading-none p-1 rounded hover:bg-orange-900/30"
             aria-label="Dismiss escalation"
           >
             ×
@@ -169,27 +176,8 @@ const AdminDashboard = () => {
         </div>
       ))}
 
-      {/* Alert banner */}
-      {globalAlert && (
-        <div className={`relative flex items-start gap-3 px-6 py-3 text-sm font-medium border-b animate-pulse shrink-0 ${
-          globalAlert.alertType === 'evacuation' ? 'bg-red-950/80 border-red-800 text-red-200' :
-          globalAlert.alertType === 'medical'    ? 'bg-orange-950/80 border-orange-800 text-orange-200' :
-          'bg-zinc-800/80 border-zinc-700 text-zinc-200'
-        }`}>
-          <span className="text-xl shrink-0">
-            {globalAlert.alertType === 'evacuation' ? '🚨' : globalAlert.alertType === 'medical' ? '🚑' : '📢'}
-          </span>
-          <div className="flex-1">
-            <span className="font-bold uppercase text-xs opacity-70 mr-2">{globalAlert.alertType} ALERT</span>
-            {globalAlert.message}
-            <span className="text-xs opacity-50 ml-2">— {globalAlert.broadcastBy}</span>
-          </div>
-          <button onClick={() => setGlobalAlert(null)} className="text-lg opacity-50 hover:opacity-100 transition">×</button>
-        </div>
-      )}
-
       {/* Stats strip */}
-      <div className="shrink-0 px-5 py-3 border-b border-zinc-800/60 bg-zinc-900/50 flex items-center gap-3 flex-wrap">
+      <div className="shrink-0 px-5 py-3 border-b border-zinc-800/80 bg-zinc-900/60 backdrop-blur-sm flex items-center gap-3 flex-wrap shadow-sm z-10">
         {[
           { value: activeCount,    label: 'Active',    color: 'text-green-400',  dot: 'bg-green-500',  bg: 'bg-green-500/10 border-green-500/20' },
           { value: criticalCount,  label: 'Critical',  color: 'text-red-400',    dot: 'bg-red-500',    bg: 'bg-red-500/10 border-red-500/20' },
@@ -201,8 +189,8 @@ const AdminDashboard = () => {
         ].map(({ value, label, color, dot, bg }) => (
           <div key={label} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold ${bg}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${dot} ${label === 'Active' || label === 'SOS' ? 'animate-pulse' : ''}`} />
-            <span className={`text-base font-black tabular-nums ${color}`}>{value}</span>
-            <span className="text-zinc-500 font-medium">{label}</span>
+            <span className={`text-base font-black tabular-nums tracking-tight ${color}`}>{value}</span>
+            <span className="text-zinc-500 font-medium tracking-wide uppercase">{label}</span>
           </div>
         ))}
         <div className="ml-auto hidden sm:block">
@@ -222,7 +210,7 @@ const AdminDashboard = () => {
               </div>
             </div>
           ) : (
-            <LiveMap incidents={incidents} latestIncidentId={latestIncidentId} />
+            <LiveMap incidents={liveIncidents} latestIncidentId={latestIncidentId} />
           )}
 
           <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 float-card text-xs font-medium z-10">
@@ -230,7 +218,7 @@ const AdminDashboard = () => {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
             </span>
-            LIVE — {incidents.length} incident{incidents.length !== 1 ? 's' : ''}
+            LIVE — {liveIncidents.length} active incident{liveIncidents.length !== 1 ? 's' : ''}
           </div>
 
           {/* Legend */}
@@ -255,20 +243,20 @@ const AdminDashboard = () => {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60" />
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
                 </span>
-                Real-time via Socket.IO
+                Live updates
               </p>
             </div>
-            <span className="text-xs font-bold text-zinc-500 tabular-nums">{incidents.length}</span>
+            <span className="text-xs font-bold text-zinc-500 tabular-nums">{liveIncidents.length}</span>
           </div>
 
           <div ref={sidebarRef} className="flex-1 overflow-y-auto divide-y divide-zinc-800/60">
-            {incidents.length === 0 ? (
+            {liveIncidents.length === 0 ? (
               <div className="p-6 text-center text-zinc-500 text-sm">
                 <p className="text-2xl mb-2">🛡️</p>
-                <p>No incidents reported yet.</p>
+                <p>No active incidents.</p>
               </div>
             ) : (
-              incidents.map(inc => {
+              liveIncidents.map(inc => {
                 const isNew = newIds.has(inc._id);
                 return (
                   <button
@@ -286,10 +274,18 @@ const AdminDashboard = () => {
                         <p className="text-sm font-medium text-zinc-100 truncate">
                           {inc.isSOS && '🚨 '}{inc.title}
                         </p>
-                        <div className="flex items-center gap-2 mt-0.5">
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${SEVERITY_BADGE[inc.severity]}`}>
                             {inc.severity?.toUpperCase()}
                           </span>
+                          {(() => {
+                            const [lng, lat] = inc.location?.coordinates || [0, 0];
+                            return (lng === 0 && lat === 0) ? (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-zinc-800 border-zinc-600 text-zinc-500" title="This incident has no GPS coordinates and is not shown on the map">
+                                📍 No GPS
+                              </span>
+                            ) : null;
+                          })()}
                           <p className="text-xs text-zinc-500 truncate">{inc.description}</p>
                         </div>
                       </div>

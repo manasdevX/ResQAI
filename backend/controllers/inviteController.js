@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import Invite from '../models/Invite.js';
+import { sendInviteEmail } from '../utils/emailService.js';
 
 // @desc   Create an invite link (admin only)
 // @route  POST /api/invites
@@ -7,12 +8,10 @@ import Invite from '../models/Invite.js';
 export const createInvite = async (req, res) => {
   try {
     const { email, role } = req.body;
-    const VALID_ROLES = ['admin', 'shelter_manager'];
-
-    if (!role || !VALID_ROLES.includes(role)) {
+    if (role !== 'admin') {
       return res.status(400).json({
         success: false,
-        message: `Role must be one of: ${VALID_ROLES.join(', ')}`,
+        message: 'Invite links can only be created for the admin role.',
       });
     }
 
@@ -27,7 +26,14 @@ export const createInvite = async (req, res) => {
       expiresAt,
     });
 
-    const inviteUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/signup?invite=${token}`;
+    const frontendOrigin = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim();
+    const inviteUrl = `${frontendOrigin}/signup?invite=${token}`;
+
+    if (invite.email) {
+      sendInviteEmail(invite.email, inviteUrl, invite.expiresAt).catch(err =>
+        console.error('[createInvite] email send failed:', err.message)
+      );
+    }
 
     return res.status(201).json({ success: true, invite, inviteUrl });
   } catch (error) {

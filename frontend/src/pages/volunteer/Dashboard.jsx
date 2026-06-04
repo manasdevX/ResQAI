@@ -119,10 +119,10 @@ const VolunteerDashboard = () => {
       {dispatchAlerts.map(alert => (
         <div
           key={alert.incidentId?.toString()}
-          className={`flex items-start gap-3 p-4 border-2 rounded-2xl ${
+          className={`flex items-start gap-3 p-4 border-2 rounded-2xl backdrop-blur-md shadow-lg ${
             alert.isSOS
-              ? 'bg-red-950/70 border-red-600/60 animate-pulse'
-              : 'bg-blue-950/60 border-blue-600/50'
+              ? 'bg-red-950/40 border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.15)] animate-pulse'
+              : 'bg-blue-950/40 border-blue-500/40 shadow-[0_0_20px_rgba(59,130,246,0.1)]'
           }`}
         >
           <span className="text-xl shrink-0">{alert.isSOS ? '🚨' : '📋'}</span>
@@ -200,12 +200,11 @@ const VolunteerDashboard = () => {
           </div>
         </div>
 
-        {/* Duty status prominent card — only shown to responders (not shelter managers) */}
-        {user?.role !== 'shelter_manager' && (
-          <div className={`p-4 rounded-2xl border transition-all ${
+        {/* Duty status prominent card */}
+        <div className={`p-5 rounded-2xl border transition-all duration-300 ${
             user?.isAvailable
-              ? 'bg-green-950/30 border-green-800/30'
-              : 'bg-zinc-900/60 border-zinc-800/60'
+              ? 'bg-green-950/20 border-green-500/40 shadow-[0_0_30px_rgba(34,197,94,0.1)] backdrop-blur-sm'
+              : 'bg-zinc-900/40 border-zinc-800/80 backdrop-blur-sm'
           }`}>
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -224,8 +223,7 @@ const VolunteerDashboard = () => {
                 <Zap className={`w-5 h-5 ${user?.isAvailable ? 'text-green-400' : 'text-zinc-600'}`} />
               </div>
             </div>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Stats */}
@@ -261,14 +259,14 @@ const VolunteerDashboard = () => {
             <Link
               key={to}
               to={to}
-              className={`flex flex-col gap-2.5 p-4 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl transition-all duration-200 group card-hover ${color}`}
+              className={`flex flex-col gap-3 p-5 bg-zinc-900/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl transition-all duration-300 group card-hover ${color}`}
             >
-              <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center group-hover:bg-zinc-700/50 transition-colors">
-                <Icon className="w-4 h-4 text-zinc-400 group-hover:text-zinc-200 transition-colors" />
+              <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center group-hover:bg-zinc-700/80 transition-colors shadow-sm">
+                <Icon className="w-5 h-5 text-zinc-400 group-hover:text-zinc-100 transition-colors" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-zinc-200">{label}</p>
-                <p className="text-xs text-zinc-500 mt-0.5">{desc}</p>
+                <p className="text-[15px] font-bold text-zinc-200 group-hover:text-white transition-colors">{label}</p>
+                <p className="text-xs text-zinc-500 mt-1">{desc}</p>
               </div>
             </Link>
           ))}
@@ -291,13 +289,13 @@ const VolunteerDashboard = () => {
 
         <div className="flex flex-wrap gap-1.5">
           {skills.map(skill => (
-            <span
+              <span
               key={skill}
-              className="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-300 rounded-full capitalize"
+              className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-300 rounded-full capitalize"
             >
               {skill}
-              <button onClick={() => removeSkill(skill)} className="hover:text-red-400 transition-colors ml-0.5" aria-label={`Remove ${skill}`}>
-                <X className="w-2.5 h-2.5" />
+              <button onClick={() => removeSkill(skill)} className="hover:text-red-400 transition-colors ml-0.5 opacity-60 hover:opacity-100" aria-label={`Remove ${skill}`}>
+                <X className="w-3 h-3" />
               </button>
             </span>
           ))}

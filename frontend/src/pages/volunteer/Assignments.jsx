@@ -337,11 +337,11 @@ const VolunteerAssignments = () => {
               return (
                 <div
                   key={inc._id}
-                  className={`bg-zinc-900 border rounded-2xl overflow-hidden transition-all duration-300 ${
-                    isJustDone  ? 'border-green-600/50 shadow-lg shadow-green-600/10' :
-                    isExpanded  ? 'border-blue-600/30'                                :
-                    inc.isSOS   ? 'border-red-600/40'                                 :
-                    'border-zinc-800 hover:border-zinc-700'
+                  className={`bg-zinc-900/40 backdrop-blur-md border rounded-2xl overflow-hidden transition-all duration-300 card-hover ${
+                    isJustDone  ? 'border-green-500/50 shadow-[0_0_20px_rgba(34,197,94,0.15)]' :
+                    isExpanded  ? 'border-blue-500/40' :
+                    inc.isSOS   ? 'border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.1)]' :
+                    'border-zinc-800/80 hover:border-zinc-700/80 hover:bg-zinc-900/60'
                   }`}
                 >
                   {/* Severity bar */}

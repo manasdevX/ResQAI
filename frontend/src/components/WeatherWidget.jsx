@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Wind, Thermometer, Eye, RefreshCw } from 'lucide-react';
+import { Wind, Thermometer, Eye, RefreshCw, MapPin } from 'lucide-react';
+
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').trim();
 
 const WMO_CODES = {
   0:  { label: 'Clear sky',        icon: '☀️' },
@@ -31,27 +33,27 @@ const WeatherWidget = ({ compact = false }) => {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
 
-  const fetchWeather = (lat, lng) => {
+  const fetchWeather = async (lat, lng) => {
     setLoading(true);
     setError(null);
-    fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&timezone=auto`
-    )
-      .then(r => r.json())
-      .then(data => {
-        const cw = data.current_weather;
-        setWeather({
-          temp:      Math.round(cw.temperature),
-          windspeed: Math.round(cw.windspeed),
-          code:      cw.weathercode,
-          isDay:     cw.is_day === 1,
-        });
-        setLoading(false);
-      })
-      .catch(() => {
-        setError('Weather unavailable');
-        setLoading(false);
+    try {
+      const res  = await fetch(`${API_URL}/weather?lat=${lat}&lon=${lng}`);
+      if (!res.ok) throw new Error('unavailable');
+      const data = await res.json();
+      const cw   = data.current_weather;
+
+      setWeather({
+        temp:      Math.round(cw.temperature),
+        windspeed: Math.round(cw.windspeed),
+        code:      cw.weathercode,
+        isDay:     cw.is_day === 1,
+        city:      data.city || null,
       });
+    } catch {
+      setError('Weather unavailable');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -95,7 +97,15 @@ const WeatherWidget = ({ compact = false }) => {
   return (
     <div className="p-4 bg-zinc-900/80 border border-zinc-800/80 rounded-2xl">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Local Weather</p>
+        <div>
+          <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Local Weather</p>
+          {weather.city && (
+            <p className="flex items-center gap-1 text-xs text-zinc-400 font-medium mt-0.5">
+              <MapPin className="w-2.5 h-2.5 text-zinc-500 shrink-0" />
+              {weather.city}
+            </p>
+          )}
+        </div>
         <span className="text-[10px] text-zinc-600 font-medium">{weather.isDay ? '☀️ Day' : '🌙 Night'}</span>
       </div>
 

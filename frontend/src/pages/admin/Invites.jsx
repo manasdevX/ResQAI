@@ -6,8 +6,7 @@ import {
 } from 'lucide-react';
 
 const ROLE_STYLES = {
-  admin:           { label: 'Admin',           color: 'text-red-400 bg-red-500/10 border-red-500/30' },
-  shelter_manager: { label: 'Shelter Manager', color: 'text-purple-400 bg-purple-500/10 border-purple-500/30' },
+  admin: { label: 'Admin', color: 'text-red-400 bg-red-500/10 border-red-500/30' },
 };
 
 const AdminInvites = () => {
@@ -23,9 +22,8 @@ const AdminInvites = () => {
   const [showForm,  setShowForm]  = useState(false);
 
   const [formEmail, setFormEmail] = useState('');
-  const [formRole,  setFormRole]  = useState('admin');
 
-  const fetch = useCallback(async () => {
+  const fetchInvites = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -38,7 +36,7 @@ const AdminInvites = () => {
     }
   }, [api]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => { fetchInvites(); }, [fetchInvites]);
 
   const showSuccessMsg = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(''), 4000); };
 
@@ -47,11 +45,16 @@ const AdminInvites = () => {
     setCreating(true);
     setError(null);
     try {
-      const { data } = await api.post('/invites', { email: formEmail || undefined, role: formRole });
+      const { data } = await api.post('/invites', { email: formEmail || undefined, role: 'admin' });
       setInvites(prev => [data.invite, ...prev]);
+      const emailEntered = formEmail.trim();
       setFormEmail('');
       setShowForm(false);
-      showSuccessMsg('Invite link created. Share it with the recipient.');
+      showSuccessMsg(
+        emailEntered
+          ? `Invite link created and sent to ${emailEntered}.`
+          : 'Invite link created. Share it with the recipient.'
+      );
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create invite');
     } finally {
@@ -96,11 +99,11 @@ const AdminInvites = () => {
         <div>
           <h1 className="text-lg font-black text-zinc-100">Invite Links</h1>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Generate invite-only access links for admins and shelter managers
+            Generate one-time invite links to onboard new administrators
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={fetch} disabled={loading}
+          <button onClick={fetchInvites} disabled={loading}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-xs font-medium text-zinc-300 transition">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
@@ -139,7 +142,7 @@ const AdminInvites = () => {
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
               <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5 block">
-                Recipient Email <span className="text-zinc-600 font-normal normal-case">(optional — locks the invite to this email)</span>
+                Recipient Email <span className="text-zinc-600 font-normal normal-case">(optional — invite link will be emailed to them)</span>
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
@@ -153,21 +156,11 @@ const AdminInvites = () => {
               </div>
             </div>
 
-            <div>
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2 block">Grant Role</label>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(ROLE_STYLES).map(([role, { label, color }]) => (
-                  <button
-                    key={role}
-                    type="button"
-                    onClick={() => setFormRole(role)}
-                    className={`p-3 rounded-xl border text-sm font-semibold transition ${
-                      formRole === role ? color : 'border-zinc-700 bg-zinc-800/40 text-zinc-400 hover:border-zinc-600'
-                    }`}
-                  >
-                    {role === 'admin' ? '⚙️' : '🏠'} {label}
-                  </button>
-                ))}
+            <div className="flex items-center gap-2 p-3 bg-red-500/8 border border-red-500/20 rounded-xl">
+              <span>⚙️</span>
+              <div>
+                <p className="text-sm font-semibold text-red-300">Admin Access</p>
+                <p className="text-xs text-zinc-500">The recipient will receive full administrator privileges</p>
               </div>
             </div>
 
@@ -212,7 +205,7 @@ const AdminInvites = () => {
         <div className="flex flex-col items-center justify-center py-20 text-zinc-500">
           <Link2 className="w-10 h-10 mb-3 opacity-30" />
           <p className="text-sm font-semibold text-zinc-400">No invites yet</p>
-          <p className="text-xs mt-1">Create your first invite to onboard admins or shelter managers</p>
+          <p className="text-xs mt-1">Create your first invite to onboard a new administrator</p>
         </div>
       ) : (
         <div className="space-y-3">

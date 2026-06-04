@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import {
   Home, AlertOctagon, Building2, Package, FileText,
   MessageCircle, User, LogOut, Menu, X, Bell,
@@ -119,11 +120,23 @@ const AvatarChip = ({ avatar, initials, size = 'sm' }) => {
 const CitizenLayout = () => {
   const { user, logout }     = useAuth();
   const { unreadCount }      = useNotifications();
+  const socket               = useSocket();
   const navigate             = useNavigate();
   const location             = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileOpen,       setMobileOpen]       = useState(false);
+  const [broadcastAlert,   setBroadcastAlert]   = useState(null);
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const onBroadcast = (alert) => {
+      setBroadcastAlert(alert);
+      setTimeout(() => setBroadcastAlert(null), 15000);
+    };
+    socket.on('alertBroadcast', onBroadcast);
+    return () => socket.off('alertBroadcast', onBroadcast);
+  }, [socket]);
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -272,6 +285,35 @@ const CitizenLayout = () => {
           </div>
         </div>
       </div>
+
+      {/* ── Broadcast alert banner (shown on every citizen page) ───────────── */}
+      {broadcastAlert && (
+        <div className={`shrink-0 flex items-start gap-3 px-5 py-3 text-sm font-medium border-b animate-pulse ${
+          broadcastAlert.alertType === 'evacuation' ? 'bg-red-950/90 border-red-800/60 text-red-100' :
+          broadcastAlert.alertType === 'medical'    ? 'bg-orange-950/90 border-orange-800/60 text-orange-100' :
+          broadcastAlert.alertType === 'shelter'    ? 'bg-blue-950/90 border-blue-800/60 text-blue-100' :
+          'bg-zinc-800/90 border-zinc-700/60 text-zinc-100'
+        }`}>
+          <span className="text-xl shrink-0">
+            {broadcastAlert.alertType === 'evacuation' ? '🚨' :
+             broadcastAlert.alertType === 'medical'    ? '🚑' :
+             broadcastAlert.alertType === 'shelter'    ? '🏠' : '📢'}
+          </span>
+          <div className="flex-1 min-w-0">
+            <span className="font-black uppercase text-xs tracking-wider opacity-80 mr-2">
+              {broadcastAlert.alertType} Alert
+            </span>
+            {broadcastAlert.message}
+          </div>
+          <button
+            onClick={() => setBroadcastAlert(null)}
+            className="shrink-0 opacity-60 hover:opacity-100 transition-opacity p-1"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* ── Page content ─────────────────────────────────────────────────────── */}
       <main className="flex-1 overflow-y-auto pb-16 lg:pb-0">

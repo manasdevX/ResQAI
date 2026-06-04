@@ -13,7 +13,7 @@ const InviteSchema = new Schema(
 
     role: {
       type: String,
-      enum: ['admin', 'shelter_manager'],
+      enum: ['admin'],
       required: [true, 'Role is required'],
     },
 

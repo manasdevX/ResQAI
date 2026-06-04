@@ -58,7 +58,7 @@ export const getAnalyticsSummary = async (req, res) => {
 
       // 3. Responder stats
       User.aggregate([
-        { $match: { role: { $in: ['responder', 'shelter_manager'] }, isActive: true } },
+        { $match: { role: 'responder', isActive: true } },
         {
           $group: {
             _id:       null,

@@ -13,6 +13,8 @@ import {
   acceptIncidentTask,
   assignResponder,
   unassignResponder,
+  retryAITriage,
+  deleteIncident,
 } from '../controllers/incidentController.js';
 import upload from '../middleware/upload.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
@@ -67,7 +69,13 @@ router.post('/:id/accept', protect, authorize('responder', 'admin'), acceptIncid
 router.post('/:id/assign',                  protect, authorize('admin'), assignResponder);
 router.delete('/:id/assign/:responderId',   protect, authorize('admin'), unassignResponder);
 
+// Retry AI triage on an incident that didn't get it (admin / responder only)
+router.post('/:id/triage', protect, authorize('admin', 'responder'), retryAITriage);
+
 // Upload media to a specific incident
 router.post('/:id/media', protect, withUpload('media', 5), uploadIncidentMedia);
+
+// Delete an incident (admin: any; citizen: own + within 24h + still 'reported')
+router.delete('/:id', protect, deleteIncident);
 
 export default router;

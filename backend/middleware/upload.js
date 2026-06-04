@@ -139,50 +139,25 @@ export const uploadToCloudinary = (buffer, mimetype, options = {}) => {
     resource_type,
   };
   
-  // Remove options that might trigger 403 or unexpected errors
   delete safeOptions.type;
   delete safeOptions.access_mode;
   delete safeOptions.moderation;
-  // Note: upload_preset typically requires an unsigned upload endpoint, so it should be used cautiously. If present and causing 403, it might be misconfigured.
-  // Assuming it's safe to keep unless proven otherwise, but let's log everything.
-
-  console.log('--- CLOUDINARY UPLOAD ATTEMPT ---');
-  console.log(`[Upload] Mimetype: ${mimetype}`);
-  console.log(`[Upload] File size: ${buffer.length} bytes`);
-  console.log(`[Upload] Final Options sent to Cloudinary:`, JSON.stringify(safeOptions));
 
   return new Promise((resolve, reject) => {
     const stream = cld.uploader.upload_stream(
       safeOptions,
       (error, result) => {
         if (error) {
-          console.error('--- CLOUDINARY UPLOAD ERROR ---');
-          console.error('Name:', error.name);
-          console.error('Message:', error.message);
-          console.error('HTTP Code:', error.http_code);
-          console.error('Stack:', error.stack);
-          console.error('Full Error Object:', JSON.stringify(error, null, 2));
+          console.error('[cloudinary] Upload error — HTTP', error.http_code, '|', error.message);
           return reject(error);
-        }
-        console.log('--- CLOUDINARY UPLOAD SUCCESS ---');
-        console.log(`[Success] public_id: ${result.public_id}`);
-        console.log(`[Success] secure_url: ${result.secure_url}`);
-        console.log(`[Success] resource_type: ${result.resource_type}`);
-        console.log(`[Success] bytes: ${result.bytes}`);
-        if (result.original_extension) {
-          console.log(`[Success] original_extension: ${result.original_extension}`);
         }
         resolve(result);
       }
     );
 
-    // Pipe the Buffer into the Cloudinary upload stream as a Readable
-    stream.on('error', streamError => {
-       console.error('--- CLOUDINARY STREAM ERROR ---');
-       console.error('Stream Error Name:', streamError.name);
-       console.error('Stream Error Message:', streamError.message);
-       console.error('Stream Error Stack:', streamError.stack);
-       reject(streamError);
+    stream.on('error', (streamError) => {
+      console.error('[cloudinary] Stream error:', streamError.message);
+      reject(streamError);
     });
 
     Readable.from(buffer).pipe(stream);

@@ -10,7 +10,7 @@ const badId = (res) => res.status(400).json({ success: false, message: 'Invalid 
 
 const VALID_INCIDENT_TYPES = [
   'fire', 'flood', 'earthquake', 'cyclone', 'landslide',
-  'accident', 'medical_emergency', 'building_collapse', 'chemical_spill', 'riot', 'other',
+  'accident', 'medical_emergency', 'building_collapse', 'chemical_spill', 'riot', 'sos', 'other',
 ];
 
 // Sensible initial severity by type — AI refines this async
@@ -18,6 +18,7 @@ const SEVERITY_BY_TYPE = {
   earthquake:        'critical',
   building_collapse: 'critical',
   chemical_spill:    'critical',
+  sos:               'critical',
   fire:              'high',
   flood:             'high',
   cyclone:           'high',
@@ -41,32 +42,20 @@ const INCIDENT_SKILL_MAP = {
   chemical_spill:    ['hazmat', 'chemical', 'decontamination'],
   landslide:         ['search and rescue', 'geology', 'landslide'],
   cyclone:           ['evacuation', 'rescue', 'cyclone'],
+  sos:               ['search and rescue', 'first aid', 'rescue', 'medical'],
   other:             [],
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-/** Upload req.files buffers to Cloudinary; silently skip any that fail. */
+/** Upload req.files buffers to Cloudinary; log failures but skip rather than aborting. */
 const uploadMediaFiles = async (files = [], folder = 'resqai_incidents') => {
-  const media = [];
-  console.log(`[incidentController] Recevied ${files.length} files to upload.`);
-  console.log(`[incidentController] req.files inspect:`, files.map(f => ({ originalname: f.originalname, mimetype: f.mimetype, size: f.size, buffer_len: f.buffer?.length })));
+  const media   = [];
+  const skipped = [];
   for (const file of files) {
-    console.log(`[incidentController] BEFORE UPLOAD: file path: ${file.path ? file.path : 'Missing (buffer mode)'}`);
-    console.log(`[incidentController] file originalname: ${file.originalname}`);
-    console.log(`[incidentController] file mimetype: ${file.mimetype}`);
-    console.log(`[incidentController] file size: ${file.size} buffer length: ${file.buffer?.length}`);
     try {
-      // Resolve the concrete resource_type from the MIME type BEFORE uploading.
-      // Passing 'auto' to Cloudinary SDK v2 causes a 403 because the SDK signs
-      // the request for the /auto/upload endpoint but Cloudinary's server
-      // re-validates the signature against the resolved concrete endpoint.
       const resource_type = resolveResourceType(file.mimetype);
-
-      // Strip the file extension from the public_id. Cloudinary SDK v2 treats
-      // any dot-separated suffix that matches a known format as the `format`
-      // parameter, altering the signed payload and causing another 403.
-      const public_id = `${Date.now()}_${sanitizePublicId(file.originalname)}`;
+      const public_id     = `${Date.now()}_${sanitizePublicId(file.originalname)}`;
 
       const result = await uploadToCloudinary(file.buffer, file.mimetype, {
         folder,
@@ -74,7 +63,6 @@ const uploadMediaFiles = async (files = [], folder = 'resqai_incidents') => {
         public_id,
       });
 
-      // Determine the media type for the stored record
       let type = 'image';
       if (file.mimetype?.startsWith('video/'))      type = 'video';
       else if (file.mimetype?.startsWith('audio/')) type = 'audio';
@@ -82,15 +70,17 @@ const uploadMediaFiles = async (files = [], folder = 'resqai_incidents') => {
 
       media.push({ url: result.secure_url, publicId: result.public_id, type, caption: '' });
     } catch (err) {
-      // Log full detail so we can diagnose future upload errors easily
+      // Log error details for diagnostics but do NOT abort the whole submission.
+      // The caller will surface a mediaWarning to the client.
       console.error(
         `[upload] Failed: "${file.originalname}" — HTTP ${err.http_code ?? err.status ?? 'unknown'} | ${err.message}`
       );
-      throw err; // Stop swallowing errors so that the client gets clear feedback
+      skipped.push(file.originalname);
     }
   }
-  return media;
+  return { media, skipped };
 };
+
 
 /** Safe JSON parse — returns fallback on failure */
 const safeParse = (value, fallback) => {
@@ -158,7 +148,7 @@ export const createIncident = async (req, res) => {
     }
 
     // ── Media ──────────────────────────────────────────────────────────────────
-    const media = await uploadMediaFiles(req.files);
+    const { media, skipped: skippedFiles } = await uploadMediaFiles(req.files);
 
     // ── Save incident immediately — AI runs async so user gets instant response ─
     const newIncident = new Incident({
@@ -184,12 +174,11 @@ export const createIncident = async (req, res) => {
     io.emit('newIncident', savedIncident);
 
     // Respond immediately — don't make the user wait for AI
-    const skipped = (req.files?.length || 0) - media.length;
     res.status(201).json({
       success:  true,
       message:  'Incident reported successfully',
       incident: savedIncident,
-      ...(skipped > 0 && { mediaWarning: `${skipped} file(s) could not be uploaded and were skipped.` }),
+      ...(skippedFiles.length > 0 && { mediaWarning: `${skippedFiles.length} file(s) could not be uploaded and were skipped.` }),
     });
 
     // ── AI triage (async — fires after HTTP response is sent) ──────────────────
@@ -396,7 +385,7 @@ export const uploadIncidentMedia = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No media files uploaded' });
     }
 
-    const newMedia = await uploadMediaFiles(req.files);
+    const { media: newMedia, skipped: skippedFiles } = await uploadMediaFiles(req.files);
     if (!newMedia.length) {
       return res.status(503).json({ success: false, message: 'Media upload failed. Please try again.' });
     }
@@ -405,7 +394,9 @@ export const uploadIncidentMedia = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Media uploaded successfully',
+      message: skippedFiles.length > 0
+        ? `${newMedia.length} file(s) uploaded. ${skippedFiles.length} failed and were skipped.`
+        : 'Media uploaded successfully',
       media:   incident.media,
     });
   } catch (error) {
@@ -500,6 +491,8 @@ export const updateIncidentSeverity = async (req, res) => {
   }
 };
 
+const ALERT_EMOJI = { evacuation: '🚨', medical: '🚑', shelter: '🏠', general: '📢' };
+
 /**
  * @desc  Broadcast an emergency alert
  * @route POST /api/incidents/broadcast-alert
@@ -517,14 +510,46 @@ export const broadcastAlert = async (req, res) => {
     const resolvedType = VALID_ALERT_TYPES.includes(alertType) ? alertType : 'general';
 
     const alertPayload = {
-      incidentId: incidentId || undefined,
+      incidentId:  incidentId || undefined,
       message:     message.trim(),
       alertType:   resolvedType,
       broadcastBy: req.user.name,
       broadcastAt: new Date(),
     };
 
+    // Emit real-time banner to every connected socket
     io.emit('alertBroadcast', alertPayload);
+
+    // Persist as a notification for every active user so it appears in the
+    // notification bell (online users get the socket push; offline users see it
+    // on next login). Fire-and-forget — never block the HTTP response.
+    const notifTitle = `${ALERT_EMOJI[resolvedType]} ${resolvedType.charAt(0).toUpperCase() + resolvedType.slice(1)} Alert`;
+    User.find({ isActive: true }).select('_id').lean().then(async (users) => {
+      if (!users.length) return;
+      try {
+        const Notification = (await import('../models/Notification.js')).default;
+        await Notification.insertMany(
+          users.map(u => ({
+            recipient: u._id,
+            type:      'alert',
+            title:     notifTitle,
+            body:      message.trim(),
+          })),
+          { ordered: false }
+        );
+        // Push the bell notification to every currently connected user's room
+        const notifPayload = {
+          type:      'alert',
+          title:     notifTitle,
+          body:      message.trim(),
+          read:      false,
+          createdAt: new Date(),
+        };
+        users.forEach(u => io.to(`user:${u._id}`).emit('notification', notifPayload));
+      } catch (err) {
+        console.error('[broadcastAlert] notification persist error:', err.message);
+      }
+    }).catch(err => console.error('[broadcastAlert] user query error:', err.message));
 
     return res.status(200).json({ success: true, message: 'Alert broadcast sent', alert: alertPayload });
   } catch (error) {
@@ -588,7 +613,7 @@ export const createSOSIncident = async (req, res) => {
     const incident = new Incident({
       title:       `SOS Emergency — ${req.user.name}`,
       description: description?.trim() || 'Emergency SOS activated. Immediate assistance required.',
-      type:        'other',
+      type:        'sos',
       severity:    'critical',
       isSOS:       true,
       location,
@@ -714,12 +739,11 @@ export const assignResponder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Responder account is inactive' });
     }
 
-    if (incident.assignedResponders.some(r => r.equals(responderId))) {
-      return res.status(409).json({ success: false, message: 'Responder already assigned to this incident' });
-    }
-
-    incident.assignedResponders.push(responderId);
-    await incident.save();
+    const updatedIncident = await Incident.findByIdAndUpdate(
+      id,
+      { $addToSet: { assignedResponders: responderId } },
+      { new: true }
+    );
 
     notify(responderId, {
       type:  'assignment',
@@ -728,10 +752,10 @@ export const assignResponder = async (req, res) => {
       link:  '/volunteer/assignments',
     });
 
-    await incident.populate('assignedResponders', 'name email avatar role isAvailable');
-    io.emit('incidentUpdated', { incidentId: id, assignedResponders: incident.assignedResponders });
+    await updatedIncident.populate('assignedResponders', 'name email avatar role isAvailable');
+    io.emit('incidentUpdated', { incidentId: id, assignedResponders: updatedIncident.assignedResponders });
 
-    return res.json({ success: true, message: `${responder.name} assigned`, incident });
+    return res.json({ success: true, message: `${responder.name} assigned`, incident: updatedIncident });
   } catch (error) {
     console.error('[assignResponder]', error);
     return res.status(500).json({ success: false, message: 'Failed to assign responder' });
@@ -785,5 +809,128 @@ export const getIncidentById = async (req, res) => {
   } catch (error) {
     console.error('[getIncidentById]', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch incident' });
+  }
+};
+
+/**
+ * @desc  Delete an incident
+ * @route DELETE /api/incidents/:id
+ * @access Private (admin can delete any; reporter can delete own within 24h if still 'reported')
+ */
+export const deleteIncident = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return badId(res);
+
+    const incident = await Incident.findById(req.params.id);
+    if (!incident) return res.status(404).json({ success: false, message: 'Incident not found' });
+
+    const isAdmin    = req.user.role === 'admin';
+    const isReporter = incident.reportedBy.equals(req.user._id);
+    const ageMs      = Date.now() - new Date(incident.createdAt).getTime();
+    const isRecent   = ageMs < 24 * 60 * 60_000; // within 24 hours
+
+    // Citizens can only delete their own, recent, unaccepted reports
+    if (!isAdmin && !(isReporter && isRecent && incident.status === 'reported')) {
+      return res.status(403).json({
+        success: false,
+        message: isReporter
+          ? 'You can only delete your own reports within 24 hours and before a responder accepts them.'
+          : 'Not authorized to delete this incident',
+      });
+    }
+
+    // Best-effort Cloudinary cleanup — log failures but don't abort
+    if (incident.media?.length) {
+      try {
+        const { v2: cloudinary } = await import('cloudinary');
+        cloudinary.config({
+          cloud_name: process.env.CLOUDINARY_CLOUD_NAME?.trim(),
+          api_key:    process.env.CLOUDINARY_API_KEY?.trim(),
+          api_secret: process.env.CLOUDINARY_API_SECRET?.trim(),
+        });
+        await Promise.allSettled(
+          incident.media
+            .filter(m => m.publicId)
+            .map(m => cloudinary.uploader.destroy(m.publicId, { resource_type: m.type === 'video' ? 'video' : 'image' }))
+        );
+      } catch (cleanupErr) {
+        console.error('[deleteIncident] Cloudinary cleanup failed:', cleanupErr.message);
+      }
+    }
+
+    await incident.deleteOne();
+    io.emit('incidentDeleted', { incidentId: req.params.id });
+
+    return res.json({ success: true, message: 'Incident deleted successfully' });
+  } catch (error) {
+    console.error('[deleteIncident]', error);
+    return res.status(500).json({ success: false, message: 'Failed to delete incident' });
+  }
+};
+
+/**
+ * @desc  Re-run AI triage on an existing incident
+ * @route POST /api/incidents/:id/triage
+ * @access Private (admin / responder)
+ *
+ * Useful when AI was unavailable at report time (rate-limited, quota hit, etc.).
+ * Returns immediately with { queued: true } and runs the analysis asynchronously,
+ * pushing the result via the existing incidentUpdated socket event.
+ */
+export const retryAITriage = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return badId(res);
+
+    const incident = await Incident.findById(req.params.id)
+      .select('title description type aiTriage media');
+    if (!incident) return res.status(404).json({ success: false, message: 'Incident not found' });
+
+    // Respond immediately — analysis is async
+    res.json({ success: true, queued: true, message: 'AI analysis queued. Results will appear automatically.' });
+
+    // Run analysis asynchronously
+    setImmediate(async () => {
+      try {
+        const mediaUrls = (incident.media || []).map(m => m.url);
+        const triage = await analyzeIncident(incident.title, incident.description, incident.type, mediaUrls);
+
+        if (!triage.aiAvailable) {
+          io.emit('incidentUpdated', { incidentId: incident._id, aiTriageDone: true, aiTriageSuccess: false });
+          return;
+        }
+
+        const updated = await Incident.findByIdAndUpdate(
+          incident._id,
+          {
+            severity: triage.urgency,
+            aiTriage: {
+              summary:            triage.summary,
+              recommendedActions: triage.recommendedActions,
+              estimatedAffected:  triage.estimatedAffected,
+              riskScore:          triage.riskScore,
+              processedAt:        new Date(),
+              modelUsed:          triage.modelUsed || 'gemini',
+            },
+          },
+          { returnDocument: 'after' }
+        );
+
+        if (updated) {
+          io.emit('incidentUpdated', {
+            incidentId:      updated._id,
+            severity:        updated.severity,
+            aiTriage:        updated.aiTriage,
+            aiTriageDone:    true,
+            aiTriageSuccess: true,
+          });
+        }
+      } catch (err) {
+        console.error('[retryAITriage] async error:', err.message);
+        io.emit('incidentUpdated', { incidentId: incident._id, aiTriageDone: true, aiTriageSuccess: false });
+      }
+    });
+  } catch (error) {
+    console.error('[retryAITriage]', error);
+    return res.status(500).json({ success: false, message: 'Failed to queue AI triage' });
   }
 };

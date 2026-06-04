@@ -14,7 +14,7 @@ const ProtectedRoute = ({ allowedRoles }) => {
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     const home = user.role === 'admin' ? '/admin'
-               : user.role === 'responder' || user.role === 'shelter_manager' ? '/volunteer'
+               : user.role === 'responder' ? '/volunteer'
                : '/home';
     return <Navigate to={home} replace />;
   }

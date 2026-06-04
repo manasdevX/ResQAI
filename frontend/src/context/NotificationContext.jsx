@@ -11,7 +11,6 @@ export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount,   setUnreadCount]   = useState(0);
   const [loading,       setLoading]       = useState(false);
-  const [open,          setOpen]          = useState(false);
 
   const fetchNotifications = useCallback(async () => {
     if (!user) return;
@@ -60,8 +59,8 @@ export const NotificationProvider = ({ children }) => {
 
   return (
     <NotificationContext.Provider value={{
-      notifications, unreadCount, loading, open,
-      setOpen, markRead, markAllRead, fetchNotifications,
+      notifications, unreadCount, loading,
+      markRead, markAllRead, fetchNotifications,
     }}>
       {children}
     </NotificationContext.Provider>

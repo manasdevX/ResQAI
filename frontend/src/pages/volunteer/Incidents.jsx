@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
-import { MapPin, RefreshCw, AlertTriangle, CheckCircle, Zap } from 'lucide-react';
+import { MapPin, RefreshCw, AlertTriangle, CheckCircle, Zap, ExternalLink } from 'lucide-react';
 
 import { SEVERITY_BADGE, SEVERITY_DOT, TYPE_ICONS, INCIDENT_STATUS } from '../../constants/incident';
 
@@ -71,10 +72,12 @@ const VolunteerIncidents = () => {
         inc._id === incidentId ? { ...inc, ...(status && { status }), ...(severity && { severity }), ...(assignedResponders && { assignedResponders }) } : inc
       ));
     };
-    const onNew = () => setRefreshKey(k => k + 1);
+    const onNew     = () => setRefreshKey(k => k + 1);
+    const onDeleted = ({ incidentId }) => setIncidents(prev => prev.filter(i => i._id !== incidentId));
     socket.on('incidentUpdated', onUpdated);
     socket.on('newIncident', onNew);
-    return () => { socket.off('incidentUpdated', onUpdated); socket.off('newIncident', onNew); };
+    socket.on('incidentDeleted', onDeleted);
+    return () => { socket.off('incidentUpdated', onUpdated); socket.off('newIncident', onNew); socket.off('incidentDeleted', onDeleted); };
   }, [socket]);
 
   const handleAccept = useCallback(async (incidentId) => {
@@ -166,7 +169,11 @@ const VolunteerIncidents = () => {
             const statusStyle = INCIDENT_STATUS[inc.status] || INCIDENT_STATUS.reported;
 
             return (
-              <div key={inc._id} className={`bg-zinc-900 border rounded-2xl overflow-hidden transition-all ${inc.isSOS ? 'border-red-600/60 shadow-lg shadow-red-600/10' : 'border-zinc-800 hover:border-zinc-700'}`}>
+              <div key={inc._id} className={`bg-zinc-900/40 backdrop-blur-md border rounded-2xl overflow-hidden transition-all duration-300 card-hover ${
+                inc.isSOS 
+                  ? 'border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.1)]' 
+                  : 'border-zinc-800/80 hover:border-zinc-700/80 hover:bg-zinc-900/60'
+              }`}>
                 <div className={`h-0.5 w-full ${SEVERITY_DOT[inc.severity] || 'bg-zinc-700'}`} />
 
                 <div className="p-4 space-y-3">
@@ -209,19 +216,30 @@ const VolunteerIncidents = () => {
                       {statusStyle.label}
                     </span>
 
-                    {isAssigned ? (
-                      <span className="text-xs font-semibold text-green-400 flex items-center gap-1.5">
-                        <CheckCircle className="w-3.5 h-3.5" /> Assigned to you
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleAccept(inc._id)}
-                        disabled={accepting === inc._id}
-                        className="flex items-center gap-1.5 text-xs font-semibold px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-all hover:scale-105 active:scale-95"
+                    <div className="flex items-center gap-2">
+                      <Link
+                        to={`/incidents/${inc._id}`}
+                        onClick={e => e.stopPropagation()}
+                        className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-blue-400 transition"
+                        title="View full incident details"
                       >
-                        {accepting === inc._id ? <RefreshCw className="w-3 h-3 animate-spin" /> : '✓'} Accept Task
-                      </button>
-                    )}
+                        <ExternalLink className="w-3 h-3" /> Details
+                      </Link>
+
+                      {isAssigned ? (
+                        <span className="text-xs font-semibold text-green-400 flex items-center gap-1.5">
+                          <CheckCircle className="w-3.5 h-3.5" /> Assigned
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleAccept(inc._id)}
+                          disabled={accepting === inc._id}
+                          className="flex items-center gap-1.5 text-xs font-semibold px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-all hover:scale-105 active:scale-95"
+                        >
+                          {accepting === inc._id ? <RefreshCw className="w-3 h-3 animate-spin" /> : '✓'} Accept Task
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

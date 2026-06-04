@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Loader2, Mail, Lock, AlertTriangle, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
+import GoogleRolePicker from '../components/GoogleRolePicker';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -12,6 +13,9 @@ const Login = () => {
   const [showPwd,      setShowPwd]      = useState(false);
   const [error,        setError]        = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Google role picker state — shown when a brand-new Google user has no account yet
+  const [pendingGoogleToken, setPendingGoogleToken] = useState(null);
 
   // Real-time email validation state
   const [emailTouched, setEmailTouched] = useState(false);
@@ -33,9 +37,29 @@ const Login = () => {
     setError('');
     try {
       const data = await googleLogin(tokenResponse.access_token);
+      if (data?.requiresRole) {
+        // New user — show the role picker before creating the account
+        setPendingGoogleToken(tokenResponse.access_token);
+        setIsSubmitting(false);
+        return;
+      }
       redirect(data.role);
     } catch (err) {
       setError(err.response?.data?.message || 'Google Sign-In failed. Please try again.');
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleRoleSelect = async (role) => {
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const data = await googleLogin(pendingGoogleToken, role);
+      setPendingGoogleToken(null);
+      redirect(data.role);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Google Sign-Up failed. Please try again.');
+      setPendingGoogleToken(null);
       setIsSubmitting(false);
     }
   };
@@ -72,6 +96,14 @@ const Login = () => {
   };
 
   return (
+    <>
+    {pendingGoogleToken && (
+      <GoogleRolePicker
+        onSelect={handleGoogleRoleSelect}
+        onCancel={() => { setPendingGoogleToken(null); setIsSubmitting(false); }}
+        isSubmitting={isSubmitting}
+      />
+    )}
     <div className="flex min-h-screen bg-zinc-950 text-zinc-100">
 
       {/* Left hero */}
@@ -110,7 +142,7 @@ const Login = () => {
 
         <div className="relative space-y-2.5">
           {[
-            { icon: '🗺️', label: 'Live incident map with geospatial search' },
+            { icon: '🗺️', label: 'Live incident map — see what\'s near you' },
             { icon: '🤖', label: 'AI triage and risk scoring via Gemini'     },
             { icon: '🏥', label: 'Real-time shelter & hospital finder'        },
             { icon: '🚨', label: 'One-tap SOS with GPS location broadcast'   },
@@ -160,7 +192,7 @@ const Login = () => {
                   ${showEmailError ? 'text-red-400' : showEmailValid ? 'text-emerald-400' : 'text-zinc-500'}`} />
                 <input
                   type="email"
-                  autoComplete="email"
+                  autoComplete="off"
                   required
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setEmailTouched(false); }}
@@ -193,7 +225,7 @@ const Login = () => {
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
                 <input
                   type={showPwd ? 'text' : 'password'}
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -262,6 +294,7 @@ const Login = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 
